@@ -801,11 +801,6 @@ function renderDrawer() {
   const series = hist ? seriesFor(k, hist) : null;
   const options = GROUPS.slice(1).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].map(x => `<option value="${x}" ${x === k ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('');
   const tile = x => `<button type="button" class="kpi ${x === k ? 'on' : ''}" data-metric="${x}"><span>${esc(M[x].l)}</span><b>${fmtV(x, v[x])}</b></button>`;
-  const groupsHtml = GROUPS.slice(1).map(([name, keys]) => {
-    const rows = [...new Set(keys)].filter(x => v[x] != null);
-    if (!rows.length) return '';
-    return `<div class="sec"><h4>${esc(name)}</h4><table>${rows.map(x => `<tr class="${x === k ? 'cur' : ''}" data-metric="${x}"><td>${esc(M[x].l)}</td><td>${fmtV(x, v[x])}</td></tr>`).join('')}</table></div>`;
-  }).join('');
   const toggles = `<div class="chart-ctrl"><div class="seg-sm">${[['yearly', 'Yearly'], ['monthly', 'Monthly']].map(([m, l]) => `<button type="button" class="${chartMode === m ? 'on' : ''}" data-cmode="${m}">${l}</button>`).join('')}</div>
     <div class="seg-sm">${[['5', '5Y'], ['10', '10Y'], ['20', '20Y'], ['all', 'All']].map(([r, l]) => `<button type="button" class="${chartRange === r ? 'on' : ''}" data-range="${r}">${l}</button>`).join('')}</div></div>`;
   const chart = hist == null ? '<p class="note chart-empty">Loading history…</p>'
@@ -817,9 +812,7 @@ function renderDrawer() {
     ${toggles}
     ${chart}
     <h4 class="snap-h">Market snapshot</h4>
-    <div class="kpis">${['hv', 'hv_yoy', 'fc_1y', 'inv', 'hv_5y', 'overvalued'].map(tile).join('')}</div>
-    ${groupsHtml}
-    <p class="note">Home values: Zillow (${ymLabel(D.meta.months.zillow)}). Listings: Realtor.com (${ymLabel(D.meta.months.realtor)}). Income &amp; poverty: Census ${D.meta.months.income}; population ${D.meta.months.population}. Mortgage math uses ${D.meta.mortgage.rate}% today (30-year fixed, ${esc(D.meta.mortgage.date)}) and each month's rate in the charts.${level === 'metro' ? ' Metro income and population are combined from their counties.' : ''}${level === 'zip' ? ' ZIP figures that use income use the county’s median income, and the forecast is the metro’s.' : ''}</p>`;
+    <div class="kpis">${['hv', 'hv_yoy', 'fc_1y', 'inv', 'hv_5y', 'overvalued'].map(tile).join('')}</div>`;
 }
 document.getElementById('dBody').addEventListener('click', e => {
   const m = e.target.closest('[data-metric]'); if (m) { setMetric(m.dataset.metric); return; }
