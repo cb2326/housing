@@ -238,12 +238,7 @@ def mortgage_rate():
     so this one identifies plainly as a program."""
     plain = {"User-Agent": "HousingMapBuilder/1.0"}
     weekly = []  # (YYYY-MM-DD, rate)
-    try:
-        data = fetch("https://fred.stlouisfed.org/graph/fredgraph.csv?id=MORTGAGE30US", "fred_mortgage.csv", plain, timeout=40, tries=2)
-        weekly = [(r[0], num(r[1])) for r in list(rows(data))[1:] if len(r) == 2 and num(r[1]) is not None]
-    except Exception as e:
-        print(f"  (FRED unavailable: {e}); trying Freddie Mac")
-    if not weekly:
+    try:  # Freddie Mac's own file first (FRED often stalls requests from GitHub's servers)
         data = fetch("https://www.freddiemac.com/pmms/docs/PMMS_history.csv", "pmms_history.csv", plain, timeout=60, tries=2)
         r = rows(data)
         head = [h.strip().lower() for h in next(r)]
@@ -254,6 +249,11 @@ def mortgage_rate():
                 if y:
                     weekly.append((f"{y}-{int(m):02d}-{int(d):02d}", v))
         weekly.sort()
+    except Exception as e:
+        print(f"  (Freddie Mac unavailable: {e}); trying FRED")
+    if not weekly:
+        data = fetch("https://fred.stlouisfed.org/graph/fredgraph.csv?id=MORTGAGE30US", "fred_mortgage.csv", plain, timeout=40, tries=2)
+        weekly = [(r[0], num(r[1])) for r in list(rows(data))[1:] if len(r) == 2 and num(r[1]) is not None]
     monthly = {day[:7]: v for day, v in weekly}
     return monthly, weekly[-1][1], weekly[-1][0]
 
@@ -505,13 +505,353 @@ def main():
         "us": {"income": us_inc.get("income"), "poverty": us_inc.get("poverty")},
         "counts": {k: len(v) for k, v in places.items()},
     }
-    write_json(os.path.join(OUT, "meta.json"), meta)
     for lvl, ps in places.items():
         write_json(os.path.join(OUT, f"{lvl}.json"), ps)
         for group in hist[lvl].values():  # one small file per place, loaded when you click it
             for pid, bundle in group.items():
                 write_json(os.path.join(OUT, "hist", lvl, f"{pid}.json"), bundle)
     print(f"Done: {meta['counts']} - Zillow {zillow_month}, Realtor.com {realtor_month}, mortgage {rate}% ({rate_day})")
+
+    # ZIP codes: the biggest files, so the state/metro/county data is let go of first.
+    del zv, zr, rt, hist
+    zip_count, zip_breaks = build_zips(county_to_cbsa, inc, rate, forecast)
+    meta["counts"]["zip"] = zip_count
+    meta["zipBreaks"] = zip_breaks
+    write_json(os.path.join(OUT, "meta.json"), meta)
+    print(f"ZIP codes: {zip_count}")
+
+
+# ---------- ZIP codes ----------
+# ~30,000 ZIPs: values are kept in compact arrays (one slot per month) instead of dictionaries, the 840 MB
+# Realtor.com file is read line by line, and the map shapes are simplified and split into one file per state.
+from array import array
+
+MONTH0 = 2000 * 12  # month index 0 = Jan 2000
+
+
+def mi(ym):
+    return int(ym[:4]) * 12 + int(ym[5:7]) - 1 - MONTH0
+
+
+def im(i):
+    i += MONTH0
+    return f"{i // 12:04d}-{i % 12 + 1:02d}"
+
+
+def fetch_file(url, name):
+    """Stream a large download to .cache/ and return its path."""
+    os.makedirs(CACHE, exist_ok=True)
+    path = os.path.join(CACHE, name)
+    if os.path.exists(path) and time.time() - os.path.getmtime(path) < 20 * 3600:
+        return path
+    import shutil
+    for attempt in range(3):
+        try:
+            print(f"  downloading {url}", flush=True)
+            with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=300) as r, open(path + ".part", "wb") as f:
+                shutil.copyfileobj(r, f, 1 << 20)
+            os.replace(path + ".part", path)
+            return path
+        except Exception as e:
+            last = e
+            time.sleep(10 * (attempt + 1))
+    raise last
+
+
+def dense(series_dict):
+    """{YYYY-MM: v} -> (first month index, array of floats, NaN where missing)."""
+    if not series_dict:
+        return None
+    idx = {mi(k): v for k, v in series_dict.items()}
+    lo, hi = min(idx), max(idx)
+    a = array("f", [float("nan")] * (hi - lo + 1))
+    for i, v in idx.items():
+        a[i - lo] = v
+    return (lo, a)
+
+
+def compact(d, start):
+    """{YYYY-MM: v} -> [first month, [v, v, null, ...]]: a third of the size of month-labelled values."""
+    keys = sorted(k for k in d if k >= start)
+    if not keys:
+        return None
+    lo, hi = mi(keys[0]), mi(keys[-1])
+    vals = [None] * (hi - lo + 1)
+    for k in keys:
+        v = d[k]
+        vals[mi(k) - lo] = round(v) if abs(v) >= 1000 else round(v, 3)
+    return [keys[0], vals]
+
+
+def to_dict(d, start="0000"):
+    if not d:
+        return {}
+    lo, a = d
+    return {im(lo + i): float(v) for i, v in enumerate(a) if v == v and im(lo + i) >= start}
+
+
+def zillow_zip(path):
+    data = fetch(f"{ZILLOW}/{path}", f"zillow_{path.replace('/', '_')}")
+    r = rows(data)
+    head = next(r)
+    col = {h: i for i, h in enumerate(head)}
+    months = [(i, mi(h[:7])) for i, h in enumerate(head) if len(h) == 10 and h[4] == "-"]
+    out, info = {}, {}
+    for row in r:
+        if not row:
+            continue
+        z = row[col["RegionName"]].zfill(5)
+        vals = [(m, num(row[i])) for i, m in months]
+        vals = [(m, v) for m, v in vals if v is not None]
+        if not vals:
+            continue
+        lo, hi = vals[0][0], vals[-1][0]
+        a = array("f", [float("nan")] * (hi - lo + 1))
+        for m, v in vals:
+            a[m - lo] = v
+        out[z] = (lo, a)
+        info[z] = (row[col.get("City", 0)] if "City" in col else "", row[col["State"]] if "State" in col else "")
+    return out, info
+
+
+def realtor_zip():
+    path = fetch_file(f"{REALTOR}/RDC_Inventory_Core_Metrics_Zip_History.csv", "realtor_zip.csv")
+    tmp = {}  # zip -> metric -> {month index: v}
+    names = {}
+    with open(path, encoding="utf-8", errors="replace", newline="") as f:
+        r = csv.reader(f)
+        head = next(r)
+        col = {h: i for i, h in enumerate(head)}
+        cols = {k: col[v] for k, v in REALTOR_FIELDS.items()}
+        zc, nc = col["postal_code"], col.get("zip_name")
+        for row in r:
+            if len(row) < len(head) - 1 or not row[0].isdigit():
+                continue
+            m = mi(f"{row[0][:4]}-{row[0][4:6]}")
+            z = row[zc].zfill(5)
+            rec = tmp.get(z)
+            if rec is None:
+                rec = tmp[z] = {k: {} for k in REALTOR_FIELDS}
+                if nc is not None:
+                    names[z] = row[nc]
+            for k, i in cols.items():
+                v = num(row[i])
+                if v is not None:
+                    rec[k][m] = v
+    out = {}
+    for z, rec in tmp.items():
+        packed = {}
+        for k, d in rec.items():
+            if d:
+                lo, hi = min(d), max(d)
+                a = array("f", [float("nan")] * (hi - lo + 1))
+                for i, v in d.items():
+                    a[i - lo] = v
+                packed[k] = (lo, a)
+        out[z] = packed
+    return out, names
+
+
+def zcta_counties():
+    """ZIP (ZCTA) -> the county that holds most of its land (Census 2020 relationship file)."""
+    data = fetch("https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt", "zcta_county.txt")
+    lines = data.decode("utf-8-sig", "replace").splitlines()
+    head = lines[0].split("|")
+    zi, ci, ai = head.index("GEOID_ZCTA5_20"), head.index("GEOID_COUNTY_20"), head.index("AREALAND_PART")
+    best = {}
+    for line in lines[1:]:
+        t = line.split("|")
+        if len(t) <= ai or not t[zi]:
+            continue
+        a = num(t[ai]) or 0
+        if t[zi] not in best or a > best[t[zi]][1]:
+            best[t[zi]] = (t[ci], a)
+    return {z: c for z, (c, a) in best.items()}
+
+
+# ----- ZIP shapes: read the Census shapefile with plain Python, simplify, and pack per state -----
+def read_shapefile(zip_path):
+    import struct
+    import zipfile
+    with zipfile.ZipFile(zip_path) as zf:
+        shp_name = next(n for n in zf.namelist() if n.endswith(".shp"))
+        dbf = zf.read(shp_name[:-4] + ".dbf")
+        shp = zf.read(shp_name)
+    # attribute table: find the ZIP column
+    nrec, hlen, rlen = struct.unpack("<IHH", dbf[4:12])
+    fields, pos, off = [], 32, 1
+    while dbf[pos] != 0x0D:
+        name = dbf[pos:pos + 11].split(b"\x00")[0].decode()
+        flen = dbf[pos + 16]
+        fields.append((name, off, flen))
+        off += flen
+        pos += 32
+    zf_ = next(f for f in fields if f[0].startswith("ZCTA5CE") or f[0].startswith("GEOID"))
+    zips = [dbf[hlen + i * rlen + zf_[1]: hlen + i * rlen + zf_[1] + zf_[2]].decode().strip() for i in range(nrec)]
+    # geometry
+    out, p, n = {}, 100, 0
+    while p < len(shp) and n < nrec:
+        clen = struct.unpack(">i", shp[p + 4:p + 8])[0] * 2
+        c = p + 8
+        stype = struct.unpack("<i", shp[c:c + 4])[0]
+        if stype == 5:
+            nparts, npts = struct.unpack("<ii", shp[c + 36:c + 44])
+            parts = struct.unpack(f"<{nparts}i", shp[c + 44:c + 44 + 4 * nparts])
+            pts = struct.unpack(f"<{2 * npts}d", shp[c + 44 + 4 * nparts:c + 44 + 4 * nparts + 16 * npts])
+            bounds = list(parts) + [npts]
+            rings = [[(pts[2 * j], pts[2 * j + 1]) for j in range(bounds[k], bounds[k + 1])] for k in range(nparts)]
+            out[zips[n]] = rings
+        p = c + clen
+        n += 1
+    return out
+
+
+def simplify(ring, tol):
+    """Douglas-Peucker line simplification (iterative)."""
+    if len(ring) < 5:
+        return ring
+    keep = [False] * len(ring)
+    keep[0] = keep[-1] = True
+    stack = [(0, len(ring) - 1)]
+    t2 = tol * tol
+    while stack:
+        a, b = stack.pop()
+        ax, ay = ring[a]
+        bx, by = ring[b]
+        dx, dy = bx - ax, by - ay
+        dd = dx * dx + dy * dy
+        best, bi = -1, -1
+        for i in range(a + 1, b):
+            px, py = ring[i]
+            if dd:
+                t = ((px - ax) * dx + (py - ay) * dy) / dd
+                t = 0 if t < 0 else 1 if t > 1 else t
+                qx, qy = ax + t * dx - px, ay + t * dy - py
+            else:
+                qx, qy = ax - px, ay - py
+            d = qx * qx + qy * qy
+            if d > best:
+                best, bi = d, i
+        if best > t2:
+            keep[bi] = True
+            stack.append((a, bi))
+            stack.append((bi, b))
+    return [pt for pt, k in zip(ring, keep) if k]
+
+
+def ring_area(r):
+    return sum((r[i + 1][0] - r[i][0]) * (r[i + 1][1] + r[i][1]) for i in range(len(r) - 1)) / 2  # >0: clockwise
+
+
+def pack_shape(rings, tol=0.0009, q=10000):
+    """Rings -> polygons (shapefile outer rings are clockwise, holes counter-clockwise), simplified and
+    stored as delta-encoded integers (1/10,000 of a degree, about 10 m)."""
+    polys = []
+    for r in rings:
+        a = ring_area(r)
+        if abs(a) < tol * tol * 2 and len(rings) > 1:
+            continue  # specks
+        s = simplify(r, tol)
+        if len(s) < 4:
+            continue
+        flat, px, py = [], 0, 0
+        for x, y in s:
+            ix, iy = round(x * q), round(y * q)
+            flat += [ix - px, iy - py]
+            px, py = ix, iy
+        if a > 0 or not polys:
+            polys.append([flat])
+        else:
+            polys[-1].append(flat)
+    return polys
+
+
+def scale_breaks(vals, diverging):
+    """Same colour breaks the map uses (see buildScale in index.html), computed over every ZIP nationwide."""
+    vals = sorted(v for v in vals if v is not None and math.isfinite(v))
+    if not vals:
+        return None
+
+    def q(s, p):
+        i = (len(s) - 1) * p
+        lo, hi = math.floor(i), math.ceil(i)
+        return s[lo] + (s[hi] - s[lo]) * (i - lo)
+
+    def nice(v):
+        if not v:
+            return 0
+        p = 10 ** (math.floor(math.log10(abs(v))) - 1)
+        return round(v / p) * p
+    if diverging:
+        a = sorted(abs(v) for v in vals)
+        t = [nice(q(a, p)) for p in (0.2, 0.5, 0.8)]
+        for i in (1, 2):
+            if t[i] <= t[i - 1]:
+                t[i] = t[i - 1] * 1.5 or 1
+        b = [-t[2], -t[1], -t[0], t[0], t[1], t[2]]
+    else:
+        b = [nice(q(vals, i / 7)) for i in range(1, 7)]
+        for i in range(1, 6):
+            if b[i] <= b[i - 1]:
+                b[i] = b[i - 1] + abs(b[i - 1] or 1) * 0.01
+    return [round(x, 6) for x in b]
+
+
+DIVERGING = {"hv_yoy", "hv_mom", "hv_5y", "fc_1y", "overvalued", "from_2022_peak", "crash_2007", "buy_vs_rent", "inv_yoy",
+             "inv_vs_2019", "newl_yoy", "dom_yoy", "lp_yoy", "rent_yoy"}
+
+
+def build_zips(county_to_cbsa, inc, rate, forecast):
+    print("ZIP codes: Zillow, Realtor.com, Census shapes")
+    zhv, zinfo = zillow_zip("zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
+    zrent, _ = zillow_zip("zori/Zip_zori_uc_sfrcondomfr_sm_month.csv")
+    rtz, rnames = realtor_zip()
+    zc = zcta_counties()
+    shapes = read_shapefile(fetch_file("https://www2.census.gov/geo/tiger/GENZ2020/shp/cb_2020_us_zcta520_500k.zip", "zcta_shapes.zip"))
+    print(f"  {len(zhv)} Zillow ZIPs, {len(rtz)} Realtor.com ZIPs, {len(shapes)} shapes")
+
+    by_state, index, hist_groups, all_vals = {}, {}, {}, {}
+    for z in sorted(set(zhv) | set(rtz)):
+        county = zc.get(z)
+        if not county or county[:2] not in STATES or z not in shapes:
+            continue
+        st = STATES[county[:2]][0]
+        hv_d, rent_d = to_dict(zhv.get(z)), to_dict(zrent.get(z))
+        rt_d = {k: to_dict(rtz[z].get(k)) for k in REALTOR_FIELDS} if z in rtz else None
+        v = metrics_for(hv_d, rent_d, rt_d, inc.get(county), None, rate, forecast.get(county_to_cbsa.get(county)))
+        v.pop("income", None)
+        v.pop("poverty", None)
+        if not v:
+            continue
+        city = (zinfo.get(z) or ("", ""))[0] or (rnames.get(z, "").rsplit(",", 1)[0].title())
+        rec = {"c": city, "k": county}
+        if county_to_cbsa.get(county):
+            rec["m"] = county_to_cbsa[county]
+        rec["v"] = v
+        by_state.setdefault(st, {})[z] = rec
+        index[z] = [city, st]
+        for k, x in v.items():
+            all_vals.setdefault(k, []).append(x)
+        b = {}
+        if hv_d:
+            b["hv"] = compact(hv_d, "2008-01")
+        if rent_d:
+            b["rent"] = compact(rent_d, "2015-01")
+        if rt_d:
+            five_years = im(mi(max(rt_d["inv"])) - 60) if rt_d.get("inv") else "2016-01"
+            for k in ("inv", "dom", "cut", "lp", "newl"):
+                if rt_d.get(k):
+                    b[k] = compact(rt_d[k], five_years)
+        hist_groups.setdefault(z[:3], {})[z] = {k: x for k, x in b.items() if x}
+
+    for st, recs in by_state.items():
+        write_json(os.path.join(OUT, "zip", f"{st}.json"), recs)
+        write_json(os.path.join(OUT, "zip", "shapes", f"{st}.json"), {z: pack_shape(shapes[z]) for z in recs})
+    for prefix, group in hist_groups.items():
+        write_json(os.path.join(OUT, "hist", "zip", f"{prefix}.json"), group)
+    write_json(os.path.join(OUT, "zip", "index.json"), index)
+    breaks = {k: scale_breaks(vals, k in DIVERGING) for k, vals in all_vals.items()}
+    return len(index), breaks
 
 
 def series_bundle(zrec, zrrec, rtrec, start):

@@ -5,22 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Housing Map</title>
 <meta name="description" content="US housing market map: home values, forecasts, inventory, rents, income and population by state, metro and county.">
-<meta name="theme-color" content="#1f5a52">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231f5a52'/%3E%3Cpath d='M14 34 32 18l18 16v14a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2z' fill='%23f6efe3'/%3E%3Cpath d='M26 50V38h12v12' fill='%23d9774f'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#4f46e5">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234f46e5'/%3E%3Cpath d='M14 34 32 18l18 16v14a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2z' fill='%23f6efe3'/%3E%3Cpath d='M26 50V38h12v12' fill='%23a5b4fc'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
+  /* Crisp white: white panels, soft gray lines, indigo accent. */
   :root {
-    --bg: #f4efe6; --panel: #fffcf6; --panel-2: #f6f0e5; --line: #e4dacb; --text: #24211c; --muted: #7a7265;
-    --accent: #1f5a52; --accent-soft: #e2eeea; --warm: #c8623c; --shadow: 0 10px 30px -14px rgba(50, 40, 20, .35);
-    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
-    --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
-    --na: #d9d4ca;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #15140f; --panel: #1f1d18; --panel-2: #29261f; --line: #3a352c; --text: #efe8dc; --muted: #a59b8b;
-      --accent: #74c3b0; --accent-soft: #223731; --warm: #e58c66; --shadow: 0 10px 30px -14px rgba(0, 0, 0, .7); --na: #3b3830;
-    }
+    color-scheme: light;
+    --bg: #f5f6f8; --panel: #ffffff; --panel-2: #f3f4f6; --line: #e5e7eb; --text: #111827; --muted: #6b7280;
+    --accent: #4f46e5; --accent-soft: #eef2ff; --warm: #f59e0b;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 8px 24px -10px rgba(16, 24, 40, .18);
+    --serif: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    --sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    --na: #e5e7eb;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -87,6 +86,13 @@
   .legend .na { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 6px; }
   .legend .na i { width: 12px; height: 12px; border-radius: 3px; background: var(--na); }
 
+  .zip-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 520; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; box-shadow: var(--shadow); text-align: center; max-width: 300px; display: none; }
+  .zip-hint.show { display: block; }
+  .zip-hint b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .zip-hint span { color: var(--muted); font-size: 13px; }
+  .zip-loading { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); z-index: 520; background: var(--text); color: #fff; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; display: none; }
+  .zip-loading.show { display: block; }
+  .brand h1, .legend h3, .drawer header h2, .sec h4, .tv-head h3, .kpi b { letter-spacing: -0.01em; }
   .tip { position: absolute; z-index: 600; pointer-events: none; background: #1d1b17; color: #f4eee4; border-radius: 10px; padding: 9px 11px; font-size: 12.5px; min-width: 190px; box-shadow: 0 10px 24px rgba(0, 0, 0, .3); display: none; }
   .tip b { display: block; font-size: 13.5px; margin-bottom: 4px; }
   .tip .row { display: flex; justify-content: space-between; gap: 14px; font-variant-numeric: tabular-nums; }
@@ -106,8 +112,7 @@
   .kpi span { display: block; color: var(--muted); font-size: 11.5px; }
   .kpi b { font: 600 18px var(--serif); font-variant-numeric: tabular-nums; }
   .kpi em { font-style: normal; font-size: 12px; margin-left: 4px; }
-  .up { color: #2e7d4f; } .down { color: #b4452f; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .up { color: #84cf9c; } :root:not([data-theme="light"]) .down { color: #ec8a71; } }
+  .up { color: #059669; } .down { color: #dc2626; }
   .chart-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
   .chart-tabs button, .ranges button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
   .chart-tabs button.on, .ranges button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -153,8 +158,10 @@
     .menu-btn { display: inline-flex; }
     .topbar { top: 10px; left: 10px; right: 10px; gap: 8px; }
     .place-search { flex-basis: 100%; max-width: none; order: -1; }
-    .seg button { padding: 6px 10px; font-size: 13px; }
+    .seg button { padding: 6px 8px; font-size: 13px; }
     .pill-btn { padding: 8px 12px; font-size: 13px; }
+    #tableBtn .btxt { display: none; }
+    #tableBtn { padding: 8px 10px; }
     .legend { left: 10px; right: 10px; bottom: 12px; width: auto; }
     .drawer { width: 100%; top: 42%; border-left: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; transform: translateY(102%); }
     .drawer.open { transform: none; }
@@ -171,7 +178,7 @@
 <div class="app">
   <aside class="side" id="side" aria-label="Data points">
     <div class="brand">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#1f5a52"/><path d="M14 34 32 18l18 16v14a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2z" fill="#f6efe3"/><path d="M26 50V38h12v12" fill="#d9774f"/></svg>
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#4f46e5"/><path d="M14 34 32 18l18 16v14a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2z" fill="#f6efe3"/><path d="M26 50V38h12v12" fill="#a5b4fc"/></svg>
       <div><h1>Housing Map</h1><small id="asof">Loading data…</small></div>
     </div>
     <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -185,15 +192,17 @@
       <button class="pill-btn menu-btn" id="menuBtn" type="button" aria-label="Data points"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Data</button>
       <div class="place-search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input id="placeSearch" type="search" placeholder="Search a state, metro or county" autocomplete="off" aria-label="Search places">
+        <input id="placeSearch" type="search" placeholder="Search a state, metro, county or ZIP" autocomplete="off" aria-label="Search places">
         <div class="results" id="results"></div>
       </div>
       <div class="seg" id="levels" role="tablist" aria-label="Map level">
-        <button data-level="state" type="button">State</button><button data-level="metro" type="button">Metro</button><button data-level="county" type="button" class="on">County</button>
+        <button data-level="state" type="button">State</button><button data-level="metro" type="button">Metro</button><button data-level="county" type="button" class="on">County</button><button data-level="zip" type="button">Zip</button>
       </div>
-      <button class="pill-btn" id="tableBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>Table</button>
+      <button class="pill-btn" id="tableBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg><span class="btxt">Table</span></button>
     </div>
     <div class="legend" id="legend"></div>
+    <div class="zip-hint" id="zipHint"><b>Zoom in to see ZIP codes</b><span>There are 32,000+ of them, so they appear once you zoom into a state, or search a ZIP code above.</span></div>
+    <div class="zip-loading" id="zipLoading">Loading ZIP codes…</div>
     <div class="tip" id="tip"></div>
     <section class="table-view" id="tableView" aria-label="Table view">
       <div class="tv-head"><h3 id="tvTitle"></h3><input id="tvFilter" type="search" placeholder="Filter places"><button class="x" id="tvClose" type="button" aria-label="Close table">✕</button></div>
@@ -267,8 +276,8 @@ const SERIES = { hv: ['Home value', 'usd'], rent: ['Rent', 'usd'], inv: ['Invent
 
 // Colour ramps: one hue light-to-dark for amounts,
 // cool-to-warm through a neutral grey for changes that can go either way.
-const SEQ = ['#e3efe9', '#bddbd0', '#93c3b4', '#66a898', '#3f8b7c', '#256e62', '#14504a'];
-const DIV = ['#2f5f93', '#6890c2', '#b3c8e2', '#e9e5dc', '#f0bf9f', '#d97a52', '#a3432a'];
+const SEQ = ['#f1effb', '#d9d3f4', '#bbb0ea', '#9a89dc', '#7a63cb', '#5c44ae', '#3e2a84'];
+const DIV = ['#2166ac', '#5a9bd0', '#a9cfe8', '#eeeeec', '#f6b8a0', '#e0684f', '#b2182b'];
 
 // ---------- formatting ----------
 const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
@@ -293,9 +302,9 @@ const ymLabel = k => k ? `${MON[+k.slice(5, 7) - 1]} ${k.slice(0, 4)}` : '';
 
 // ---------- state ----------
 const saved = (() => { try { return JSON.parse(localStorage.getItem('hm-ui')) || {}; } catch (e) { return {}; } })();
-const ui = { metric: M[saved.metric] ? saved.metric : 'hv_yoy', level: ['state', 'metro', 'county'].includes(saved.level) ? saved.level : 'county', open: new Set(saved.open || ['Popular']) };
+const ui = { metric: M[saved.metric] ? saved.metric : 'hv_yoy', level: ['state', 'metro', 'county', 'zip'].includes(saved.level) ? saved.level : 'county', open: new Set(saved.open || ['Popular']) };
 const saveUi = () => { try { localStorage.setItem('hm-ui', JSON.stringify({ metric: ui.metric, level: ui.level, open: [...ui.open] })); } catch (e) {} };
-const D = { meta: null, state: null, metro: null, county: null };
+const D = { meta: null, state: null, metro: null, county: null, zip: {} };
 let topo, layers = {}, map, scale = null;
 
 // Connecticut's data now uses planning regions; the map shapes still use its 8 old counties. Each old county
@@ -352,7 +361,13 @@ function niceRound(v) {
 }
 function buildScale() {
   const key = ui.metric, def = M[key];
-  const vals = Object.values(D[ui.level]).map(p => p.v[key]).filter(v => v != null && isFinite(v)).sort((a, b) => a - b);
+  if (ui.level === 'zip') {
+    // ZIP colours come from all 32,000 ZIPs nationwide (worked out by the data builder), not just the ones loaded.
+    const b = (D.meta.zipBreaks || {})[key];
+    scale = { breaks: b || [], colors: def.d ? DIV : SEQ, key, count: b ? null : 0 };
+    return;
+  }
+  const vals =Object.values(D[ui.level]).map(p => p.v[key]).filter(v => v != null && isFinite(v)).sort((a, b) => a - b);
   let breaks;
   if (def.d) {
     const abs = vals.map(Math.abs).sort((a, b) => a - b);
@@ -366,7 +381,7 @@ function buildScale() {
   scale = { breaks, colors: def.d ? DIV : SEQ, key, count: vals.length };
 }
 function colorFor(v) {
-  if (v == null || !isFinite(v)) return null;
+  if (v == null || !isFinite(v) || !scale || !scale.breaks.length) return null;
   let i = 0;
   while (i < scale.breaks.length && v >= scale.breaks[i]) i++;
   return scale.colors[i];
@@ -379,10 +394,12 @@ function renderLegend() {
     : ui.metric.startsWith('pop') || ui.metric.endsWith('_pct') && !['mtg_pct_income', 'rent_pct_income'].includes(ui.metric) ? `Census, ${meta.months.population}`
     : ui.metric === 'fc_1y' ? `Zillow forecast from ${ymLabel(meta.months.zillow)}`
     : `Zillow, ${ymLabel(meta.months.zillow)}${['mtg_pmt', 'mtg_pct_income', 'salary_needed', 'buy_vs_rent'].includes(ui.metric) ? ` · rate ${meta.mortgage ? meta.mortgage.rate : ''}%` : ''}`;
-  const ticks = [scale.breaks[0], def.d ? 0 : scale.breaks[Math.floor(scale.breaks.length / 2)], scale.breaks[scale.breaks.length - 1]];
-  document.getElementById('legend').innerHTML = `<h3>${esc(def.l)}</h3><div class="asof">${esc(src)} · ${scale.count} ${ui.level === 'county' ? 'counties' : ui.level === 'metro' ? 'metros' : 'states'}</div>
+  const count = ui.level === 'zip' ? (scale.breaks.length ? 'ZIP codes, colours set nationwide' : 'not available for ZIP codes')
+    : `${scale.count} ${ui.level === 'county' ? 'counties' : ui.level === 'metro' ? 'metros' : 'states'}`;
+  const ticks = scale.breaks.length ? [scale.breaks[0], def.d ? 0 : scale.breaks[Math.floor(scale.breaks.length / 2)], scale.breaks[scale.breaks.length - 1]] : null;
+  document.getElementById('legend').innerHTML = `<h3>${esc(def.l)}</h3><div class="asof">${esc(src)} · ${count}</div>
     <div class="bar">${scale.colors.map(c => `<i style="background:${c}"></i>`).join('')}</div>
-    <div class="ticks"><span>&lt; ${fmt(ticks[0], f, true)}</span><span>${fmt(ticks[1], f, true)}</span><span>&gt; ${fmt(ticks[2], f, true)}</span></div>
+    ${ticks ? `<div class="ticks"><span>&lt; ${fmt(ticks[0], f, true)}</span><span>${fmt(ticks[1], f, true)}</span><span>&gt; ${fmt(ticks[2], f, true)}</span></div>` : ''}
     <div class="na"><i></i>No data</div>`;
 }
 
@@ -391,23 +408,73 @@ function styleFor(level, id) {
   const p = D[level][dataId(level, id)];
   const c = p ? colorFor(p.v[ui.metric]) : null;
   const strong = level === 'state';
-  return { fillColor: c || getComputedStyle(document.documentElement).getPropertyValue('--na').trim(), fillOpacity: c ? 0.85 : 0.3, color: dark() ? '#15140f' : '#fffcf6', weight: strong ? 1.2 : level === 'metro' ? 0.8 : 0.4, opacity: 0.9 };
+  return { fillColor: c || '#e5e7eb', fillOpacity: c ? 0.85 : 0.35, color: '#ffffff', weight: strong ? 1.2 : level === 'metro' ? 0.8 : level === 'zip' ? 0.3 : 0.4, opacity: 0.95 };
 }
-const dark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+const dark = () => false; // Crisp white is a light theme everywhere
+function eachShape(level, fn) {
+  if (level === 'zip') Object.values(zipLayers).forEach(g => g.eachLayer(fn));
+  else if (layers[level]) layers[level].eachLayer(fn);
+}
 function restyle() {
   buildScale();
   renderLegend();
-  const lyr = layers[ui.level];
-  if (lyr) lyr.eachLayer(l => l.setStyle(styleFor(ui.level, l.feature.id)));
+  eachShape(ui.level, l => l.setStyle(styleFor(ui.level, l.feature.id)));
   if (tableOpen) renderTable();
 }
 function setLevel(level) {
   ui.level = level;
   document.querySelectorAll('#levels button').forEach(b => b.classList.toggle('on', b.dataset.level === level));
-  for (const [k, l] of Object.entries(layers)) { if (k === level) l.addTo(map); else map.removeLayer(l); }
+  for (const [k, l] of Object.entries(layers)) {
+    if (k === 'stateLines') continue;
+    if (k === level) l.addTo(map); else map.removeLayer(l);
+  }
   if (layers.stateLines) layers.stateLines.bringToFront();
   if (openPlace && openPlace.level !== level) closeDrawer();
   restyle(); saveUi();
+  if (level === 'zip') ensureZips(); else { zipHint.classList.remove('show'); }
+}
+
+// ---------- ZIP codes: loaded state by state as you zoom in ----------
+const zipLayers = {}, zipLoading = {}, zipHint = document.getElementById('zipHint');
+const ZIP_MIN_ZOOM = 6.5;
+const abbrOf = fips => D.state[fips] && D.state[fips].s;
+// Shapes are stored as delta-encoded integers (1/10,000 of a degree) to keep the files small.
+function decodeShape(polys) {
+  return { type: 'MultiPolygon', coordinates: polys.map(rings => rings.map(flat => {
+    const pts = []; let x = 0, y = 0;
+    for (let i = 0; i < flat.length; i += 2) { x += flat[i]; y += flat[i + 1]; pts.push([x / 1e4, y / 1e4]); }
+    return pts;
+  })) };
+}
+let zipPending = 0;
+async function loadZipState(st) {
+  if (zipLayers[st]) return zipLayers[st];
+  if (zipLoading[st]) return zipLoading[st];
+  zipPending++;
+  document.getElementById('zipLoading').classList.add('show');
+  zipLoading[st] = (async () => {
+    try {
+      const [recs, shapes] = await Promise.all([fetch(`data/zip/${st}.json`).then(r => r.json()), fetch(`data/zip/shapes/${st}.json`).then(r => r.json())]);
+      for (const [z, rec] of Object.entries(recs)) { rec.s = st; rec.z = z; D.zip[z] = rec; }
+      const feats = Object.entries(shapes).map(([z, polys]) => ({ type: 'Feature', id: z, properties: {}, geometry: decodeShape(polys) }));
+      zipLayers[st] = makeLayer('zip', feats);
+      if (ui.level === 'zip') { buildScale(); zipLayers[st].addTo(map); if (layers.stateLines) layers.stateLines.bringToFront(); if (selLayer) selLayer.bringToFront(); }
+      if (tableOpen && ui.level === 'zip') renderTable();
+      return zipLayers[st];
+    } catch (e) { delete zipLoading[st]; return null; }
+    finally { if (--zipPending === 0) document.getElementById('zipLoading').classList.remove('show'); }
+  })();
+  return zipLoading[st];
+}
+function ensureZips() {
+  if (ui.level !== 'zip') return;
+  // Show only the loaded states that are on screen; load the rest when zoomed in far enough.
+  const view = map.getBounds(), near = map.getZoom() >= ZIP_MIN_ZOOM;
+  const visible = [];
+  layers.state.eachLayer(l => { const st = abbrOf(l.feature.id); if (st && view.intersects(l.getBounds())) visible.push(st); });
+  for (const [st, g] of Object.entries(zipLayers)) { if (visible.includes(st) && near) g.addTo(map); else map.removeLayer(g); }
+  zipHint.classList.toggle('show', !near);
+  if (near) visible.slice(0, 8).forEach(st => loadZipState(st));
 }
 document.getElementById('levels').addEventListener('click', e => { const b = e.target.closest('[data-level]'); if (b) setLevel(b.dataset.level); });
 
@@ -428,13 +495,14 @@ function showTip(e, level, id) {
   if (y + tip.offsetHeight > r.height - 8) y -= tip.offsetHeight + 28;
   tip.style.left = x + 'px'; tip.style.top = y + 'px';
 }
-const placeName = (level, p) => level === 'county' ? `${p.n}, ${p.s}` : p.n;
+const placeName = (level, p) => level === 'county' ? `${p.n}, ${p.s}` : level === 'zip' ? `${zipOf(p)}${p.c ? ' · ' + p.c : ''}, ${p.s}` : p.n;
+const zipOf = p => p.z || '';
 
 function makeLayer(level, features) {
   return L.geoJSON(features, {
     style: f => styleFor(level, f.id),
     onEachFeature: (f, l) => {
-      l.on('mousemove', e => { if (matchMedia('(hover: hover)').matches) showTip(e, level, f.id); l.setStyle({ weight: 2.2, color: '#24211c' }); l.bringToFront(); });
+      l.on('mousemove', e => { if (matchMedia('(hover: hover)').matches) showTip(e, level, f.id); l.setStyle({ weight: 2.2, color: '#111827' }); l.bringToFront(); });
       l.on('mouseout', () => { tip.style.display = 'none'; l.setStyle(styleFor(level, f.id)); if (layers.stateLines) layers.stateLines.bringToFront(); });
       l.on('click', () => { tip.style.display = 'none'; openDetail(level, dataId(level, f.id)); });
     },
@@ -478,7 +546,8 @@ async function init() {
   layers.county = makeLayer('county', counties);
   layers.metro = makeLayer('metro', metros);
   layers.state = makeLayer('state', states.filter(f => D.state[f.id]));
-  layers.stateLines = L.geoJSON(topojson.mesh(topo, topo.objects.states, (a, b) => a !== b), { style: { color: dark() ? '#0d0c09' : '#5b5348', weight: 1, opacity: 0.55, fill: false }, interactive: false }).addTo(map);
+  layers.stateLines = L.geoJSON(topojson.mesh(topo, topo.objects.states, (a, b) => a !== b), { style: { color: '#6b7280', weight: 1, opacity: 0.6, fill: false }, interactive: false }).addTo(map);
+  map.on('moveend', ensureZips);
   buildSearchIndex();
   renderGroups();
   setLevel(ui.level);
@@ -486,21 +555,35 @@ async function init() {
 }
 
 // ---------- place search ----------
-let index = [];
+let index = [], zipIndexLoaded = null;
 function buildSearchIndex() {
   index = [];
   for (const level of ['state', 'metro', 'county']) for (const [id, p] of Object.entries(D[level])) {
     index.push({ level, id, label: placeName(level, p), key: placeName(level, p).toLowerCase() });
   }
 }
+// The ZIP list (32,000 entries) is fetched the first time you use the search box.
+function loadZipIndex() {
+  zipIndexLoaded ||= fetch('data/zip/index.json').then(r => r.json()).then(zi => {
+    for (const [z, [city, st]] of Object.entries(zi)) {
+      const label = `${z} · ${city ? city + ', ' : ''}${st}`;
+      index.push({ level: 'zip', id: z, st, label, key: label.toLowerCase() });
+    }
+  }).catch(() => { zipIndexLoaded = null; });
+  return zipIndexLoaded;
+}
+const LEVEL_ORDER = ['state', 'metro', 'county', 'zip'];
 const searchEl = document.getElementById('placeSearch'), resultsEl = document.getElementById('results');
 let hits = [], sel = 0;
-searchEl.addEventListener('input', () => {
+searchEl.addEventListener('focus', loadZipIndex);
+searchEl.addEventListener('input', async () => {
   const q = searchEl.value.trim().toLowerCase();
   if (q.length < 2) { resultsEl.classList.remove('show'); return; }
+  if (/\d/.test(q)) await loadZipIndex();
+  if (searchEl.value.trim().toLowerCase() !== q) return; // typed on while loading
   const words = q.split(/\s+/);
   hits = index.filter(x => words.every(w => x.key.includes(w)))
-    .sort((a, b) => (b.key.startsWith(q) - a.key.startsWith(q)) || (['state', 'metro', 'county'].indexOf(a.level) - ['state', 'metro', 'county'].indexOf(b.level)) || a.key.length - b.key.length)
+    .sort((a, b) => (b.key.startsWith(q) - a.key.startsWith(q)) || (LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level)) || a.key.length - b.key.length)
     .slice(0, 8);
   sel = 0;
   resultsEl.innerHTML = hits.length ? hits.map((h, i) => `<button type="button" data-i="${i}" class="${i === 0 ? 'sel' : ''}"><span>${esc(h.label)}</span><small>${h.level}</small></button>`).join('') : '<div class="note" style="padding:10px 14px">No matches</div>';
@@ -514,21 +597,27 @@ searchEl.addEventListener('keydown', e => {
 });
 resultsEl.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) pick(hits[+b.dataset.i]); });
 document.addEventListener('click', e => { if (!e.target.closest('.place-search')) resultsEl.classList.remove('show'); });
-function pick(h) {
+async function pick(h) {
   resultsEl.classList.remove('show');
   searchEl.value = h.label;
   searchEl.blur();
   if (ui.level !== h.level) setLevel(h.level);
+  if (h.level === 'zip') await loadZipState(h.st);
   zoomTo(h.level, h.id);
   openDetail(h.level, h.id);
 }
-function zoomTo(level, id) {
+function shapesOf(level, id) {
   const ids = level === 'county' ? [id, ...Object.keys(CT_OLD_TO_NEW).filter(o => CT_OLD_TO_NEW[o] === id)] : [id];
+  const out = [];
+  eachShape(level, l => { if (ids.includes(l.feature.id)) out.push(l); });
+  return out;
+}
+function zoomTo(level, id) {
   let bounds = null;
-  layers[level].eachLayer(l => { if (ids.includes(l.feature.id)) bounds = bounds ? bounds.extend(l.getBounds()) : l.getBounds(); });
+  shapesOf(level, id).forEach(l => { bounds = bounds ? bounds.extend(l.getBounds()) : l.getBounds(); });
   if (!bounds) return;
   const wide = innerWidth > 820;
-  map.flyToBounds(bounds, { maxZoom: level === 'state' ? 6 : 7.5, paddingTopLeft: [40, wide ? 80 : 120], paddingBottomRight: wide ? [460, 40] : [40, innerHeight * 0.6] });
+  map.flyToBounds(bounds, { maxZoom: level === 'state' ? 6 : level === 'zip' ? 9 : 7.5, paddingTopLeft: [40, wide ? 80 : 120], paddingBottomRight: wide ? [460, 40] : [40, innerHeight * 0.6] });
 }
 
 // ---------- detail drawer ----------
@@ -543,18 +632,32 @@ async function openDetail(level, id) {
   hist = null;
   renderDrawer();
   drawer.classList.add('open');
-  try { hist = await fetch(`data/hist/${level}/${id}.json`).then(r => r.ok ? r.json() : {}); } catch (e) { hist = {}; }
+  try {
+    if (level === 'zip') {
+      // ZIP histories come bundled by the first three digits, stored as [first month, [values…]].
+      const bundle = await fetch(`data/hist/zip/${id.slice(0, 3)}.json`).then(r => r.ok ? r.json() : {});
+      hist = {};
+      for (const [k, s] of Object.entries(bundle[id] || {})) hist[k] = expand(s);
+    } else hist = await fetch(`data/hist/${level}/${id}.json`).then(r => r.ok ? r.json() : {});
+  } catch (e) { hist = {}; }
   if (openPlace && openPlace.id === id) renderDrawer();
+}
+function expand([start, vals]) {
+  const out = {};
+  let y = +start.slice(0, 4), m = +start.slice(5, 7);
+  for (const v of vals) {
+    if (v != null) out[`${y}-${String(m).padStart(2, '0')}`] = v;
+    if (++m > 12) { m = 1; y++; }
+  }
+  return out;
 }
 // The selected place gets a bold outline on the map.
 let selLayer = null;
 function outline(level, id) {
   if (selLayer) { map.removeLayer(selLayer); selLayer = null; }
-  if (!level || !layers[level]) return;
-  const ids = level === 'county' ? [id, ...Object.keys(CT_OLD_TO_NEW).filter(o => CT_OLD_TO_NEW[o] === id)] : [id];
-  const feats = [];
-  layers[level].eachLayer(l => { if (ids.includes(l.feature.id)) feats.push(l.feature); });
-  selLayer = L.geoJSON(feats, { interactive: false, style: { color: dark() ? '#ffffff' : '#1d1b17', weight: 3, fill: false, opacity: 0.95 } }).addTo(map);
+  if (!level) return;
+  const feats = shapesOf(level, id).map(l => l.feature);
+  selLayer = L.geoJSON(feats, { interactive: false, style: { color: '#111827', weight: 3, fill: false, opacity: 0.95 } }).addTo(map);
 }
 function closeDrawer() { drawer.classList.remove('open'); openPlace = null; outline(); }
 document.getElementById('dClose').addEventListener('click', closeDrawer);
@@ -562,8 +665,10 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(
 
 function renderDrawer() {
   const { level, id } = openPlace, p = D[level][id], v = p.v;
-  const parent = level === 'county' && p.m && D.metro[p.m] ? `<br>Part of ${esc(D.metro[p.m].n)}` : '';
-  document.getElementById('dTitle').innerHTML = `${esc(placeName(level, p))}<small>${level === 'metro' ? 'Metro area' : level === 'county' ? 'County' : 'State'}${parent}</small>`;
+  const county = level === 'zip' && D.county[p.k] ? `${D.county[p.k].n}, ${D.county[p.k].s}` : '';
+  const metro = (level === 'county' || level === 'zip') && p.m && D.metro[p.m] ? D.metro[p.m].n : '';
+  const parent = [county, metro].filter(Boolean).map(x => `<br>Part of ${esc(x)}`).join('');
+  document.getElementById('dTitle').innerHTML = `${esc(placeName(level, p))}<small>${level === 'metro' ? 'Metro area' : level === 'county' ? 'County' : level === 'zip' ? 'ZIP code' : 'State'}${parent}</small>`;
   const kpi = (k, label) => `<div class="kpi"><span>${esc(label || M[k].l)}</span><b>${M[k].d ? signed(v[k], M[k].f) : fmt(v[k], M[k].f)}</b></div>`;
   const kpiYoy = (k, yk, label) => `<div class="kpi"><span>${esc(label)}</span><b>${fmt(v[k], M[k].f)}</b>${v[yk] != null ? `<em class="${v[yk] >= 0 ? 'up' : 'down'}">${signed(v[yk], 'pct')} YoY</em>` : ''}</div>`;
   if (!hist || !hist[chartKey]) chartKey = hist ? Object.keys(SERIES).find(k => hist[k]) || chartKey : chartKey;
@@ -585,7 +690,7 @@ function renderDrawer() {
     <div class="chart-tabs">${hist == null ? '<span class="note">Loading history…</span>' : avail.map(k => `<button type="button" class="${k === chartKey ? 'on' : ''}" data-series="${k}">${SERIES[k][0]}</button>`).join('')}</div>
     ${hist && hist[chartKey] ? `<div class="ranges">${[['all', 'All'], ['10', '10Y'], ['5', '5Y'], ['1', '1Y']].map(([r, l]) => `<button type="button" class="${chartRange === r ? 'on' : ''}" data-range="${r}">${l}</button>`).join('')}</div><div class="chart" id="chart">${chartSvg(hist[chartKey], SERIES[chartKey][1])}<div class="ctip"></div></div>` : ''}
     ${groupsHtml}
-    <p class="note">Home values: Zillow (${ymLabel(D.meta.months.zillow)}). Listings: Realtor.com (${ymLabel(D.meta.months.realtor)}). Income &amp; poverty: Census ${D.meta.months.income}; population ${D.meta.months.population}. Mortgage math uses ${D.meta.mortgage.rate}% (30-year fixed, ${esc(D.meta.mortgage.date)}).${level === 'metro' ? ' Metro income and population are combined from their counties.' : ''}</p>`;
+    <p class="note">Home values: Zillow (${ymLabel(D.meta.months.zillow)}). Listings: Realtor.com (${ymLabel(D.meta.months.realtor)}). Income &amp; poverty: Census ${D.meta.months.income}; population ${D.meta.months.population}. Mortgage math uses ${D.meta.mortgage.rate}% (30-year fixed, ${esc(D.meta.mortgage.date)}).${level === 'metro' ? ' Metro income and population are combined from their counties.' : ''}${level === 'zip' ? ' ZIP figures that use income (value/income, payment % of income, rent % of income) use the county’s median income, and the forecast is the metro’s.' : ''}</p>`;
 }
 document.getElementById('dBody').addEventListener('click', e => {
   const s = e.target.closest('[data-series]'); if (s) { chartKey = s.dataset.series; renderDrawer(); return; }
@@ -663,10 +768,10 @@ function renderTable() {
     return (x - y) * sortDir;
   });
   const shown = list.slice(0, 400);
-  document.getElementById('tvTitle').textContent = `${M[ui.metric].l} · ${ui.level === 'county' ? 'Counties' : ui.level === 'metro' ? 'Metros' : 'States'}`;
+  document.getElementById('tvTitle').textContent = `${M[ui.metric].l} · ${ui.level === 'county' ? 'Counties' : ui.level === 'metro' ? 'Metros' : ui.level === 'zip' ? 'ZIP codes in the states you’ve opened' : 'States'}`;
   document.getElementById('tvScroll').innerHTML = `<table><thead><tr><th>Place</th>${cols.map(c => `<th data-sort="${c}" class="${c === k ? 'sorted' : ''}">${esc(M[c].l)}${c === k ? (sortDir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('')}</tr></thead><tbody>${
     shown.map(r => `<tr data-id="${r.id}"><td>${esc(r.name)}</td>${cols.map(c => `<td>${M[c].d ? signed(r.p.v[c], M[c].f) : fmt(r.p.v[c], M[c].f)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-  document.getElementById('tvFoot').textContent = `${list.length} places${list.length > shown.length ? ` · showing the first ${shown.length} (filter to narrow)` : ''} · click a column to sort, a row to open it`;
+  document.getElementById('tvFoot').textContent = (ui.level === 'zip' && !list.length ? 'Zoom into a state on the map (or search a ZIP) to list its ZIP codes · ' : '') + `${list.length} places${list.length > shown.length ? ` · showing the first ${shown.length} (filter to narrow)` : ''} · click a column to sort, a row to open it`;
 }
 document.getElementById('tvScroll').addEventListener('click', e => {
   const th = e.target.closest('[data-sort]');
