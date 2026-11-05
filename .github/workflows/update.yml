@@ -1,4 +1,6 @@
 # Rebuilds the housing data and publishes the map on GitHub Pages.
+# Runs on the 5th and 20th of every month (Realtor.com updates early in the month, Zillow mid-month),
+# whenever files change, and on demand (Actions tab -> Update housing map -> Run workflow).
 name: Update housing map
 
 on:
@@ -10,7 +12,7 @@ on:
     paths-ignore: ["last-update.txt"]
 
 permissions:
-  contents: write
+  contents: write   # to save last-update.txt (keeps the monthly schedule from being paused)
   pages: write
   id-token: write
 
@@ -25,25 +27,26 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Download and build the data
         run: python build_data.py
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
       - name: Publish
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
+      # GitHub pauses scheduled jobs in repositories with no activity for 60 days; a tiny commit prevents that.
       - name: Note the update
         if: github.event_name == 'schedule'
         run: |
