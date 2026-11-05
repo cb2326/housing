@@ -9,10 +9,10 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths-ignore: ["last-update.txt"]
+    paths-ignore: ["last-update.txt", "data_cache/**"]
 
 permissions:
-  contents: write   # to save last-update.txt (keeps the monthly schedule from being paused)
+  contents: write   # to save data_cache/ and last-update.txt back into the repository
   pages: write
   id-token: write
 
@@ -23,6 +23,7 @@ concurrency:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 150
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -34,6 +35,10 @@ jobs:
           python-version: "3.12"
 
       - name: Download and build the data
+        env:
+          # Optional: a free key from https://api.census.gov/data/key_signup.html, saved as a repository secret
+          # (Settings -> Secrets and variables -> Actions -> New repository secret, name CENSUS_API_KEY).
+          CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
         run: python build_data.py
 
       - uses: actions/configure-pages@v6
@@ -46,13 +51,16 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
-      # GitHub pauses scheduled jobs in repositories with no activity for 60 days; a tiny commit prevents that.
-      - name: Note the update
-        if: github.event_name == 'schedule'
+      # Saves the once-a-year results (data_cache/) so later runs don't work them out again. On scheduled runs it also
+      # notes the date: GitHub pauses scheduled jobs in repositories with no activity for 60 days.
+      - name: Save yearly data
+        if: always()
         run: |
-          date -u +"%Y-%m-%d %H:%M UTC" > last-update.txt
+          if [ "${{ github.event_name }}" = "schedule" ]; then date -u +"%Y-%m-%d %H:%M UTC" > last-update.txt; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
-          git add last-update.txt
-          git commit -m "Monthly data update" || true
+          git add data_cache 2>/dev/null || true
+          git add last-update.txt 2>/dev/null || true
+          git commit -m "Save yearly data" || true
+          git pull --rebase || true
           git push || true
