@@ -496,6 +496,9 @@ ACS_VARS = {
     "income": "B19013_001E", "pop": "B01003_001E",
 }
 ACS_EXTRA = {"tax": "B25103_001E", "value": "B25077_001E", "edu": "B15003_001E", "ba": "B15003_022E", "ma": "B15003_023E", "prof": "B15003_024E", "phd": "B15003_025E"}
+# Age groups for ZIP codes (counties and states get these from the yearly population estimates instead).
+_AGE_CELLS = [3, 4, 5, 6, 11, 12, 13, 14, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 35, 36, 37, 38, 44, 45, 46, 47, 48, 49]
+ACS_AGE = {"agepop": "B01001_001E", "medage": "B01002_001E", **{f"c{n}": f"B01001_{n:03d}E" for n in _AGE_CELLS}}
 ACS_GEOS = {"state": "state:*", "county": "county:*", "metro": "metropolitan%20statistical%20area/micropolitan%20statistical%20area:*", "zip": "zip%20code%20tabulation%20area:*"}
 
 
@@ -546,6 +549,18 @@ def acs_derive(v):
     m["r_rent2544_own75"] = young / old75 if young is not None and old75 else None
     m["acs_income"] = g("income")
     m["acs_pop"] = g("pop")
+    m["acs_units"] = g("units")
+    p = g("agepop")
+    if p and g("c3") is not None:
+        cells = lambda ns: sum(g(f"c{n}") or 0 for n in ns)
+        u18, a2544 = cells((3, 4, 5, 6, 27, 28, 29, 30)), cells((11, 12, 13, 14, 35, 36, 37, 38))
+        a65, a75 = cells((20, 21, 22, 23, 24, 25, 44, 45, 46, 47, 48, 49)), cells((23, 24, 25, 47, 48, 49))
+        m.update({"u18_pct": u18 / p * 100, "a2544_pct": a2544 / p * 100, "a65_pct": a65 / p * 100, "a75_pct": a75 / p * 100,
+                  "med_age": g("medage")})
+        if a65:
+            m["r_u18_65"], m["r_2544_65"] = u18 / a65, a2544 / a65
+        if a75:
+            m["r_u18_75"], m["r_2544_75"] = u18 / a75, a2544 / a75
     return {k: round(x, 3) for k, x in m.items() if x is not None and math.isfinite(x)}
 
 
@@ -573,6 +588,12 @@ def acs_years():
                     extra = acs_call(y, geo, ACS_EXTRA if y >= 2012 else {k: v for k, v in ACS_EXTRA.items() if k in ("tax", "value")})
                 except Exception:
                     extra = {}
+                if geo == "zip":
+                    try:
+                        for pid, vals in acs_call(y, geo, ACS_AGE).items():
+                            extra.setdefault(pid, {}).update(vals)
+                    except Exception as e:
+                        print(f"  (ACS {y} ZIP ages not available: {e})")
                 res[geo] = {pid: d for pid, vals in base.items() if (d := acs_derive({**vals, **extra.get(pid, {})}))}
             if not res.get("county"):
                 continue  # not published yet
@@ -729,6 +750,41 @@ def hmda_years(county_to_cbsa):
         save_dcache(f"hmda/{y}.json", res)
         out[y] = res
     return out, max(out, default=None)
+
+
+def archive_forecasts(fc_hist, zmetro):
+    """Earlier Zillow metro forecasts (2022 onwards) from the Internet Archive's saved copies of Zillow's file.
+    Runs once; the results are kept in data_cache/forecast.json."""
+    cdx = ("https://web.archive.org/cdx/search/cdx?url=files.zillowstatic.com/research/public_csvs/zhvf_growth/Metro_zhvf_growth_uc_sfrcondo"
+           "&matchType=prefix&filter=statuscode:200&fl=timestamp,original&collapse=digest")
+    try:
+        listing = fetch(cdx, "wayback_fc.txt", PLAIN, timeout=120, tries=2).decode()
+    except Exception as e:
+        print(f"  (Internet Archive unavailable: {e})")
+        return False
+    snaps = [line.split(" ", 1) for line in listing.splitlines() if " " in line]
+    snaps.sort(key=lambda s: ("_sm_sa_" in s[1], s[0]))  # the seasonally adjusted file wins for the same month
+    got = 0
+    for ts, orig in snaps:
+        try:
+            data = fetch(f"https://web.archive.org/web/{ts}id_/{orig}", f"wayback_fc_{ts}.csv", PLAIN, timeout=120, tries=2)
+        except Exception:
+            continue
+        time.sleep(1)
+        r = rows(data)
+        head = next(r)
+        if "BaseDate" not in head or "RegionName" not in head:
+            continue
+        bi, ni, last = head.index("BaseDate"), head.index("RegionName"), len(head) - 1  # last column: 12 months ahead
+        recs = {}
+        for row in r:
+            if len(row) > last and row[bi] and (v := num(row[last])) is not None:
+                recs[row[ni]] = (row[bi][:7], v)
+        for cbsa, (month, v) in zmetro(recs).items():
+            fc_hist.setdefault(cbsa, {})[month] = round(v, 2)
+        got += 1
+    print(f"  {got} archived Zillow forecasts")
+    return got > 0
 
 
 def mortgage_rate():
@@ -1115,8 +1171,11 @@ def main():
         if s:
             forecast[cbsa] = s[max(s)]  # the last column is the 12-month-ahead forecast
     zillow_month = max((max(r["series"]) for r in zv["state"].values() if r["series"]), default=None)
-    # Zillow only publishes today's forecast, so each one is saved to build up a history.
+    # Zillow only publishes today's forecast, so each one is saved to build up a history; earlier ones come once
+    # from the Internet Archive's saved copies of Zillow's file.
     fc_hist = load_dcache("forecast.json") or {}
+    if not fc_hist.get("_archive") and archive_forecasts(fc_hist, zmetro):
+        fc_hist["_archive"] = 1
     for cbsa, v in forecast.items():
         fc_hist.setdefault(cbsa, {})[zillow_month] = round(v, 2)
     save_dcache("forecast.json", fc_hist)
@@ -1173,12 +1232,27 @@ def main():
     HSTART = "2000-01"
     srcs = lambda d, lvl, pid: (d.get(lvl) or {}).get(pid, {}).get("series")
 
+    # States: Zillow has no state forecast, so each month's is the average of the state's metros, weighted by population.
+    state_fc = {}
+    for fips, (abbr, _) in STATES.items():
+        ms = [c for c, n in metro_names.items() if n.rsplit(", ", 1)[-1].split("-")[0] == abbr and c in fc_hist]
+        wts = {c: latest_annual(A["metro"].get(c, {})).get("pop") or 0 for c in ms}
+        series = {}
+        for month in {mm for c in ms for mm in fc_hist[c]}:
+            pairs = [(fc_hist[c][month], wts[c]) for c in ms if month in fc_hist[c] and wts[c]]
+            tw = sum(w for _, w in pairs)
+            if tw:
+                series[month] = round(sum(v * w for v, w in pairs) / tw, 2)
+        if series:
+            state_fc[fips] = series
+
     def build(lvl, pid, name, st, extra, fc_key):
         a = A[lvl].get(pid, {})
         la = latest_annual(a)
         z = srcs(zv, lvl, pid)
         yearly_tax(a, z)
-        m = metrics_for(z, srcs(zr, lvl, pid), rt[lvl].get(pid), la.get("income"), rate, forecast.get(fc_key),
+        fc_series = state_fc.get(pid) if lvl == "state" else fc_hist.get(fc_key)
+        m = metrics_for(z, srcs(zr, lvl, pid), rt[lvl].get(pid), la.get("income"), rate, (fc_series or {}).get(zillow_month),
                         srcs(zs, lvl, pid), srcs(zc, lvl, pid), srcs(zrs, lvl, pid), la.get("units"), la.get("prop_tax_rate"))
         v = {**{k: x for k, x in la.items() if k not in ("prop_tax",)}, **m}
         if not v:
@@ -1194,14 +1268,14 @@ def main():
             for k in ("inv", "dom", "cut", "lp", "newl", "pend"):
                 if rr.get(k):
                     b[k] = trim_series(rr[k], HSTART)
-        if fc_key in fc_hist:
-            b["fc"] = fc_hist[fc_key]
+        if fc_series:
+            b["fc"] = dict(sorted(fc_series.items()))
         if a:
             b["a"] = a
         hist[lvl][pid] = b
 
     for fips, (abbr, name) in STATES.items():
-        build("state", fips, name, abbr, {}, None)
+        build("state", fips, name, abbr, {}, fips)
     for cbsa, name in metro_names.items():
         build("metro", cbsa, name, name.rsplit(", ", 1)[-1].split("-")[0], {"c": sorted(metro_counties.get(cbsa, []))}, cbsa)
     county_ids = set(zv["county"]) | set(rt["county"]) | {k for k in R if len(k) == 5}
@@ -1228,9 +1302,11 @@ def main():
 
     # ZIP codes: the biggest files, so the state/metro/county data is let go of first.
     county_income = {pid: latest_annual(a).get("income") for pid, a in A["county"].items()}
+    # ZIP codes show their county's weather and election results (neither is published by ZIP).
+    county_shared = {pid: {k: a[k] for k in ("temp", "vote_r", "vote_d") if a.get(k)} for pid, a in A["county"].items()}
     acs_zip = {y: res.get("zip", {}) for y, res in acs.items() if res.get("zip")}
     del zv, zs, zc, zr, zrs, rt, hist, A, R
-    zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, forecast, acs_zip, area)
+    zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared)
     meta["counts"]["zip"] = zip_count
     meta["zipBreaks"] = zip_breaks
     write_json(os.path.join(OUT, "meta.json"), meta)
@@ -1511,8 +1587,17 @@ DIVERGING = {"hv_yoy", "hv_mom", "hv_5y", "fc_1y", "overvalued", "from_2022_peak
              "sales_vs_2019", "rent_overvalued"}
 
 
-def build_zips(county_to_cbsa, county_income, rate, forecast, acs_zip, area):
+def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared):
     print("ZIP codes: Zillow, Realtor.com, Census shapes")
+    # Zillow's own ZIP forecasts, saved each run to build up a history (the chart uses the metro's until there are two).
+    zfc_raw, _ = zillow_zip("zhvf_growth/Zip_zhvf_growth_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
+    zfc_hist = load_dcache("forecast_zip.json") or {}
+    for z, d in zfc_raw.items():
+        k, v = latest(to_dict(d))
+        if v is not None:
+            zfc_hist.setdefault(z, {})[zillow_month] = round(v, 2)
+    save_dcache("forecast_zip.json", zfc_hist)
+    del zfc_raw
     zhv, zinfo = zillow_zip("zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
     zsfr, _ = zillow_zip("zhvi/Zip_zhvi_uc_sfr_tier_0.33_0.67_sm_sa_month.csv")
     zcondo, _ = zillow_zip("zhvi/Zip_zhvi_uc_condo_tier_0.33_0.67_sm_sa_month.csv")
@@ -1535,10 +1620,24 @@ def build_zips(county_to_cbsa, county_income, rate, forecast, acs_zip, area):
         a = {}
         for y in acs_years_:
             for k, v in acs_zip[y].get(z, {}).items():
-                key = {"acs_income": "income", "acs_pop": "pop"}.get(k, k)
+                key = {"acs_income": "income", "acs_pop": "pop", "acs_units": "units"}.get(k, k)
                 a.setdefault(key, {})[str(y)] = v
-        if a.get("pop") and area.get("z" + z):
-            a["density"] = {y: tidy(p / area["z" + z]) for y, p in a["pop"].items()}
+        pops = a.get("pop", {})
+        if pops and area.get("z" + z):
+            a["density"] = {y: tidy(p / area["z" + z]) for y, p in pops.items()}
+        for y, p in pops.items():
+            for back, key in ((1, "pop_growth"), (5, "pop_growth_5y")):
+                old = pops.get(str(int(y) - back))
+                if old:
+                    a.setdefault(key, {})[y] = tidy((p / old - 1) * 100)
+        inc_s = a.get("income", {})
+        for y, v in inc_s.items():
+            if inc_s.get(str(int(y) - 1)):
+                a.setdefault("income_growth", {})[y] = tidy((v / inc_s[str(int(y) - 1)] - 1) * 100)
+        for k, s in county_shared.get(county, {}).items():
+            a[k] = s
+        own_fc, metro_fc = zfc_hist.get(z, {}), fc_hist.get(county_to_cbsa.get(county), {})
+        fc_now = own_fc.get(zillow_month, metro_fc.get(zillow_month))
         la = latest_annual(a)
         income = la.get("income") or county_income.get(county)
         if a.get("prop_tax_rate") and hv_d:
@@ -1546,7 +1645,7 @@ def build_zips(county_to_cbsa, county_income, rate, forecast, acs_zip, area):
                 hv = hv_d.get(f"{y}-12") or latest({k: v for k, v in hv_d.items() if k <= f"{y}-12"})[1]
                 if hv:
                     a.setdefault("prop_tax", {})[y] = tidy(hv * r / 100)
-        v = metrics_for(hv_d, rent_d, rt_d, income, rate, forecast.get(county_to_cbsa.get(county)), sfr_d, condo_d, None, None, la.get("prop_tax_rate"))
+        v = metrics_for(hv_d, rent_d, rt_d, income, rate, fc_now, sfr_d, condo_d, None, la.get("units"), la.get("prop_tax_rate"))
         if not v:
             continue
         v.update({k: x for k, x in la.items() if k not in ("prop_tax",)})
@@ -1564,10 +1663,12 @@ def build_zips(county_to_cbsa, county_income, rate, forecast, acs_zip, area):
             if d:
                 b[key] = compact(d, start)
         if rt_d:
-            five_years = im(mi(max(rt_d["inv"])) - 60) if rt_d.get("inv") else "2016-01"
-            for k in ("inv", "dom", "cut", "lp", "newl", "pend"):
+            for k in ("inv", "dom", "cut", "lp", "newl", "pend"):  # all of it (from 2016), so 2017-19 can be the baseline
                 if rt_d.get(k):
-                    b[k] = compact(rt_d[k], five_years)
+                    b[k] = compact(rt_d[k], "2016-01")
+        fc_s = own_fc if len(own_fc) >= 2 else {**metro_fc, **own_fc}  # metro's past forecasts, ZIP's own for now
+        if fc_s:
+            b["fc"] = compact(fc_s, "2000-01")
         if a:
             b["a"] = a
         hist_groups.setdefault(z[:3], {})[z] = {k: x for k, x in b.items() if x}
