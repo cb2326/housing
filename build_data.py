@@ -743,7 +743,7 @@ def ring_area(r):
     return sum((r[i + 1][0] - r[i][0]) * (r[i + 1][1] + r[i][1]) for i in range(len(r) - 1)) / 2  # >0: clockwise
 
 
-def pack_shape(rings, tol=0.0009, q=10000):
+def pack_shape(rings, tol=0.0004, q=10000):
     """Rings -> polygons (shapefile outer rings are clockwise, holes counter-clockwise), simplified and
     stored as delta-encoded integers (1/10,000 of a degree, about 10 m)."""
     polys = []

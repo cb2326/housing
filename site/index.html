@@ -85,6 +85,10 @@
   .legend .ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
   .legend .na { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 6px; }
   .legend .na i { width: 12px; height: 12px; border-radius: 3px; background: var(--na); }
+  .cmode { display: flex; align-items: center; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .cmode span { margin-right: 4px; }
+  .cmode button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; color: var(--text); }
+  .cmode button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   .zip-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 520; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; box-shadow: var(--shadow); text-align: center; max-width: 300px; display: none; }
   .zip-hint.show { display: block; }
@@ -302,8 +306,8 @@ const ymLabel = k => k ? `${MON[+k.slice(5, 7) - 1]} ${k.slice(0, 4)}` : '';
 
 // ---------- state ----------
 const saved = (() => { try { return JSON.parse(localStorage.getItem('hm-ui')) || {}; } catch (e) { return {}; } })();
-const ui = { metric: M[saved.metric] ? saved.metric : 'hv_yoy', level: ['state', 'metro', 'county', 'zip'].includes(saved.level) ? saved.level : 'county', open: new Set(saved.open || ['Popular']) };
-const saveUi = () => { try { localStorage.setItem('hm-ui', JSON.stringify({ metric: ui.metric, level: ui.level, open: [...ui.open] })); } catch (e) {} };
+const ui = { scaleMode: saved.scaleMode === 'national' ? 'national' : 'view', metric: M[saved.metric] ? saved.metric : 'hv_yoy', level: ['state', 'metro', 'county', 'zip'].includes(saved.level) ? saved.level : 'county', open: new Set(saved.open || ['Popular']) };
+const saveUi = () => { try { localStorage.setItem('hm-ui', JSON.stringify({ metric: ui.metric, level: ui.level, open: [...ui.open], scaleMode: ui.scaleMode })); } catch (e) {} };
 const D = { meta: null, state: null, metro: null, county: null, zip: {} };
 let topo, layers = {}, map, scale = null;
 
@@ -359,26 +363,48 @@ function niceRound(v) {
   const a = Math.abs(v), p = Math.pow(10, Math.floor(Math.log10(a)) - 1);
   return Math.round(v / p) * p;
 }
-function buildScale() {
-  const key = ui.metric, def = M[key];
-  if (ui.level === 'zip') {
-    // ZIP colours come from all 32,000 ZIPs nationwide (worked out by the data builder), not just the ones loaded.
-    const b = (D.meta.zipBreaks || {})[key];
-    scale = { breaks: b || [], colors: def.d ? DIV : SEQ, key, count: b ? null : 0 };
-    return;
-  }
-  const vals =Object.values(D[ui.level]).map(p => p.v[key]).filter(v => v != null && isFinite(v)).sort((a, b) => a - b);
-  let breaks;
-  if (def.d) {
+// Seven colour steps from a list of values: amounts split into equal-sized groups, changes split
+// symmetrically around zero.
+function breaksFrom(vals, diverging) {
+  vals = vals.filter(v => v != null && isFinite(v)).sort((a, b) => a - b);
+  if (!vals.length) return [];
+  if (diverging) {
     const abs = vals.map(Math.abs).sort((a, b) => a - b);
     const t = [0.2, 0.5, 0.8].map(p => niceRound(quantile(abs, p)));
-    for (let i = 1; i < 3; i++) if (t[i] <= t[i - 1]) t[i] = t[i - 1] * 1.5 || 1;
-    breaks = [-t[2], -t[1], -t[0], t[0], t[1], t[2]];
-  } else {
-    breaks = [1, 2, 3, 4, 5, 6].map(i => niceRound(quantile(vals, i / 7)));
-    for (let i = 1; i < breaks.length; i++) if (breaks[i] <= breaks[i - 1]) breaks[i] = breaks[i - 1] + Math.abs(breaks[i - 1] || 1) * 0.01;
+    if (!t[0]) t[0] = t[1] / 2 || abs[abs.length - 1] / 10 || 0.1;
+    for (let i = 1; i < 3; i++) if (t[i] <= t[i - 1]) t[i] = t[i - 1] * 1.5;
+    return [-t[2], -t[1], -t[0], t[0], t[1], t[2]];
   }
-  scale = { breaks, colors: def.d ? DIV : SEQ, key, count: vals.length };
+  const b = [1, 2, 3, 4, 5, 6].map(i => niceRound(quantile(vals, i / 7)));
+  for (let i = 1; i < b.length; i++) if (b[i] <= b[i - 1]) b[i] = b[i - 1] + Math.abs(b[i - 1] || 1) * 0.01;
+  return b;
+}
+// Colours can compare every place in the country ("Nationwide") or only the places on screen ("On screen"),
+// which shows more contrast inside one region (e.g. home values across Southern California).
+function viewValues(key) {
+  const view = map.getBounds(), vals = [];
+  eachShape(ui.level, l => {
+    const p = D[ui.level][dataId(ui.level, l.feature.id)];
+    if (!p || p.v[key] == null) return;
+    const b = l._bb || (l._bb = l.getBounds());
+    if (view.intersects(b)) vals.push(p.v[key]);
+  });
+  return vals;
+}
+function buildScale() {
+  const key = ui.metric, def = M[key], colors = def.d ? DIV : SEQ;
+  if (ui.scaleMode === 'view' && map) {
+    const vals = viewValues(key);
+    if (vals.length >= 8) { scale = { breaks: breaksFrom(vals, def.d), colors, key, count: vals.length, mode: 'view' }; return; }
+  }
+  if (ui.level === 'zip') {
+    // Nationwide ZIP colours come from all 32,000 ZIPs (worked out by the data builder), not just the ones loaded.
+    const b = (D.meta.zipBreaks || {})[key];
+    scale = { breaks: b || [], colors, key, count: null, mode: 'national' };
+    return;
+  }
+  const vals = Object.values(D[ui.level]).map(p => p.v[key]);
+  scale = { breaks: breaksFrom(vals, def.d), colors, key, count: vals.filter(v => v != null).length, mode: 'national' };
 }
 function colorFor(v) {
   if (v == null || !isFinite(v) || !scale || !scale.breaks.length) return null;
@@ -394,21 +420,35 @@ function renderLegend() {
     : ui.metric.startsWith('pop') || ui.metric.endsWith('_pct') && !['mtg_pct_income', 'rent_pct_income'].includes(ui.metric) ? `Census, ${meta.months.population}`
     : ui.metric === 'fc_1y' ? `Zillow forecast from ${ymLabel(meta.months.zillow)}`
     : `Zillow, ${ymLabel(meta.months.zillow)}${['mtg_pmt', 'mtg_pct_income', 'salary_needed', 'buy_vs_rent'].includes(ui.metric) ? ` · rate ${meta.mortgage ? meta.mortgage.rate : ''}%` : ''}`;
-  const count = ui.level === 'zip' ? (scale.breaks.length ? 'ZIP codes, colours set nationwide' : 'not available for ZIP codes')
-    : `${scale.count} ${ui.level === 'county' ? 'counties' : ui.level === 'metro' ? 'metros' : 'states'}`;
+  const noun = { county: 'counties', metro: 'metros', state: 'states', zip: 'ZIP codes' }[ui.level];
+  const count = !scale.breaks.length ? `not available for ${noun}`
+    : scale.mode === 'view' ? `${scale.count} ${noun} on screen`
+    : ui.level === 'zip' ? 'all ZIP codes nationwide' : `${scale.count} ${noun} nationwide`;
+  const sw = `<div class="cmode" role="group" aria-label="Colour comparison"><span>Colors:</span><button type="button" data-mode="national" class="${ui.scaleMode !== 'view' ? 'on' : ''}">Nationwide</button><button type="button" data-mode="view" class="${ui.scaleMode === 'view' ? 'on' : ''}">On screen</button></div>`;
   const ticks = scale.breaks.length ? [scale.breaks[0], def.d ? 0 : scale.breaks[Math.floor(scale.breaks.length / 2)], scale.breaks[scale.breaks.length - 1]] : null;
   document.getElementById('legend').innerHTML = `<h3>${esc(def.l)}</h3><div class="asof">${esc(src)} · ${count}</div>
     <div class="bar">${scale.colors.map(c => `<i style="background:${c}"></i>`).join('')}</div>
     ${ticks ? `<div class="ticks"><span>&lt; ${fmt(ticks[0], f, true)}</span><span>${fmt(ticks[1], f, true)}</span><span>&gt; ${fmt(ticks[2], f, true)}</span></div>` : ''}
-    <div class="na"><i></i>No data</div>`;
+    <div class="na"><i></i>No data</div>${sw}`;
 }
+document.getElementById('legend').addEventListener('click', e => {
+  const b = e.target.closest('[data-mode]');
+  if (b) { ui.scaleMode = b.dataset.mode; saveUi(); restyle(); }
+});
 
 // ---------- map ----------
 function styleFor(level, id) {
   const p = D[level][dataId(level, id)];
   const c = p ? colorFor(p.v[ui.metric]) : null;
   const strong = level === 'state';
-  return { fillColor: c || '#e5e7eb', fillOpacity: c ? 0.85 : 0.35, color: '#ffffff', weight: strong ? 1.2 : level === 'metro' ? 0.8 : level === 'zip' ? 0.3 : 0.4, opacity: 0.95 };
+  if (level === 'zip') {
+    // Zoomed in, ZIP borders get bolder and the fill lighter, so streets and town names show through.
+    const z = map ? map.getZoom() : 8;
+    const close = z >= 9.5;
+    return { fillColor: c || '#e5e7eb', fillOpacity: c ? (z >= 11 ? 0.6 : 0.8) : 0.3, color: close ? '#374151' : '#ffffff',
+      weight: z >= 12 ? 1.8 : close ? 1.1 : z >= 8 ? 0.7 : 0.4, opacity: close ? 0.55 : 1 };
+  }
+  return { fillColor: c || '#e5e7eb', fillOpacity: c ? 0.85 : 0.35, color: '#ffffff', weight: strong ? 1.2 : level === 'metro' ? 0.8 : 0.4, opacity: 0.95 };
 }
 const dark = () => false; // Crisp white is a light theme everywhere
 function eachShape(level, fn) {
@@ -510,7 +550,7 @@ function makeLayer(level, features) {
 }
 
 async function init() {
-  map = L.map('map', { zoomControl: true, preferCanvas: true, minZoom: 3, maxZoom: 10, zoomSnap: 0.25, worldCopyJump: false }).setView([38.5, -96], 4.4);
+  map = L.map('map', { zoomControl: true, preferCanvas: true, minZoom: 3, maxZoom: 14, zoomSnap: 0.25, worldCopyJump: false }).setView([38.5, -96], 4.4);
   map.zoomControl.setPosition('bottomleft');
   map.createPane('labels'); map.getPane('labels').style.zIndex = 650; map.getPane('labels').style.pointerEvents = 'none';
   // Background: Esri's gray canvas (no key needed), with its place-name layer drawn above the coloured areas.
@@ -547,7 +587,9 @@ async function init() {
   layers.metro = makeLayer('metro', metros);
   layers.state = makeLayer('state', states.filter(f => D.state[f.id]));
   layers.stateLines = L.geoJSON(topojson.mesh(topo, topo.objects.states, (a, b) => a !== b), { style: { color: '#6b7280', weight: 1, opacity: 0.6, fill: false }, interactive: false }).addTo(map);
-  map.on('moveend', ensureZips);
+  // After every pan or zoom: load ZIPs that came into view, and recolour (On screen colours and ZIP borders depend on the view).
+  let moveTimer;
+  map.on('moveend', () => { ensureZips(); clearTimeout(moveTimer); moveTimer = setTimeout(() => { if (ui.scaleMode === 'view' || ui.level === 'zip') restyle(); }, 120); });
   buildSearchIndex();
   renderGroups();
   setLevel(ui.level);
