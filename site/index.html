@@ -104,10 +104,37 @@
   .tip .hint { color: #a59b8b; font-size: 11px; margin-top: 5px; font-style: italic; }
 
   /* ---------- detail drawer ---------- */
-  .drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 420px; max-width: 100%; z-index: 700; background: var(--panel); border-left: 1px solid var(--line); box-shadow: var(--shadow); transform: translateX(102%); transition: transform .22s ease; display: flex; flex-direction: column; }
+  .drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 600px; max-width: 100%; z-index: 700; background: var(--panel); border-left: 1px solid var(--line); box-shadow: var(--shadow); transform: translateX(102%); transition: transform .22s ease; display: flex; flex-direction: column; }
   .drawer.open { transform: none; }
+  @media (min-width: 821px) {
+    .stage.panel-open .topbar, .stage.panel-open .legend { right: 614px; }
+    .stage .topbar, .stage .legend { transition: right .22s ease; }
+  }
   .drawer header { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: flex-start; }
-  .drawer header h2 { margin: 0; font: 600 22px/1.15 var(--serif); flex: 1; }
+  .drawer header h2 { margin: 0; font: 700 26px/1.15 var(--serif); flex: 1; color: var(--accent); letter-spacing: -0.02em; }
+  .drawer header h2 small { color: var(--muted); font-weight: 500; letter-spacing: 0; }
+  .metric-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 2px 0 8px; }
+  .mpick { position: relative; flex: 1; min-width: 0; }
+  .mpick select { appearance: none; -webkit-appearance: none; width: 100%; border: 0; background: transparent; font: 650 20px var(--sans); color: var(--text); padding: 4px 26px 4px 0; cursor: pointer; text-overflow: ellipsis; }
+  .mpick::after { content: ""; position: absolute; right: 6px; top: 50%; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+  .mpick select:focus-visible { outline: 2px solid var(--accent); border-radius: 8px; }
+  .mnow { text-align: right; flex: none; }
+  .mnow b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .mnow span { font-size: 11.5px; color: var(--muted); }
+  .chart-ctrl { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .seg-sm { display: inline-flex; background: var(--panel-2); border-radius: 999px; padding: 3px; }
+  .seg-sm button { border: 0; background: none; border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .seg-sm button.on { background: var(--text); color: #fff; }
+  .chart-empty { background: var(--panel-2); border-radius: 14px; padding: 26px 18px; text-align: center; margin: 6px 0; }
+  .chart-empty b { display: block; font-size: 26px; margin-bottom: 6px; }
+  .chart-empty span { color: var(--muted); font-size: 13px; }
+  .snap-h { margin: 18px 0 8px; font: 600 15px var(--sans); }
+  .kpis { grid-template-columns: repeat(3, 1fr) !important; }
+  button.kpi { border: 1px solid transparent; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+  button.kpi:hover { border-color: var(--line); }
+  button.kpi.on { border-color: var(--accent); background: var(--accent-soft); }
+  .sec tr[data-metric] { cursor: pointer; }
+  .sec tr[data-metric]:hover td { color: var(--accent); }
   .drawer header small { display: block; color: var(--muted); font: 12.5px var(--sans); margin-top: 3px; }
   .x { border: 0; background: var(--panel-2); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; flex: none; }
   .drawer .body { overflow-y: auto; padding: 14px 18px 24px; }
@@ -167,6 +194,9 @@
     #tableBtn .btxt { display: none; }
     #tableBtn { padding: 8px 10px; }
     .legend { left: 10px; right: 10px; bottom: 12px; width: auto; }
+    .kpis { grid-template-columns: repeat(2, 1fr) !important; }
+    .drawer header h2 { font-size: 20px !important; }
+    .mpick select { font-size: 17px; }
     .drawer { width: 100%; top: 42%; border-left: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; transform: translateY(102%); }
     .drawer.open { transform: none; }
     .drawer header { padding: 12px 16px 10px; }
@@ -280,8 +310,9 @@ const SERIES = { hv: ['Home value', 'usd'], rent: ['Rent', 'usd'], inv: ['Invent
 
 // Colour ramps: one hue light-to-dark for amounts,
 // cool-to-warm through a neutral grey for changes that can go either way.
-const SEQ = ['#f1effb', '#d9d3f4', '#bbb0ea', '#9a89dc', '#7a63cb', '#5c44ae', '#3e2a84'];
-const DIV = ['#2166ac', '#5a9bd0', '#a9cfe8', '#eeeeec', '#f6b8a0', '#e0684f', '#b2182b'];
+// One vivid scale for everything: deep blue (low / falling) through white to red (high / rising).
+const RAMP = ['#1d3fd8', '#6b7ff2', '#b9b9f4', '#f4f2f5', '#f9c3ad', '#f27a5c', '#dc2626'];
+const SEQ = RAMP, DIV = RAMP;
 
 // ---------- formatting ----------
 const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
@@ -445,10 +476,10 @@ function styleFor(level, id) {
     // Zoomed in, ZIP borders get bolder and the fill lighter, so streets and town names show through.
     const z = map ? map.getZoom() : 8;
     const close = z >= 9.5;
-    return { fillColor: c || '#e5e7eb', fillOpacity: c ? (z >= 11 ? 0.6 : 0.8) : 0.3, color: close ? '#374151' : '#ffffff',
+    return { fillColor: c || '#e5e7eb', fillOpacity: c ? (z >= 11 ? 0.45 : 0.62) : 0.15, color: close ? '#1f2937' : '#ffffff',
       weight: z >= 12 ? 1.8 : close ? 1.1 : z >= 8 ? 0.7 : 0.4, opacity: close ? 0.55 : 1 };
   }
-  return { fillColor: c || '#e5e7eb', fillOpacity: c ? 0.85 : 0.35, color: '#ffffff', weight: strong ? 1.2 : level === 'metro' ? 0.8 : 0.4, opacity: 0.95 };
+  return { fillColor: c || '#e5e7eb', fillOpacity: c ? 0.62 : 0.15, color: '#1f2937', weight: strong ? 1.2 : level === 'metro' ? 0.9 : 0.5, opacity: strong ? 0.7 : 0.5 };
 }
 const dark = () => false; // Crisp white is a light theme everywhere
 function eachShape(level, fn) {
@@ -553,11 +584,8 @@ async function init() {
   map = L.map('map', { zoomControl: true, preferCanvas: true, minZoom: 3, maxZoom: 14, zoomSnap: 0.25, worldCopyJump: false }).setView([38.5, -96], 4.4);
   map.zoomControl.setPosition('bottomleft');
   map.createPane('labels'); map.getPane('labels').style.zIndex = 650; map.getPane('labels').style.pointerEvents = 'none';
-  // Background: Esri's gray canvas (no key needed), with its place-name layer drawn above the coloured areas.
-  const tone = dark() ? 'Dark' : 'Light';
-  const esri = name => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${tone}_Gray_${name}/MapServer/tile/{z}/{y}/{x}`;
-  L.tileLayer(esri('Base'), { attribution: 'Basemap &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors', maxNativeZoom: 16 }).addTo(map);
-  L.tileLayer(esri('Reference'), { pane: 'labels', maxNativeZoom: 16 }).addTo(map);
+  // Background: Esri's colourful topographic map (no key needed); the coloured areas sit on it see-through.
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Basemap &copy; Esri, HERE, Garmin, USGS, &copy; OpenStreetMap contributors', maxNativeZoom: 18 }).addTo(map);
   if (innerWidth < 820) map.setView([39, -97], 3.4);
 
   const get = u => fetch(u).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
@@ -586,7 +614,7 @@ async function init() {
   layers.county = makeLayer('county', counties);
   layers.metro = makeLayer('metro', metros);
   layers.state = makeLayer('state', states.filter(f => D.state[f.id]));
-  layers.stateLines = L.geoJSON(topojson.mesh(topo, topo.objects.states, (a, b) => a !== b), { style: { color: '#6b7280', weight: 1, opacity: 0.6, fill: false }, interactive: false }).addTo(map);
+  layers.stateLines = L.geoJSON(topojson.mesh(topo, topo.objects.states, (a, b) => a !== b), { style: { color: '#111827', weight: 1.8, opacity: 0.85, fill: false }, interactive: false }).addTo(map);
   // After every pan or zoom: load ZIPs that came into view, and recolour (On screen colours and ZIP borders depend on the view).
   let moveTimer;
   map.on('moveend', () => { ensureZips(); clearTimeout(moveTimer); moveTimer = setTimeout(() => { if (ui.scaleMode === 'view' || ui.level === 'zip') restyle(); }, 120); });
@@ -659,7 +687,7 @@ function zoomTo(level, id) {
   shapesOf(level, id).forEach(l => { bounds = bounds ? bounds.extend(l.getBounds()) : l.getBounds(); });
   if (!bounds) return;
   const wide = innerWidth > 820;
-  map.flyToBounds(bounds, { maxZoom: level === 'state' ? 6 : level === 'zip' ? 9 : 7.5, paddingTopLeft: [40, wide ? 80 : 120], paddingBottomRight: wide ? [460, 40] : [40, innerHeight * 0.6] });
+  map.flyToBounds(bounds, { maxZoom: level === 'state' ? 6 : level === 'zip' ? 9 : 7.5, paddingTopLeft: [40, wide ? 80 : 120], paddingBottomRight: wide ? [640, 40] : [40, innerHeight * 0.6] });
 }
 
 // ---------- detail drawer ----------
@@ -674,6 +702,7 @@ async function openDetail(level, id) {
   hist = null;
   renderDrawer();
   drawer.classList.add('open');
+  document.querySelector('.stage').classList.add('panel-open');
   try {
     if (level === 'zip') {
       // ZIP histories come bundled by the first three digits, stored as [first month, [values…]].
@@ -701,74 +730,143 @@ function outline(level, id) {
   const feats = shapesOf(level, id).map(l => l.feature);
   selLayer = L.geoJSON(feats, { interactive: false, style: { color: '#111827', weight: 3, fill: false, opacity: 0.95 } }).addTo(map);
 }
-function closeDrawer() { drawer.classList.remove('open'); openPlace = null; outline(); }
+function closeDrawer() { drawer.classList.remove('open'); document.querySelector('.stage').classList.remove('panel-open'); openPlace = null; outline(); }
 document.getElementById('dClose').addEventListener('click', closeDrawer);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
 
+// ----- every data point gets its own history, worked out from the raw monthly series -----
+const backKey = (k, n) => { let y = +k.slice(0, 4), m = +k.slice(5, 7) - n; while (m <= 0) { m += 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; };
+function pctSeries(s, n) {
+  const out = {};
+  for (const k in s) { const o = s[backKey(k, n)]; if (o) out[k] = (s[k] / o - 1) * 100; }
+  return out;
+}
+const mapSeries = (s, fn) => { const out = {}; for (const k in s) { const v = fn(s[k], k); if (v != null && isFinite(v)) out[k] = v; } return out; };
+const rateAt = k => { const h = D.meta.mortgage.history; if (h[k] != null) return h[k]; const prev = Object.keys(h).filter(m => m <= k).sort().pop(); return prev ? h[prev] : D.meta.mortgage.rate; };
+const pmt = (price, rate) => { const r = rate / 1200; return price * 0.8 * r / (1 - Math.pow(1 + r, -360)); };
+function trendGapSeries(s) {
+  const keys = Object.keys(s).sort(), pts = keys.map((k, i) => [i, k]).filter(([i, k]) => k < '2020-01' && s[k] > 0);
+  if (pts.length < 120) return null;
+  const n = pts.length, mx = pts.reduce((a, [i]) => a + i, 0) / n, my = pts.reduce((a, [, k]) => a + Math.log(s[k]), 0) / n;
+  let sxy = 0, sxx = 0;
+  for (const [i, k] of pts) { sxy += (i - mx) * (Math.log(s[k]) - my); sxx += (i - mx) ** 2; }
+  const slope = sxy / sxx, out = {};
+  keys.forEach((k, i) => { out[k] = (s[k] / Math.exp(my + slope * (i - mx)) - 1) * 100; });
+  return out;
+}
+function seriesFor(key, h) {
+  if (!h) return null;
+  const hv = h.hv, rent = h.rent;
+  switch (key) {
+    case 'hv': return hv;
+    case 'hv_yoy': return hv && pctSeries(hv, 12);
+    case 'hv_mom': return hv && pctSeries(hv, 1);
+    case 'hv_5y': return hv && pctSeries(hv, 60);
+    case 'overvalued': return hv && trendGapSeries(hv);
+    case 'from_2022_peak': { if (!hv) return null; const peak = Math.max(...Object.keys(hv).filter(k => k.startsWith('2022')).map(k => hv[k])); return isFinite(peak) ? mapSeries(hv, (v, k) => k >= '2022-01' ? (v / peak - 1) * 100 : null) : null; }
+    case 'mtg_pmt': return hv && mapSeries(hv, (v, k) => pmt(v, rateAt(k)));
+    case 'salary_needed': return hv && mapSeries(hv, (v, k) => pmt(v, rateAt(k)) * 12 / 0.3);
+    case 'buy_vs_rent': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? pmt(hv[k], rateAt(k)) - r : null);
+    case 'rent': return rent;
+    case 'rent_yoy': return rent && pctSeries(rent, 12);
+    case 'price_rent': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? hv[k] / (r * 12) : null);
+    case 'gross_yield': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? r * 12 / hv[k] * 100 : null);
+    case 'inv': return h.inv;
+    case 'inv_yoy': return h.inv && pctSeries(h.inv, 12);
+    case 'inv_vs_2019': return h.inv && mapSeries(h.inv, (v, k) => { const b = [2017, 2018, 2019].map(y => h.inv[`${y}${k.slice(4)}`]).filter(Boolean); return b.length && k >= '2020-01' ? (v / (b.reduce((a, c) => a + c, 0) / b.length) - 1) * 100 : null; });
+    case 'newl': return h.newl;
+    case 'newl_yoy': return h.newl && pctSeries(h.newl, 12);
+    case 'dom': return h.dom;
+    case 'dom_yoy': return h.dom && pctSeries(h.dom, 12);
+    case 'cut': return h.cut && mapSeries(h.cut, v => v * 100);
+    case 'lp': return h.lp;
+    case 'lp_yoy': return h.lp && pctSeries(h.lp, 12);
+    case 'pop': return h.pop;
+    case 'pop_growth': return h.pop && pctSeries(h.pop, 12);
+    default: return null;
+  }
+}
+
+let chartMode = 'yearly';
+chartRange = '10';
+const fmtV = (k, v) => M[k].d ? signed(v, M[k].f) : fmt(v, M[k].f);
+function setMetric(k) { ui.metric = k; renderGroups(); restyle(); saveUi(); if (openPlace) renderDrawer(); }
+
 function renderDrawer() {
-  const { level, id } = openPlace, p = D[level][id], v = p.v;
+  const { level, id } = openPlace, p = D[level][id], v = p.v, k = ui.metric, def = M[k];
   const county = level === 'zip' && D.county[p.k] ? `${D.county[p.k].n}, ${D.county[p.k].s}` : '';
   const metro = (level === 'county' || level === 'zip') && p.m && D.metro[p.m] ? D.metro[p.m].n : '';
-  const parent = [county, metro].filter(Boolean).map(x => `<br>Part of ${esc(x)}`).join('');
-  document.getElementById('dTitle').innerHTML = `${esc(placeName(level, p))}<small>${level === 'metro' ? 'Metro area' : level === 'county' ? 'County' : level === 'zip' ? 'ZIP code' : 'State'}${parent}</small>`;
-  const kpi = (k, label) => `<div class="kpi"><span>${esc(label || M[k].l)}</span><b>${M[k].d ? signed(v[k], M[k].f) : fmt(v[k], M[k].f)}</b></div>`;
-  const kpiYoy = (k, yk, label) => `<div class="kpi"><span>${esc(label)}</span><b>${fmt(v[k], M[k].f)}</b>${v[yk] != null ? `<em class="${v[yk] >= 0 ? 'up' : 'down'}">${signed(v[yk], 'pct')} YoY</em>` : ''}</div>`;
-  if (!hist || !hist[chartKey]) chartKey = hist ? Object.keys(SERIES).find(k => hist[k]) || chartKey : chartKey;
-  const avail = hist ? Object.keys(SERIES).filter(k => hist[k]) : [];
+  const kind = level === 'metro' ? 'Metro area' : level === 'county' ? 'County' : level === 'zip' ? 'ZIP code' : 'State';
+  document.getElementById('dTitle').innerHTML = `${esc(placeName(level, p))}<small>${kind}${[county, metro].filter(Boolean).map(x => ` · ${esc(x)}`).join('')}</small>`;
+  const series = hist ? seriesFor(k, hist) : null;
+  const options = GROUPS.slice(1).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].map(x => `<option value="${x}" ${x === k ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('');
+  const tile = x => `<button type="button" class="kpi ${x === k ? 'on' : ''}" data-metric="${x}"><span>${esc(M[x].l)}</span><b>${fmtV(x, v[x])}</b></button>`;
   const groupsHtml = GROUPS.slice(1).map(([name, keys]) => {
-    const rows = [...new Set(keys)].filter(k => v[k] != null);
+    const rows = [...new Set(keys)].filter(x => v[x] != null);
     if (!rows.length) return '';
-    return `<div class="sec"><h4>${esc(name)}</h4><table>${rows.map(k => `<tr class="${k === ui.metric ? 'cur' : ''}"><td>${esc(M[k].l)}</td><td>${M[k].d ? signed(v[k], M[k].f) : fmt(v[k], M[k].f)}</td></tr>`).join('')}</table></div>`;
+    return `<div class="sec"><h4>${esc(name)}</h4><table>${rows.map(x => `<tr class="${x === k ? 'cur' : ''}" data-metric="${x}"><td>${esc(M[x].l)}</td><td>${fmtV(x, v[x])}</td></tr>`).join('')}</table></div>`;
   }).join('');
+  const toggles = `<div class="chart-ctrl"><div class="seg-sm">${[['yearly', 'Yearly'], ['monthly', 'Monthly']].map(([m, l]) => `<button type="button" class="${chartMode === m ? 'on' : ''}" data-cmode="${m}">${l}</button>`).join('')}</div>
+    <div class="seg-sm">${[['5', '5Y'], ['10', '10Y'], ['20', '20Y'], ['all', 'All']].map(([r, l]) => `<button type="button" class="${chartRange === r ? 'on' : ''}" data-range="${r}">${l}</button>`).join('')}</div></div>`;
+  const chart = hist == null ? '<p class="note chart-empty">Loading history…</p>'
+    : series && Object.keys(series).length > 1 ? `<div class="chart" id="chart">${chartSvg(series, def)}<div class="ctip"></div></div>`
+    : `<div class="chart-empty"><b>${fmtV(k, v[k])}</b><span>${v[k] == null ? 'No data for this place.' : 'Only the latest value is published for this data point, so there is no history to chart.'}</span></div>`;
   document.getElementById('dBody').innerHTML = `
-    <div class="kpis">
-      ${kpiYoy('hv', 'hv_yoy', 'Home value')}
-      ${kpi('fc_1y', '1-year forecast')}
-      ${kpiYoy('inv', 'inv_yoy', 'For sale inventory')}
-      ${kpiYoy('dom', 'dom_yoy', 'Days on market')}
-      ${kpi('cut', 'Price cut %')}
-      ${kpiYoy('rent', 'rent_yoy', 'Typical rent')}
-    </div>
-    <div class="chart-tabs">${hist == null ? '<span class="note">Loading history…</span>' : avail.map(k => `<button type="button" class="${k === chartKey ? 'on' : ''}" data-series="${k}">${SERIES[k][0]}</button>`).join('')}</div>
-    ${hist && hist[chartKey] ? `<div class="ranges">${[['all', 'All'], ['10', '10Y'], ['5', '5Y'], ['1', '1Y']].map(([r, l]) => `<button type="button" class="${chartRange === r ? 'on' : ''}" data-range="${r}">${l}</button>`).join('')}</div><div class="chart" id="chart">${chartSvg(hist[chartKey], SERIES[chartKey][1])}<div class="ctip"></div></div>` : ''}
+    <div class="metric-head"><label class="mpick"><select id="mPick" aria-label="Data point">${options}</select></label>
+      <div class="mnow"><b>${fmtV(k, v[k])}</b><span>now</span></div></div>
+    ${toggles}
+    ${chart}
+    <h4 class="snap-h">Market snapshot</h4>
+    <div class="kpis">${['hv', 'hv_yoy', 'fc_1y', 'inv', 'hv_5y', 'overvalued'].map(tile).join('')}</div>
     ${groupsHtml}
-    <p class="note">Home values: Zillow (${ymLabel(D.meta.months.zillow)}). Listings: Realtor.com (${ymLabel(D.meta.months.realtor)}). Income &amp; poverty: Census ${D.meta.months.income}; population ${D.meta.months.population}. Mortgage math uses ${D.meta.mortgage.rate}% (30-year fixed, ${esc(D.meta.mortgage.date)}).${level === 'metro' ? ' Metro income and population are combined from their counties.' : ''}${level === 'zip' ? ' ZIP figures that use income (value/income, payment % of income, rent % of income) use the county’s median income, and the forecast is the metro’s.' : ''}</p>`;
+    <p class="note">Home values: Zillow (${ymLabel(D.meta.months.zillow)}). Listings: Realtor.com (${ymLabel(D.meta.months.realtor)}). Income &amp; poverty: Census ${D.meta.months.income}; population ${D.meta.months.population}. Mortgage math uses ${D.meta.mortgage.rate}% today (30-year fixed, ${esc(D.meta.mortgage.date)}) and each month's rate in the charts.${level === 'metro' ? ' Metro income and population are combined from their counties.' : ''}${level === 'zip' ? ' ZIP figures that use income use the county’s median income, and the forecast is the metro’s.' : ''}</p>`;
 }
 document.getElementById('dBody').addEventListener('click', e => {
-  const s = e.target.closest('[data-series]'); if (s) { chartKey = s.dataset.series; renderDrawer(); return; }
+  const m = e.target.closest('[data-metric]'); if (m) { setMetric(m.dataset.metric); return; }
+  const c = e.target.closest('[data-cmode]'); if (c) { chartMode = c.dataset.cmode; renderDrawer(); return; }
   const r = e.target.closest('[data-range]'); if (r) { chartRange = r.dataset.range; renderDrawer(); }
 });
+document.getElementById('dBody').addEventListener('change', e => { if (e.target.id === 'mPick') setMetric(e.target.value); });
 
-// History chart: one line, hover for the month's value.
-function chartSvg(series, f) {
+// History chart for the selected data point. Yearly = the same month each year (labelled), Monthly = every month.
+function chartSvg(series, def) {
+  const f = def.f;
   let keys = Object.keys(series).sort();
-  if (chartRange !== 'all') { const cut = `${+keys[keys.length - 1].slice(0, 4) - +chartRange}${keys[keys.length - 1].slice(4)}`; keys = keys.filter(k => k >= cut); }
-  if (keys.length < 2) return '<p class="note">Not enough history.</p>';
+  const last = keys[keys.length - 1];
+  if (chartRange !== 'all') { const cut = `${+last.slice(0, 4) - +chartRange}${last.slice(4)}`; keys = keys.filter(k => k >= cut); }
+  if (chartMode === 'yearly') { const yearly = keys.filter(k => k.slice(5) === last.slice(5)); if (yearly.length >= 2) keys = yearly; }
+  if (keys.length < 2) return '<p class="note">Not enough history for this range.</p>';
   const vals = keys.map(k => series[k]);
-  const W = 380, H = 190, L0 = 46, R0 = 8, T0 = 10, B0 = 22;
+  const W = 560, H = 280, L0 = 56, R0 = 14, T0 = 22, B0 = 26;
   let lo = Math.min(...vals), hi = Math.max(...vals);
-  const pad = (hi - lo) * 0.08 || Math.abs(hi) * 0.05 || 1; lo -= pad; hi += pad;
-  if (lo > 0 && lo < (hi - lo) * 0.3) lo = 0;
+  if (def.d) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+  const pad = (hi - lo) * 0.1 || Math.abs(hi) * 0.05 || 1; lo -= pad; hi += pad;
+  if (!def.d && lo > 0 && lo < (hi - lo) * 0.3) lo = 0;
   const x = i => L0 + (W - L0 - R0) * i / (keys.length - 1), y = v => T0 + (H - T0 - B0) * (1 - (v - lo) / (hi - lo));
-  const step = niceStep((hi - lo) / 4);
-  const ticks = []; for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) ticks.push(t);
+  const step = niceStep((hi - lo) / 5);
+  const ticks = []; for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) ticks.push(Math.abs(t) < step / 1e6 ? 0 : t);
   const years = [...new Set(keys.map(k => k.slice(0, 4)))];
-  const every = Math.ceil(years.length / 6);
-  const xt = keys.map((k, i) => [k, i]).filter(([k]) => k.endsWith('-01') && years.indexOf(k.slice(0, 4)) % every === 0);
-  if (keys.length <= 14) xt.splice(0, xt.length, ...keys.map((k, i) => [k, i]).filter((_, i) => i % 3 === 0));
+  const every = Math.ceil(years.length / 10);
+  const yearly = chartMode === 'yearly';
+  const xt = keys.map((k, i) => [k, i]).filter(([k, i]) => yearly ? i % every === 0 || i === keys.length - 1 : k.endsWith('-01') && years.indexOf(k.slice(0, 4)) % every === 0);
   const path = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
-  const area = `${path}L${x(vals.length - 1).toFixed(1)},${(H - B0)}L${x(0)},${H - B0}Z`;
-  const first = vals[0], last = vals[vals.length - 1];
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(SERIES[chartKey][0])} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}" data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi })}'>
-    ${ticks.map(t => `<line x1="${L0}" x2="${W - R0}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${L0 - 6}" y="${y(t) + 3.5}" text-anchor="end" font-size="10" fill="var(--muted)">${fmt(t, f, true)}</text>`).join('')}
-    ${xt.map(([k, i]) => `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="var(--muted)">${keys.length <= 14 ? MON[+k.slice(5) - 1] : k.slice(0, 4)}</text>`).join('')}
-    <path d="${area}" fill="var(--accent)" opacity="0.10"/>
-    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${x(vals.length - 1)}" cy="${y(last)}" r="4" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>
+  const base = def.d ? y(0) : H - B0;
+  const area = `${path}L${x(vals.length - 1).toFixed(1)},${base}L${x(0)},${base}Z`;
+  const labels = yearly && keys.length <= 14;
+  const short = v => f === 'usd' ? fmt(v, 'usd', true) : f.startsWith('pct') ? (v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '%' : f === 'ratio' ? v.toFixed(1) + '×' : fmt(v, f === 'days' ? 'num' : f, true);
+  const first = vals[0], lastV = vals[vals.length - 1];
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.l)} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}" data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi })}'>
+    <defs><linearGradient id="cfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    ${ticks.map(t => `<line x1="${L0}" x2="${W - R0}" y1="${y(t)}" y2="${y(t)}" stroke="${def.d && t === 0 ? '#374151' : 'var(--line)'}" stroke-width="${def.d && t === 0 ? 1.4 : 1}"/><text x="${L0 - 8}" y="${y(t) + 3.5}" text-anchor="end" font-size="11" fill="var(--muted)">${short(t)}</text>`).join('')}
+    ${xt.map(([k, i]) => `<text x="${x(i)}" y="${H - 7}" text-anchor="middle" font-size="11" fill="var(--muted)">${yearly ? k.slice(0, 4) : k.slice(0, 4)}</text>`).join('')}
+    <path d="${area}" fill="url(#cfill)"/>
+    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${yearly ? vals.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="4.5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`).join('') : `<circle cx="${x(vals.length - 1)}" cy="${y(lastV)}" r="4.5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`}
+    ${labels ? vals.map((v, i) => `<text x="${x(i)}" y="${y(v) - 10}" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--text)" paint-order="stroke" stroke="var(--panel)" stroke-width="3">${short(v)}</text>`).join('') : ''}
     <line class="xh" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
-    <circle class="xd" r="4" fill="var(--warm)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
+    <circle class="xd" r="5" fill="var(--warm)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
     <rect x="${L0}" y="${T0}" width="${W - L0 - R0}" height="${H - T0 - B0}" fill="transparent"/>
-  </svg><p class="note" style="margin-top:4px">${ymLabel(keys[0])} → ${ymLabel(keys[keys.length - 1])}: ${fmt(first, f)} → ${fmt(last, f)} (${first ? signed((last / first - 1) * 100, 'pct') : '—'})</p>`;
+  </svg><p class="note" style="margin-top:4px">${ymLabel(keys[0])} → ${ymLabel(keys[keys.length - 1])}: ${fmtV(ui.metric, first)} → ${fmtV(ui.metric, lastV)}${!def.d && first > 0 ? ` (${signed((lastV / first - 1) * 100, 'pct')})` : ''}</p>`;
 }
 function niceStep(raw) {
   const p = Math.pow(10, Math.floor(Math.log10(raw || 1))), n = raw / p;

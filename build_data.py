@@ -203,6 +203,7 @@ def census_population():
             continue
         g = lambda name: num(row[col[name]]) if name in col else None
         out[pid] = {
+            "series": {f"{yy}-07": v for yy in range(2020, y + 1) if (v := g(f"POPESTIMATE{yy}")) is not None},
             "name": row[col["CTYNAME"]],
             "pop": g(f"POPESTIMATE{y}"), "pop_prev": g(f"POPESTIMATE{y - 1}"), "pop_2020": g("POPESTIMATE2020"),
             "births": g(f"BIRTHS{y}"), "deaths": g(f"DEATHS{y}"), "natural": g(f"NATURALCHG{y}"),
@@ -459,6 +460,10 @@ def main():
         if not total:
             return None, None
         agg_pop = {k: sum((pop.get(c, {}).get(k) or 0) for c in cs) for k in ("pop", "pop_prev", "pop_2020", "births", "deaths", "natural", "dom_mig", "intl_mig")}
+        agg_pop["series"] = {}
+        for c in cs:
+            for k, v in (pop.get(c, {}).get("series") or {}).items():
+                agg_pop["series"][k] = agg_pop["series"].get(k, 0) + v
         wi = [(p, inc[c]) for p, c in ps if c in inc and inc[c].get("income")]
         wt = sum(p for p, _ in wi)
         agg_inc = {"income": sum(p * i["income"] for p, i in wi) / wt, "poverty": sum(p * (i["poverty"] or 0) for p, i in wi) / wt} if wt else None
@@ -471,7 +476,7 @@ def main():
     for fips, (abbr, name) in STATES.items():
         m = metrics_for(zv["state"].get(fips, {}).get("series"), None, rt["state"].get(fips), inc.get(fips), pop.get(fips), rate)
         places["state"][fips] = {"n": name, "s": abbr, "v": m}
-        hist["state"].setdefault("all", {})[fips] = series_bundle(zv["state"].get(fips), None, rt["state"].get(fips), HSTART)
+        hist["state"].setdefault("all", {})[fips] = series_bundle(zv["state"].get(fips), None, rt["state"].get(fips), HSTART, pop.get(fips))
 
     for cbsa, name in metro_names.items():
         ai, ap = combine(cbsa)
@@ -480,7 +485,7 @@ def main():
             continue
         st = name.rsplit(", ", 1)[-1].split("-")[0]
         places["metro"][cbsa] = {"n": name, "s": st, "v": m, "c": sorted(metro_counties.get(cbsa, []))}
-        hist["metro"].setdefault(st, {})[cbsa] = series_bundle(zv["metro"].get(cbsa), zr["metro"].get(cbsa), rt["metro"].get(cbsa), HSTART)
+        hist["metro"].setdefault(st, {})[cbsa] = series_bundle(zv["metro"].get(cbsa), zr["metro"].get(cbsa), rt["metro"].get(cbsa), HSTART, ap)
 
     county_ids = set(zv["county"]) | set(rt["county"]) | {k for k in pop if len(k) == 5}
     for fips in sorted(county_ids):
@@ -493,7 +498,7 @@ def main():
             continue
         name = county_name(fips, zv, rt, pop)
         places["county"][fips] = {"n": name, "s": STATES[fips[:2]][0], "v": m, **({"m": cbsa} if cbsa else {})}
-        hist["county"].setdefault(STATES[fips[:2]][0], {})[fips] = series_bundle(zv["county"].get(fips), zr["county"].get(fips), rt["county"].get(fips), HSTART)
+        hist["county"].setdefault(STATES[fips[:2]][0], {})[fips] = series_bundle(zv["county"].get(fips), zr["county"].get(fips), rt["county"].get(fips), HSTART, pop.get(fips))
 
     us_inc = inc.get("US", {})
     zillow_month = max((max(r["series"]) for r in zv["state"].values() if r["series"]), default=None)
@@ -854,8 +859,10 @@ def build_zips(county_to_cbsa, inc, rate, forecast):
     return len(index), breaks
 
 
-def series_bundle(zrec, zrrec, rtrec, start):
+def series_bundle(zrec, zrrec, rtrec, start, poprec=None):
     b = {}
+    if poprec and poprec.get("series"):
+        b["pop"] = poprec["series"]
     if zrec and zrec.get("series"):
         b["hv"] = trim_series(zrec["series"], start)
     if zrrec and zrrec.get("series"):
