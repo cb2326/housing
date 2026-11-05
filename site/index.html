@@ -33,6 +33,7 @@
   .brand svg { width: 34px; height: 34px; flex: none; }
   .brand h1 { margin: 0; font: 600 21px/1.1 var(--serif); }
   .brand small { display: block; color: var(--muted); font: 12px var(--sans); margin-top: 2px; }
+  .brand .byline { color: var(--accent); font-weight: 600; font-size: 12.5px; margin-top: 3px; }
   .dp-search { margin: 4px 14px 10px; position: relative; }
   .dp-search input { width: 100%; padding: 8px 12px 8px 32px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
   .dp-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); }
@@ -213,12 +214,12 @@
   <aside class="side" id="side" aria-label="Data points">
     <div class="brand">
       <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#4f46e5"/><path d="M14 34 32 18l18 16v14a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2z" fill="#f6efe3"/><path d="M26 50V38h12v12" fill="#a5b4fc"/></svg>
-      <div><h1>Housing Map</h1><small id="asof">Loading data…</small></div>
+      <div><h1>Housing Map</h1><small class="byline">by Chris B</small><small id="asof">Loading data…</small></div>
     </div>
     <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="dpSearch" type="search" placeholder="Search data points" aria-label="Search data points"></label>
     <div class="groups" id="groups"></div>
-    <div class="side-foot">Data: Zillow Research, Realtor.com, U.S. Census Bureau, Freddie Mac (via FRED). Updated monthly. Personal use; not financial advice.</div>
+    <div class="side-foot">Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, Freddie Mac (via FRED). Updated monthly. Personal use; not financial advice.</div>
   </aside>
   <main class="stage">
     <div id="map"></div>
