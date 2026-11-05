@@ -1,18 +1,25 @@
-"""Housing Map - monthly data builder.
+"""Housing Map - data builder.
 
 Downloads free public housing data and writes small JSON files the map reads:
-  site/data/meta.json                 when it was built, latest months, sources, mortgage rate
-  site/data/{state,metro,county}.json latest value of every metric for every place
-  site/data/hist/{level}/{key}.json   monthly history for the charts (one file per state)
+  site/data/meta.json                 when it was built, latest months/years, mortgage rate
+  site/data/{state,metro,county}.json latest value of every data point for every place
+  site/data/hist/{level}/{id}.json    history for the charts (monthly series + yearly data points)
+  site/data/zip/...                   the same for ~30,000 ZIP codes, one file per state
 
-Sources (no keys or accounts needed):
-  Zillow Research      home values (ZHVI), rents (ZORI), 1-year forecast (metros)
-  Realtor.com          listings, days on market, price cuts, new listings, listing prices
-  U.S. Census Bureau   median household income + poverty (SAIPE), population + births/deaths/migration
-                       (Population Estimates), county-to-metro list
-  FRED (Freddie Mac)   30-year mortgage rate
+Sources (no accounts needed; the Census API key is optional but unlocks the American Community Survey):
+  Zillow Research      home values (all homes, single-family, condos), rents, 1-year forecast
+  Realtor.com          listings, pending sales, days on market, price cuts, new listings, listing prices
+  U.S. Census Bureau   population, births/deaths/migration, age (Population Estimates); income + poverty (SAIPE);
+                       housing units; building permits; land area; American Community Survey (with a key)
+  CFPB / FFIEC HMDA    every home-purchase mortgage application in the US (Mortgage Quality data points)
+  NOAA                 average temperature by county
+  MIT Election Lab     county presidential results (via the tonmcg/US_County_Level_Election_Results_08-24 copy)
+  Freddie Mac          30-year mortgage rate
 
-Runs on GitHub (see .github/workflows/update.yml) once a month, or locally:  python build_data.py
+Things that change once a year (mortgage data, Census survey answers, Zillow forecasts so far) are kept in
+data_cache/, which the GitHub workflow saves back into the repository, so they are only worked out once.
+
+Runs on GitHub (see .github/workflows/update.yml) twice a month, or locally:  python build_data.py
 Only uses the Python standard library.
 """
 import csv
@@ -21,20 +28,28 @@ import io
 import json
 import math
 import os
+import re
 import sys
 import time
 import urllib.request
+import zipfile
+from collections import Counter
 from datetime import date, datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "site", "data")
 CACHE = os.path.join(HERE, ".cache")  # downloads are reused for 20 hours when testing locally
+DCACHE = os.path.join(HERE, "data_cache")  # yearly results, saved in the repository by the workflow
 UA = {"User-Agent": "Mozilla/5.0 (compatible; HousingMapBuilder/1.0; personal non-commercial use)"}
+PLAIN = {"User-Agent": "HousingMapBuilder/1.0"}
+CENSUS_KEY = os.environ.get("CENSUS_API_KEY", "").strip()
+HMDA_YEARS_PER_RUN = int(os.environ.get("HMDA_YEARS_PER_RUN", "4"))
 csv.field_size_limit(10_000_000)
 
 ZILLOW = "https://files.zillowstatic.com/research/public_csvs"
 REALTOR = "https://econdata.s3-us-west-2.amazonaws.com/Reports/Core"
 CENSUS = "https://www2.census.gov/programs-surveys"
+THIS_YEAR = date.today().year
 
 STATES = {  # FIPS: (abbreviation, name)
     "01": ("AL", "Alabama"), "02": ("AK", "Alaska"), "04": ("AZ", "Arizona"), "05": ("AR", "Arkansas"),
@@ -66,16 +81,16 @@ def fetch(url, name=None, headers=None, timeout=180, tries=3):
     last = None
     for attempt in range(tries):
         try:
-            print(f"  downloading {url}", flush=True)
+            print(f"  downloading {url.split('&key=')[0]}", flush=True)
             data = urllib.request.urlopen(urllib.request.Request(url, headers=headers or UA), timeout=timeout).read()
-            if url.endswith(".gz"):
+            if url.endswith(".gz") or data[:2] == b"\x1f\x8b":
                 data = gzip.decompress(data)
             with open(path, "wb") as f:
                 f.write(data)
             return data
         except Exception as e:  # network hiccup: try again (but a missing file stays missing)
             last = e
-            if getattr(e, "code", None) == 404:
+            if getattr(e, "code", None) in (400, 404):
                 break
             time.sleep(5 * (attempt + 1))
     raise last
@@ -87,8 +102,16 @@ def fetch_first(urls, name):
         try:
             return fetch(url, name), url
         except Exception as e:
-            print(f"  (not available: {url} - {e})")
+            print(f"  (not available: {url.split('&key=')[0]} - {e})")
     return None, None
+
+
+def try_fetch(url, name, headers=None):
+    try:
+        return fetch(url, name, headers)
+    except Exception as e:
+        print(f"  (skipped {url.split('&key=')[0]}: {e})")
+        return None
 
 
 def rows(data, encoding="utf-8"):
@@ -103,10 +126,30 @@ def num(s):
         return None
 
 
+def load_dcache(name):
+    path = os.path.join(DCACHE, name)
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+
+def write_json(path, obj):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, separators=(",", ":"))
+
+
+def save_dcache(name, obj):
+    write_json(os.path.join(DCACHE, name), obj)
+
+
 # ---------- Zillow (wide CSVs: one column per month) ----------
 def zillow(path, level):
-    """{place id: {"name":..., "series": {"YYYY-MM": value}}} for one Zillow file."""
-    data = fetch(f"{ZILLOW}/{path}", f"zillow_{path.replace('/', '_')}")
+    """{place id: {"name":..., "series": {"YYYY-MM": value}}} for one Zillow file ({} if Zillow doesn't publish it)."""
+    data = try_fetch(f"{ZILLOW}/{path}", f"zillow_{path.replace('/', '_')}")
+    if not data:
+        return {}
     r = rows(data)
     head = next(r)
     month_cols = [(i, h[:7]) for i, h in enumerate(head) if len(h) == 10 and h[4] == "-"]
@@ -162,11 +205,10 @@ def realtor(level):
     return out
 
 
-# ---------- Census ----------
+# ---------- Census: metros ----------
 def census_metros():
-    """County -> metro (CBSA code) list, metro names and population (Census Population Estimates, metro file)."""
-    year = date.today().year
-    urls = [f"{CENSUS}/popest/datasets/2020-{y}/metro/totals/cbsa-est{y}-alldata.csv" for y in range(year, year - 4, -1)]
+    """County -> metro (CBSA code) list and metro names (Census Population Estimates, metro file)."""
+    urls = [f"{CENSUS}/popest/datasets/2020-{y}/metro/totals/cbsa-est{y}-alldata.csv" for y in range(THIS_YEAR, THIS_YEAR - 4, -1)]
     data, url = fetch_first(urls, "census_cbsa.csv")
     r = rows(data, "latin-1")
     head = next(r)
@@ -184,63 +226,517 @@ def census_metros():
     return names, county_to_cbsa
 
 
-def census_population():
-    """Population, births, deaths, migration by county and state (latest Census Population Estimates)."""
-    year = date.today().year
-    urls = [f"{CENSUS}/popest/datasets/2020-{y}/counties/totals/co-est{y}-alldata.csv" for y in range(year, year - 4, -1)]
-    data, url = fetch_first(urls, "census_pop.csv")
+# ---------- yearly data, collected as raw numbers per county (and state) so metros can be added up ----------
+# R[pid][field][year] = value.  pid = 2-digit state FIPS or 5-digit county FIPS.
+def rput(R, pid, field, year, v):
+    if v is not None:
+        R.setdefault(pid, {}).setdefault(field, {})[year] = v
+
+
+def census_population(R):
+    """Population, births, deaths and migration for every year since 2010 (two Census vintages). Returns the latest year."""
+    old = try_fetch(f"{CENSUS}/popest/datasets/2010-2019/counties/totals/co-est2019-alldata.csv", "census_pop_2010s.csv")
+    new, _ = fetch_first([f"{CENSUS}/popest/datasets/2020-{y}/counties/totals/co-est{y}-alldata.csv" for y in range(THIS_YEAR, THIS_YEAR - 4, -1)], "census_pop.csv")
+    latest = None
+    names = {}
+    for data, first in ((old, 2010), (new, 2020)):
+        if not data:
+            continue
+        r = rows(data, "latin-1")
+        head = next(r)
+        col = {h: i for i, h in enumerate(head)}
+        last = max(int(h[-4:]) for h in head if h.startswith("POPESTIMATE") and h[-4:].isdigit())
+        if first == 2020:
+            latest = last
+        for row in r:
+            if not row:
+                continue
+            sumlev, st, co = row[col["SUMLEV"]], row[col["STATE"]].zfill(2), row[col["COUNTY"]].zfill(3)
+            if st not in STATES or sumlev not in ("040", "050"):
+                continue
+            pid = st if sumlev == "040" else st + co
+            names[pid] = row[col["CTYNAME"]]
+            g = lambda name: num(row[col[name]]) if name in col else None
+            for y in range(first, last + 1):
+                if first == 2010 and y >= 2020:
+                    continue
+                rput(R, pid, "pop", y, g(f"POPESTIMATE{y}"))
+                if y in (2010, 2020):
+                    continue  # those years' births etc. only cover a few months
+                rput(R, pid, "births", y, g(f"BIRTHS{y}"))
+                rput(R, pid, "deaths", y, g(f"DEATHS{y}"))
+                rput(R, pid, "natural", y, g(f"NATURALCHG{y}") if f"NATURALCHG{y}" in col else g(f"NATURALINC{y}"))
+                rput(R, pid, "dom_mig", y, g(f"DOMESTICMIG{y}"))
+                rput(R, pid, "intl_mig", y, g(f"INTERNATIONALMIG{y}"))
+    return latest, names
+
+
+def census_age(R):
+    """Age groups and median age by county for every year since 2010 (Population Estimates by age). Returns the latest year."""
+    old = try_fetch(f"{CENSUS}/popest/datasets/2010-2020/counties/asrh/CC-EST2020-AGESEX-ALL.csv", "census_age_2010s.csv")
+    new, url = fetch_first([f"{CENSUS}/popest/datasets/2020-{y}/counties/asrh/cc-est{y}-agesex-all.csv" for y in range(THIS_YEAR, THIS_YEAR - 4, -1)], "census_age.csv")
+    latest = None
+    for data, year_of in ((old, lambda k: 2007 + k if 3 <= k <= 12 else None), (new, lambda k: 2018 + k if k >= 2 else None)):
+        if not data:
+            continue
+        r = rows(data, "latin-1")
+        head = next(r)
+        col = {h: i for i, h in enumerate(head)}
+        for row in r:
+            if not row or row[col["SUMLEV"]].zfill(3) != "050":  # the 2010s file writes "50", not "050"
+                continue
+            y = year_of(int(row[col["YEAR"]]))
+            if y is None:
+                continue
+            pid = row[col["STATE"]].zfill(2) + row[col["COUNTY"]].zfill(3)
+            if pid[:2] not in STATES:
+                continue
+            g = lambda *names: sum(num(row[col[n]]) or 0 for n in names if n in col)
+            pop = g("POPESTIMATE")
+            if not pop:
+                continue
+            rput(R, pid, "agepop", y, pop)
+            rput(R, pid, "u18", y, g("UNDER5_TOT", "AGE513_TOT", "AGE1417_TOT"))
+            rput(R, pid, "a2544", y, g("AGE2544_TOT"))
+            rput(R, pid, "a65", y, g("AGE65PLUS_TOT"))
+            rput(R, pid, "a75", y, g("AGE7579_TOT", "AGE8084_TOT", "AGE85PLUS_TOT"))
+            med = num(row[col["MEDIAN_AGE_TOT"]]) if "MEDIAN_AGE_TOT" in col else None
+            if med:
+                rput(R, pid, "medage", y, med)
+                rput(R, pid, "medage_w", y, med * pop)
+            if data is new:
+                latest = max(latest or 0, y)
+    return latest
+
+
+def census_income(R):
+    """Median household income and poverty rate by county and state for every year since 2005 (Census SAIPE)."""
+    latest = None
+    for y in range(2005, THIS_YEAR + 1):
+        yy = str(y)[2:]
+        data = None
+        if y < THIS_YEAR - 2 and os.path.exists(os.path.join(CACHE, f"saipe{yy}.txt")):
+            data = open(os.path.join(CACHE, f"saipe{yy}.txt"), "rb").read()
+        if data is None:
+            try:
+                data = fetch(f"{CENSUS}/saipe/datasets/{y}/{y}-state-and-county/est{yy}all.txt", f"saipe{yy}.txt")
+            except Exception:
+                continue
+        latest = y
+        for line in data.decode("latin-1").splitlines():
+            t = line.split()
+            if len(t) < 23 or not t[0].isdigit():
+                continue
+            st, co = t[0].zfill(2), t[1].zfill(3)
+            if st not in STATES:
+                continue
+            pid = st if co == "000" else st + co
+            inc, pov = num(t[20]), num(t[5])
+            if inc and 5000 < inc < 500000:
+                rput(R, pid, "income", y, inc)
+            if pov is not None and 0 <= pov <= 100:
+                rput(R, pid, "poverty", y, pov)
+    return latest
+
+
+def census_permits(R):
+    """New homes authorised by building permits, by county, every year since 2000 (Census Building Permits Survey)."""
+    latest = None
+    for y in range(2000, THIS_YEAR + 1):
+        data = try_fetch(f"https://www2.census.gov/econ/bps/County/co{y}a.txt", f"bps_co{y}.txt")
+        if not data:
+            continue
+        latest = y
+        for row in rows(data, "latin-1"):
+            if len(row) < 17 or not row[0].strip()[:4].isdigit() or not row[1].strip().isdigit():
+                continue
+            pid = row[1].strip().zfill(2) + row[2].strip().zfill(3)
+            if pid[:2] not in STATES:
+                continue
+            units = sum(num(row[i]) or 0 for i in (7, 10, 13, 16))
+            rput(R, pid, "permits", y, units)
+    return latest
+
+
+def census_housing_units(R):
+    """Housing units by county: Census estimates for 2010-2020, then rolled forward with each year's building permits."""
+    data = try_fetch(f"{CENSUS}/popest/datasets/2010-2020/housing/HU-EST2020_ALL.csv", "census_hu.csv")
+    if not data:
+        return None
     r = rows(data, "latin-1")
     head = next(r)
     col = {h: i for i, h in enumerate(head)}
-    y = max(int(h[-4:]) for h in head if h.startswith("POPESTIMATE") and h[-4:].isdigit())
-    out = {"_year": y}
     for row in r:
-        if not row:
+        if not row or row[col["SUMLEV"]] != "050":
             continue
-        sumlev, st, co = row[col["SUMLEV"]], row[col["STATE"]].zfill(2), row[col["COUNTY"]].zfill(3)
-        pid = st if sumlev == "040" else st + co if sumlev == "050" else None
-        if not pid:
+        pid = row[col["STATE"]].zfill(2) + row[col["COUNTY"]].zfill(3)
+        for y in range(2010, 2021):
+            rput(R, pid, "units", y, num(row[col[f"HUESTIMATE{y}"]]))
+    latest = 2020
+    for pid, rec in R.items():
+        u, p = rec.get("units"), rec.get("permits", {})
+        if not u or 2020 not in u:
             continue
-        g = lambda name: num(row[col[name]]) if name in col else None
-        out[pid] = {
-            "series": {f"{yy}-07": v for yy in range(2020, y + 1) if (v := g(f"POPESTIMATE{yy}")) is not None},
-            "name": row[col["CTYNAME"]],
-            "pop": g(f"POPESTIMATE{y}"), "pop_prev": g(f"POPESTIMATE{y - 1}"), "pop_2020": g("POPESTIMATE2020"),
-            "births": g(f"BIRTHS{y}"), "deaths": g(f"DEATHS{y}"), "natural": g(f"NATURALCHG{y}"),
-            "dom_mig": g(f"DOMESTICMIG{y}"), "intl_mig": g(f"INTERNATIONALMIG{y}"),
-        }
+        y = 2021
+        while y in p:
+            u[y] = u[y - 1] + p[y]
+            latest = max(latest, y)
+            y += 1
+    return latest
+
+
+def land_area():
+    """Land area in square miles by county and ZIP (Census Gazetteer)."""
+    out = {}
+    for kind in ("counties", "zcta"):
+        for y in range(THIS_YEAR, THIS_YEAR - 5, -1):
+            data = try_fetch(f"https://www2.census.gov/geo/docs/maps-data/data/gazetteer/{y}_Gazetteer/{y}_Gaz_{kind}_national.zip", f"gaz_{kind}.zip")
+            if data:
+                break
+        if not data:
+            continue
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            text = z.read(z.namelist()[0]).decode("latin-1")
+        lines = text.splitlines()
+        sep = "|" if "|" in lines[0] else "\t"  # tab-separated until 2025, then |
+        head = [h.strip() for h in lines[0].split(sep)]
+        gi, ai = head.index("GEOID"), head.index("ALAND_SQMI")
+        for line in lines[1:]:
+            t = line.split(sep)
+            if len(t) > ai and (a := num(t[ai])):
+                out[("z" if kind == "zcta" else "") + t[gi].strip()] = a  # ZIPs get a "z" (county 06037 ≠ ZIP 06037)
     return out
 
 
-def census_income():
-    """Median household income and poverty rate by county and state (Census SAIPE, latest year)."""
-    year = date.today().year
-    for y in range(year, year - 5, -1):
-        yy = str(y)[2:]
-        data, url = fetch_first([f"{CENSUS}/saipe/datasets/{y}/{y}-state-and-county/est{yy}all.txt"], f"saipe{yy}.txt")
-        if data:
-            break
-    out = {"_year": y}
-    for line in data.decode("latin-1").splitlines():
-        t = line.split()
-        if len(t) < 23 or not t[0].isdigit():
+NOAA_STATES = "AL AZ AR CA CO CT DE FL GA ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split()
+
+
+def noaa_temperature(R):
+    """Average yearly temperature (°F) by county and state since 1990 (NOAA climate divisional data)."""
+    base = "https://www.ncei.noaa.gov/pub/data/cirs/climdiv/"
+    listing = try_fetch(base, "noaa_listing.html")
+    if not listing:
+        return None
+    names = re.findall(r"climdiv-tmpc(?:cy|st)-v[\d.]+-\d{8}", listing.decode("latin-1"))
+    latest = None
+    for kind in ("cy", "st"):
+        fname = max((n for n in names if f"tmpc{kind}" in n), default=None)
+        data = fname and try_fetch(base + fname, f"noaa_tmp{kind}.txt")
+        if not data:
             continue
-        st, co = t[0].zfill(2), t[1].zfill(3)
-        pid = st if co == "000" else st + co
-        if st == "00":
-            pid = "US"
-        out[pid] = {"poverty": num(t[5]), "income": num(t[20])}
+        for line in data.decode("latin-1").splitlines():
+            if len(line) < 11:
+                continue
+            code, y = line[:11], int(line[7:11]) if kind == "cy" else int(line[6:10])
+            vals = [num(v) for v in line[11:].split()] if kind == "cy" else [num(v) for v in line[10:].split()]
+            if y < 1990 or len(vals) < 12 or any(v is None or v < -90 for v in vals[:12]):
+                continue  # this year isn't complete yet
+            if kind == "cy":
+                n = int(code[:2])
+                abbr = "AK" if n == 50 else NOAA_STATES[n - 1] if 1 <= n <= 48 else None
+                if not abbr:
+                    continue
+                pid = ABBR_TO_FIPS[abbr] + code[2:5]
+            else:
+                n = int(line[:3])
+                abbr = "AK" if n == 50 else NOAA_STATES[n - 1] if 1 <= n <= 48 else None
+                if not abbr or line[3] != "0":
+                    continue
+                pid = ABBR_TO_FIPS[abbr]
+            rput(R, pid, "temp", y, round(sum(vals[:12]) / 12, 1))
+            latest = max(latest or 0, y)
+    return latest
+
+
+def election_results(R):
+    """Presidential vote by county, 2008-2024."""
+    base = "https://raw.githubusercontent.com/tonmcg/US_County_Level_Election_Results_08-24/master/"
+    latest = None
+    data = try_fetch(base + "US_County_Level_Presidential_Results_08-16.csv", "votes_08_16.csv")
+    if data:
+        r = rows(data)
+        head = next(r)
+        col = {h: i for i, h in enumerate(head)}
+        for row in r:
+            if not row:
+                continue
+            pid = row[col["fips_code"]].zfill(5)
+            for y in (2008, 2012, 2016):
+                t, d, g = (num(row[col[f"{k}_{y}"]]) for k in ("total", "dem", "gop"))
+                if t:
+                    rput(R, pid, "votes_t", y, t); rput(R, pid, "votes_d", y, d); rput(R, pid, "votes_r", y, g)
+                    latest = y
+    for y in range(2020, THIS_YEAR + 1, 4):
+        data = try_fetch(base + f"{y}_US_County_Level_Presidential_Results.csv", f"votes_{y}.csv")
+        if not data:
+            continue
+        r = rows(data)
+        head = next(r)
+        col = {h: i for i, h in enumerate(head)}
+        for row in r:
+            if not row:
+                continue
+            pid = row[col["county_fips"]].zfill(5)
+            t = num(row[col["total_votes"]])
+            if t:
+                rput(R, pid, "votes_t", y, t); rput(R, pid, "votes_d", y, num(row[col["votes_dem"]])); rput(R, pid, "votes_r", y, num(row[col["votes_gop"]]))
+                latest = y
+    return latest
+
+
+# ---------- American Community Survey (needs a free Census API key) ----------
+ACS_VARS = {
+    "units": "B25001_001E", "occ": "B25003_001E", "own": "B25003_002E", "rentocc": "B25003_003E",
+    "mtg_tot": "B25081_001E", "mtg_yes": "B25081_002E",
+    "hh": "B11001_001E", "fam": "B11001_002E", "alone": "B11001_008E",
+    "work": "B08301_001E", "wfh": "B08301_021E",
+    "vac_rent": "B25004_002E", "vac_rented": "B25004_003E", "vac_other": "B25004_008E",
+    "o_tot": "B25007_002E", "o_2534": "B25007_004E", "o_3544": "B25007_005E", "o_6574": "B25007_009E", "o_7584": "B25007_010E", "o_85": "B25007_011E",
+    "r_tot": "B25007_012E", "r_2534": "B25007_014E", "r_3544": "B25007_015E",
+    "income": "B19013_001E", "pop": "B01003_001E",
+}
+ACS_EXTRA = {"tax": "B25103_001E", "value": "B25077_001E", "edu": "B15003_001E", "ba": "B15003_022E", "ma": "B15003_023E", "prof": "B15003_024E", "phd": "B15003_025E"}
+ACS_GEOS = {"state": "state:*", "county": "county:*", "metro": "metropolitan%20statistical%20area/micropolitan%20statistical%20area:*", "zip": "zip%20code%20tabulation%20area:*"}
+
+
+def acs_call(year, geo, varmap):
+    names = list(varmap)
+    url = f"https://api.census.gov/data/{year}/acs/acs5?get={','.join(varmap[n] for n in names)}&for={ACS_GEOS[geo]}&key={CENSUS_KEY}"
+    data = fetch(url, f"acs_{year}_{geo}_{len(names)}.json", PLAIN, timeout=240, tries=2)
+    table = json.loads(data)
+    head = table[0]
+    out = {}
+    for row in table[1:]:
+        if geo == "county":
+            pid = row[head.index("state")] + row[head.index("county")]
+        else:
+            pid = row[-1]
+        vals = {}
+        for i, n in enumerate(names):
+            v = num(row[i])
+            if v is not None and v >= 0:  # the Census marks missing values with big negative numbers
+                vals[n] = v
+        out[pid] = vals
     return out
+
+
+def acs_derive(v):
+    """Survey counts -> data points (all in %, except the two ratios)."""
+    def pct(a, b):
+        return a / b * 100 if a is not None and b else None
+    g = v.get
+    s = lambda *ks: sum(g(k) or 0 for k in ks) if all(g(k) is not None for k in ks) else None
+    m = {
+        "college": pct(s("ba", "ma", "prof", "phd"), g("edu")),
+        "remote": pct(g("wfh"), g("work")),
+        "homeown": pct(g("own"), g("occ")),
+        "mortgaged": pct(g("mtg_yes"), g("mtg_tot")),
+        "family_hh": pct(g("fam"), g("hh")),
+        "single_hh": pct(g("alone"), g("hh")),
+        "vacancy": pct(g("vac_rent"), s("rentocc", "vac_rent", "vac_rented")),
+        "shadow": pct(g("vac_other"), g("units")),
+        "prop_tax_rate": pct(g("tax"), g("value")),
+        "own_2544_pct": pct(s("o_2534", "o_3544"), g("o_tot")),
+        "own_65_pct": pct(s("o_6574", "o_7584", "o_85"), g("o_tot")),
+        "own_75_pct": pct(s("o_7584", "o_85"), g("o_tot")),
+        "rent_2544_pct": pct(s("r_2534", "r_3544"), g("r_tot")),
+    }
+    young, old65, old75 = s("r_2534", "r_3544"), s("o_6574", "o_7584", "o_85"), s("o_7584", "o_85")
+    m["r_rent2544_own65"] = young / old65 if young is not None and old65 else None
+    m["r_rent2544_own75"] = young / old75 if young is not None and old75 else None
+    m["acs_income"] = g("income")
+    m["acs_pop"] = g("pop")
+    return {k: round(x, 3) for k, x in m.items() if x is not None and math.isfinite(x)}
+
+
+def acs_years():
+    """Data points from the American Community Survey (5-year), for every year since 2010; ZIP codes since 2020.
+    Each year is saved in data_cache/acs/ so it is only downloaded once."""
+    if not CENSUS_KEY:
+        print("  (no CENSUS_API_KEY set: only American Community Survey years saved earlier are used)")
+    out, latest = {}, None
+    for y in range(2010, THIS_YEAR):
+        cached = load_dcache(f"acs/{y}.json")
+        if cached is None:
+            if not CENSUS_KEY:
+                continue
+            res = {}
+            for geo in ("state", "county", "metro", "zip"):
+                if geo == "zip" and y < 2020:
+                    continue
+                try:
+                    base = acs_call(y, geo, ACS_VARS)
+                except Exception as e:
+                    print(f"  (ACS {y} {geo} not available: {e})")
+                    continue
+                try:
+                    extra = acs_call(y, geo, ACS_EXTRA if y >= 2012 else {k: v for k, v in ACS_EXTRA.items() if k in ("tax", "value")})
+                except Exception:
+                    extra = {}
+                res[geo] = {pid: d for pid, vals in base.items() if (d := acs_derive({**vals, **extra.get(pid, {})}))}
+            if not res.get("county"):
+                continue  # not published yet
+            save_dcache(f"acs/{y}.json", res)
+            cached = res
+        out[y] = cached
+        latest = y
+    return out, latest
+
+
+# ---------- HMDA: every home-purchase mortgage application (yearly, published each spring) ----------
+def dti_number(s):
+    s = s.strip()
+    table = {"<20%": 15, "20%-<30%": 25, "30%-<36%": 33, "50%-60%": 55, ">60%": 65}
+    if s in table:
+        return table[s]
+    return num(s)
+
+
+def median_of(counter):
+    total = sum(counter.values())
+    if not total:
+        return None
+    half, run = total / 2, 0
+    for k in sorted(counter):
+        run += counter[k]
+        if run >= half:
+            return k
+    return None
+
+
+class Loans:
+    __slots__ = ("act", "lt", "occ", "rate", "rate_n", "dti43", "dti_n", "ltv", "dti", "inc", "amt", "val")
+
+    def __init__(self):
+        self.act = [0] * 6
+        self.lt = [0] * 5
+        self.occ = [0] * 4
+        self.rate = self.rate_n = self.dti43 = self.dti_n = 0
+        self.ltv, self.dti, self.inc, self.amt, self.val = Counter(), Counter(), Counter(), Counter(), Counter()
+
+    def result(self):
+        a = self.act
+        orig = a[1]
+        m = {"apps": sum(a[1:6]), "origs": orig}
+        decided = a[1] + a[2] + a[3]
+        if decided >= 10:
+            m["denial"] = a[3] / decided * 100
+        if orig >= 10:
+            m.update({"conv_pct": self.lt[1] / orig * 100, "fha_pct": self.lt[2] / orig * 100, "va_pct": self.lt[3] / orig * 100,
+                      "usda_pct": self.lt[4] / orig * 100, "govt_pct": sum(self.lt[2:5]) / orig * 100,
+                      "second_pct": self.occ[2] / orig * 100, "investor_pct": self.occ[3] / orig * 100, "si_pct": (self.occ[2] + self.occ[3]) / orig * 100})
+            if self.rate_n:
+                m["avg_rate"] = self.rate / self.rate_n
+            if self.dti_n:
+                m["dti43"] = self.dti43 / self.dti_n * 100
+            for k, c, mult in (("ltv", self.ltv, 1), ("dti", self.dti, 1), ("buyer_income", self.inc, 1000), ("loan_amt", self.amt, 1), ("price_med", self.val, 1)):
+                med = median_of(c)
+                if med is not None:
+                    m[k] = med * mult
+        return {k: round(v, 3) for k, v in m.items()}
+
+
+def hmda_year(y, county_to_cbsa):
+    """Stream one year of purchase-mortgage applications (about 2 GB) and add them up by county, metro and state."""
+    url = f"https://ffiec.cfpb.gov/v2/data-browser-api/view/nationwide/csv?years={y}&actions_taken=1,2,3,4,5&loan_purposes=1"
+    print(f"  streaming HMDA {y} (takes a few minutes)", flush=True)
+    resp = io.BufferedReader(urllib.request.urlopen(urllib.request.Request(url, headers=PLAIN), timeout=600), 1 << 20)
+    stream = gzip.GzipFile(fileobj=resp) if resp.peek(2)[:2] == b"\x1f\x8b" else resp
+    text = io.TextIOWrapper(stream, encoding="utf-8", errors="replace", newline="")
+    r = csv.reader(text)
+    head = next(r)
+    c = {h: i for i, h in enumerate(head)}
+    ci, si, ai, li, oi, lni = c["county_code"], c["state_code"], c["action_taken"], c["loan_type"], c["occupancy_type"], c["lien_status"]
+    ri, vi, di, ii, mi_, pi = c["interest_rate"], c["combined_loan_to_value_ratio"], c["debt_to_income_ratio"], c["income"], c["loan_amount"], c["property_value"]
+    buckets = {"county": {}, "metro": {}, "state": {}}
+    n = 0
+    for row in r:
+        if len(row) < len(head) or row[lni] != "1":
+            continue
+        n += 1
+        county = row[ci]
+        st = ABBR_TO_FIPS.get(row[si])
+        targets = []
+        if st:
+            targets.append(buckets["state"].setdefault(st, Loans()))
+        if len(county) == 5 and county.isdigit():
+            targets.append(buckets["county"].setdefault(county, Loans()))
+            if county in county_to_cbsa:
+                targets.append(buckets["metro"].setdefault(county_to_cbsa[county], Loans()))
+        if not targets:
+            continue
+        act = int(row[ai]) if row[ai].isdigit() else 0
+        if not 1 <= act <= 5:
+            continue
+        for b in targets:
+            b.act[act] += 1
+        if act != 1:
+            continue
+        lt, occ = row[li], row[oi]
+        rate, ltv, dti, inc, amt, val = num(row[ri]), num(row[vi]), dti_number(row[di]), num(row[ii]), num(row[mi_]), num(row[pi])
+        for b in targets:
+            if lt in ("1", "2", "3", "4"):
+                b.lt[int(lt)] += 1
+            if occ in ("1", "2", "3"):
+                b.occ[int(occ)] += 1
+            if rate is not None and 1 <= rate <= 15:
+                b.rate += rate
+                b.rate_n += 1
+            if ltv is not None and 1 <= ltv <= 150:
+                b.ltv[round(ltv)] += 1
+            if dti is not None:
+                b.dti[round(dti)] += 1
+                b.dti_n += 1
+                if dti > 43:
+                    b.dti43 += 1
+            if inc is not None and 0 < inc < 10000:
+                b.inc[round(inc)] += 1
+            if amt:
+                b.amt[round(amt / 5000) * 5000] += 1
+            if val:
+                b.val[round(val / 5000) * 5000] += 1
+    print(f"  HMDA {y}: {n:,} first-lien purchase applications", flush=True)
+    return {lvl: {pid: b.result() for pid, b in bs.items()} for lvl, bs in buckets.items()}
+
+
+def hmda_available(y):
+    try:
+        data = urllib.request.urlopen(urllib.request.Request(
+            f"https://ffiec.cfpb.gov/v2/data-browser-api/view/nationwide/aggregations?years={y}&actions_taken=1&loan_purposes=1", headers=PLAIN), timeout=60).read()
+        return json.loads(data)["aggregations"][0]["count"] > 100000
+    except Exception:
+        return False
+
+
+def hmda_years(county_to_cbsa):
+    """Every year of mortgage data since 2018 (when the current format began). New years are worked out at most
+    HMDA_YEARS_PER_RUN at a time (newest first) and saved in data_cache/hmda/."""
+    out, todo = {}, []
+    for y in range(THIS_YEAR, 2017, -1):
+        cached = load_dcache(f"hmda/{y}.json")
+        if cached:
+            out[y] = cached
+        elif y >= THIS_YEAR - 2 and not hmda_available(y):
+            continue
+        else:
+            todo.append(y)
+    for y in todo[:HMDA_YEARS_PER_RUN]:
+        try:
+            res = hmda_year(y, county_to_cbsa)
+        except Exception as e:
+            print(f"  (HMDA {y} failed: {e})")
+            continue
+        save_dcache(f"hmda/{y}.json", res)
+        out[y] = res
+    return out, max(out, default=None)
 
 
 def mortgage_rate():
     """Latest weekly 30-year fixed rate (Freddie Mac's weekly survey) and its monthly history.
-    Tries FRED first, then Freddie Mac's own file. FRED stalls requests that look like a web browser,
-    so this one identifies plainly as a program."""
-    plain = {"User-Agent": "HousingMapBuilder/1.0"}
+    Freddie Mac's own file first (FRED often stalls requests from GitHub's servers), then FRED."""
     weekly = []  # (YYYY-MM-DD, rate)
-    try:  # Freddie Mac's own file first (FRED often stalls requests from GitHub's servers)
-        data = fetch("https://www.freddiemac.com/pmms/docs/PMMS_history.csv", "pmms_history.csv", plain, timeout=60, tries=2)
+    try:
+        data = fetch("https://www.freddiemac.com/pmms/docs/PMMS_history.csv", "pmms_history.csv", PLAIN, timeout=60, tries=2)
         r = rows(data)
         head = [h.strip().lower() for h in next(r)]
         di, vi = head.index("date"), head.index("pmms30")
@@ -253,7 +749,7 @@ def mortgage_rate():
     except Exception as e:
         print(f"  (Freddie Mac unavailable: {e}); trying FRED")
     if not weekly:
-        data = fetch("https://fred.stlouisfed.org/graph/fredgraph.csv?id=MORTGAGE30US", "fred_mortgage.csv", plain, timeout=40, tries=2)
+        data = fetch("https://fred.stlouisfed.org/graph/fredgraph.csv?id=MORTGAGE30US", "fred_mortgage.csv", PLAIN, timeout=40, tries=2)
         weekly = [(r[0], num(r[1])) for r in list(rows(data))[1:] if len(r) == 2 and num(r[1]) is not None]
     monthly = {day[:7]: v for day, v in weekly}
     return monthly, weekly[-1][1], weekly[-1][0]
@@ -285,10 +781,10 @@ def change(series, n):
     return (v / old - 1) * 100 if old else None
 
 
-def trend_gap(series):
-    """How far today's value sits above (+) or below (-) its 2000-2019 long-term trend line (log-linear fit)."""
+def trend_gap(series, min_points=120):
+    """How far today's value sits above (+) or below (-) its pre-2020 long-term trend line (log-linear fit)."""
     pts = [(i, math.log(v)) for i, (k, v) in enumerate(sorted(series.items())) if k < "2020-01" and v > 0]
-    if len(pts) < 120:
+    if len(pts) < min_points:
         return None
     n = len(pts)
     mx, my = sum(p[0] for p in pts) / n, sum(p[1] for p in pts) / n
@@ -326,12 +822,22 @@ def rnd(v, digits):
     return round(v, digits) if digits else int(round(v))
 
 
-def metrics_for(z, zr, rt, inc, pop, rate, forecast=None):
-    """All map metrics for one place. z/zr: Zillow value/rent series, rt: Realtor.com series, inc/pop: Census dicts."""
+def tidy(v):
+    """Round for storage: big numbers to whole numbers, small ones to a few decimals."""
+    if v is None or not math.isfinite(v):
+        return None
+    a = abs(v)
+    return int(round(v)) if a >= 1000 else round(v, 1) if a >= 100 else round(v, 2) if a >= 1 else round(v, 4)
+
+
+EXPENSES = 0.35  # share of rent assumed to go to taxes, insurance, upkeep and vacancy (for the cap rate)
+
+
+def metrics_for(z, zr, rt, income, rate, forecast=None, sfr=None, condo=None, rent_sfr=None, units=None, tax_rate=None):
+    """Monthly-data metrics for one place. z/zr/sfr/condo/rent_sfr: Zillow series, rt: Realtor.com series."""
     m = {}
     hv_k, hv = latest(z or {})
     rent_k, rent = latest(zr or {})
-    income = (inc or {}).get("income")
     if hv:
         m["hv"] = rnd(hv, 0)
         m["hv_mom"] = rnd(change(z, 1), 2)
@@ -349,44 +855,50 @@ def metrics_for(z, zr, rt, inc, pop, rate, forecast=None):
             m["hv_income"] = rnd(hv / income, 1)
             m["mtg_pct_income"] = rnd(pmt * 12 / income * 100, 1)
         m["salary_needed"] = rnd(pmt * 12 / 0.30, 0)  # payment at 30% of gross income
+        if tax_rate:
+            m["prop_tax"] = rnd(hv * tax_rate / 100, 0)
+    for key, s in (("sfr", sfr), ("condo", condo)):
+        k, v = latest(s or {})
+        if v:
+            m[key] = rnd(v, 0)
+            m[key + "_yoy"] = rnd(change(s, 12), 1)
     if forecast is not None:
         m["fc_1y"] = rnd(forecast, 1)
     if rent:
         m["rent"] = rnd(rent, 0)
         m["rent_yoy"] = rnd(change(zr, 12), 1)
+        m["rent_overvalued"] = rnd(trend_gap(zr, 48), 1)
         if income:
             m["rent_pct_income"] = rnd(rent * 12 / income * 100, 1)
         if hv:
             m["price_rent"] = rnd(hv / (rent * 12), 1)
             m["gross_yield"] = rnd(rent * 12 / hv * 100, 2)
+            m["cap_rate"] = rnd(rent * 12 * (1 - EXPENSES) / hv * 100, 2)
             m["buy_vs_rent"] = rnd(payment(hv, rate) - rent, 0)
+    k, v = latest(rent_sfr or {})
+    if v:
+        m["rent_sfr"] = rnd(v, 0)
     if rt:
         for k in ("inv", "dom", "newl", "lp"):
             kk, v = latest(rt[k])
             if v is not None:
                 m[k] = rnd(v, 0)
                 m[k + "_yoy"] = rnd(change(rt[k], 12), 1)
+        m["inv_mom"] = rnd(change(rt["inv"], 1), 1)
         kk, v = latest(rt["cut"])
         if v is not None:
             m["cut"] = rnd(v * 100, 1)
         m["inv_vs_2019"] = rnd(vs_prepandemic(rt["inv"]), 1)
         _, pend = latest(rt["pend"])
         _, inv = latest(rt["inv"])
+        if pend:
+            m["sales"] = rnd(pend, 0)
+            m["sales_yoy"] = rnd(change(rt["pend"], 12), 1)
+            m["sales_vs_2019"] = rnd(vs_prepandemic(rt["pend"]), 1)
         if pend and inv:
             m["months_supply"] = rnd(inv / pend, 1)  # rough: active listings per pending sale
-    if inc:
-        m["income"] = rnd(income, 0)
-        m["poverty"] = rnd(inc.get("poverty"), 1)
-    if pop and pop.get("pop"):
-        p = pop["pop"]
-        m["pop"] = rnd(p, 0)
-        if pop.get("pop_prev"):
-            m["pop_growth"] = rnd((p / pop["pop_prev"] - 1) * 100, 2)
-        if pop.get("pop_2020"):
-            m["pop_growth_5y"] = rnd((p / pop["pop_2020"] - 1) * 100, 1)
-        for k in ("births", "deaths", "natural", "dom_mig", "intl_mig"):
-            if pop.get(k) is not None:
-                m[k + "_pct"] = rnd(pop[k] / p * 100, 2)
+        if inv and units:
+            m["inv_pct_houses"] = rnd(inv / units * 100, 2)
     return {k: v for k, v in m.items() if v is not None}
 
 
@@ -394,26 +906,180 @@ def trim_series(s, start):
     return {k: (round(v) if v >= 1000 else round(v, 4)) for k, v in sorted(s.items()) if k >= start}
 
 
-def write_json(path, obj):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(obj, f, separators=(",", ":"))
+# ---------- yearly data points ----------
+SUMMABLE = ("pop", "births", "deaths", "natural", "dom_mig", "intl_mig", "agepop", "u18", "a2544", "a65", "a75", "medage_w",
+            "permits", "units", "votes_t", "votes_d", "votes_r")
+
+
+def add_up(R, members):
+    """Raw yearly numbers for a group of counties (a metro, or a state where the source has no state rows)."""
+    out = {}
+    for f in SUMMABLE:
+        acc = {}
+        for c in members:
+            for y, v in R.get(c, {}).get(f, {}).items():
+                acc[y] = acc.get(y, 0) + v
+        if acc:
+            out[f] = acc
+    # Weighted averages: income and poverty by population, temperature by land area.
+    for f, wf in (("income", "pop"), ("poverty", "pop"), ("temp", "area")):
+        acc, wts = {}, {}
+        for c in members:
+            rec = R.get(c, {})
+            for y, v in rec.get(f, {}).items():
+                w = rec.get("area_") if wf == "area" else (rec.get("pop", {}).get(y) or (latest({str(k): x for k, x in rec.get("pop", {}).items()})[1]))
+                if w:
+                    acc[y] = acc.get(y, 0) + v * w
+                    wts[y] = wts.get(y, 0) + w
+        if acc:
+            out[f] = {y: acc[y] / wts[y] for y in acc if wts[y]}
+    area = sum(R.get(c, {}).get("area_") or 0 for c in members)
+    if area:
+        out["area_"] = area
+    return out
+
+
+def derive(r):
+    """Raw yearly numbers -> yearly data points {metric: {"YYYY": value}}."""
+    out = {}
+
+    def put(k, y, v):
+        if v is not None and math.isfinite(v):
+            out.setdefault(k, {})[str(y)] = tidy(v)
+    g = lambda f: r.get(f) or {}
+    pop, area = g("pop"), r.get("area_")
+    for y, p in sorted(pop.items()):
+        if not p:
+            continue
+        put("pop", y, p)
+        if pop.get(y - 1):
+            put("pop_growth", y, (p / pop[y - 1] - 1) * 100)
+        if pop.get(y - 5):
+            put("pop_growth_5y", y, (p / pop[y - 5] - 1) * 100)
+        if area:
+            put("density", y, p / area)
+        for f in ("births", "deaths", "natural", "dom_mig", "intl_mig"):
+            v = g(f).get(y)
+            if v is not None:
+                put(f, y, v)
+                put(f + "_pct", y, v / p * 100)
+        b, d = g("births").get(y), g("deaths").get(y)
+        if b and d:
+            put("birth_death", y, b / d)
+    for y, p in sorted(g("agepop").items()):
+        if not p:
+            continue
+        u18, a2544, a65, a75 = (g(f).get(y) for f in ("u18", "a2544", "a65", "a75"))
+        if u18 is not None:
+            put("u18_pct", y, u18 / p * 100)
+        if a2544 is not None:
+            put("a2544_pct", y, a2544 / p * 100)
+        if a65 is not None:
+            put("a65_pct", y, a65 / p * 100)
+        if a75 is not None:
+            put("a75_pct", y, a75 / p * 100)
+        if a65:
+            put("r_u18_65", y, (u18 or 0) / a65)
+            put("r_2544_65", y, (a2544 or 0) / a65)
+        if a75:
+            put("r_u18_75", y, (u18 or 0) / a75)
+            put("r_2544_75", y, (a2544 or 0) / a75)
+        med = g("medage").get(y) or (g("medage_w").get(y, 0) / p or None)
+        put("med_age", y, med)
+    inc = g("income")
+    for y, v in sorted(inc.items()):
+        put("income", y, v)
+        if inc.get(y - 1):
+            put("income_growth", y, (v / inc[y - 1] - 1) * 100)
+    for y, v in g("poverty").items():
+        put("poverty", y, v)
+    units = g("units")
+    for y, v in sorted(units.items()):
+        put("units", y, v)
+        if units.get(y - 1):
+            put("units_growth", y, (v / units[y - 1] - 1) * 100)
+    for y, v in g("permits").items():
+        put("permits", y, v)
+        base = units.get(y - 1) or units.get(y)
+        if base:
+            put("permits_pct", y, v / base * 100)
+    for y, t in g("votes_t").items():
+        if t:
+            put("vote_r", y, (g("votes_r").get(y) or 0) / t * 100)
+            put("vote_d", y, (g("votes_d").get(y) or 0) / t * 100)
+    for y, v in g("temp").items():
+        put("temp", y, v)
+    return out
+
+
+def percentile_ranks(values):
+    """{id: value} -> {id: 0..1} (ties share a rank)."""
+    items = sorted(values.items(), key=lambda kv: kv[1])
+    n = len(items)
+    return {k: (i / (n - 1) if n > 1 else 0.5) for i, (k, _) in enumerate(items)}
+
+
+def growth_scores(A):
+    """Long-Term Growth Score (0-100), yearly, for one level: the average percentile rank of 5-year population growth,
+    net domestic migration (as % of population) and 5-year median income growth."""
+    years = sorted({y for rec in A.values() for y in rec.get("pop_growth_5y", {})})
+    for y in years:
+        y5 = str(int(y) - 5)
+        parts = []
+        for key in ("pop_growth_5y", "dom_mig_pct"):
+            parts.append(percentile_ranks({pid: rec[key][y] for pid, rec in A.items() if y in rec.get(key, {})}))
+        inc = {pid: rec["income"][y] / rec["income"][y5] - 1 for pid, rec in A.items() if y in rec.get("income", {}) and rec["income"].get(y5)}
+        parts.append(percentile_ranks(inc))
+        for pid in parts[0]:
+            got = [p[pid] for p in parts if pid in p]
+            if len(got) == 3:
+                A[pid].setdefault("growth_score", {})[y] = round(sum(got) / 3 * 100)
+
+
+def latest_annual(a):
+    return {k: s[max(s)] for k, s in a.items() if s}
+
+
+def county_name(fips, zv, rt, names):
+    z = zv["county"].get(fips)
+    if z:
+        return z["name"]
+    if names.get(fips):
+        return names[fips]
+    return f"County {fips}"
 
 
 # ---------- main ----------
 def main():
-    print("Census: metros, population, income")
+    print("Census: metros, population, age, income, housing, permits, land area")
     metro_names, county_to_cbsa = census_metros()
-    pop = census_population()
-    inc = census_income()
-    print("FRED: mortgage rate")
+    R = {}
+    pop_year, pop_names = census_population(R)
+    age_year = census_age(R)
+    inc_year = census_income(R)
+    permit_year = census_permits(R)
+    unit_year = census_housing_units(R)
+    area = land_area()
+    for pid, a in area.items():
+        if len(pid) == 5 and pid in R:
+            R[pid]["area_"] = a
+    print("NOAA temperatures, election results")
+    temp_year = noaa_temperature(R)
+    vote_year = election_results(R)
+    print("American Community Survey")
+    acs, acs_year = acs_years()
+    print("Mortgage data (HMDA)")
+    hmda, hmda_year_ = hmda_years(county_to_cbsa)
+    print("Mortgage rate")
     rate_hist, rate, rate_day = mortgage_rate()
 
     print("Zillow")
-    zv = {lvl: zillow(f"zhvi/{name}_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv", lvl)
-          for lvl, name in (("county", "County"), ("metro", "Metro"), ("state", "State"))}
-    zr = {lvl: zillow(f"zori/{name}_zori_uc_sfrcondomfr_sm_month.csv", lvl)
-          for lvl, name in (("county", "County"), ("metro", "Metro"))}
+    LV = (("county", "County"), ("metro", "Metro"), ("state", "State"))
+    zv = {lvl: zillow(f"zhvi/{name}_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv", lvl) for lvl, name in LV}
+    zs = {lvl: zillow(f"zhvi/{name}_zhvi_uc_sfr_tier_0.33_0.67_sm_sa_month.csv", lvl) for lvl, name in LV}
+    zc = {lvl: zillow(f"zhvi/{name}_zhvi_uc_condo_tier_0.33_0.67_sm_sa_month.csv", lvl) for lvl, name in LV}
+    zr = {lvl: zillow(f"zori/{name}_zori_uc_sfrcondomfr_sm_month.csv", lvl) for lvl, name in LV[:2]}
+    zrs = {"metro": zillow("zori/Metro_zori_uc_sfr_sm_month.csv", "metro")}
     fc_raw = zillow("zhvf_growth/Metro_zhvf_growth_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv", "metro")
     print("Realtor.com")
     rt = {lvl: realtor(lvl) for lvl in ("county", "metro", "state")}
@@ -441,85 +1107,130 @@ def main():
             if cbsa and cbsa not in out:
                 out[cbsa] = rec
         return out
-    zv["metro"], zr["metro"] = zmetro(zv["metro"]), zmetro(zr["metro"])
+    for d in (zv, zs, zc, zr, zrs):
+        d["metro"] = zmetro(d["metro"])
     forecast = {}
     for cbsa, rec in zmetro(fc_raw).items():
         s = rec["series"]
         if s:
             forecast[cbsa] = s[max(s)]  # the last column is the 12-month-ahead forecast
+    zillow_month = max((max(r["series"]) for r in zv["state"].values() if r["series"]), default=None)
+    # Zillow only publishes today's forecast, so each one is saved to build up a history.
+    fc_hist = load_dcache("forecast.json") or {}
+    for cbsa, v in forecast.items():
+        fc_hist.setdefault(cbsa, {})[zillow_month] = round(v, 2)
+    save_dcache("forecast.json", fc_hist)
 
-    # Metro income/poverty/population: population-weighted from their counties.
+    # ----- yearly data points for every place -----
     metro_counties = {}
     for c, m in county_to_cbsa.items():
         metro_counties.setdefault(m, []).append(c)
+    counties_by_state = {}
+    for pid in R:
+        if len(pid) == 5:
+            counties_by_state.setdefault(pid[:2], []).append(pid)
+    A = {"state": {}, "metro": {}, "county": {}}
+    for pid, rec in R.items():
+        if len(pid) == 5:
+            A["county"][pid] = derive(rec)
+    for st in STATES:
+        summed = add_up(R, counties_by_state.get(st, []))
+        own = R.get(st, {})
+        for f in ("pop", "births", "deaths", "natural", "dom_mig", "intl_mig", "income", "poverty", "temp"):
+            if own.get(f):
+                summed[f] = own[f]  # the source's own state figures where it has them
+        A["state"][st] = derive(summed)
+    for cbsa, cs in metro_counties.items():
+        A["metro"][cbsa] = derive(add_up(R, cs))
+    for y, res in acs.items():
+        for lvl in ("state", "county", "metro"):
+            for pid, d in res.get(lvl, {}).items():
+                rec = A[lvl].setdefault(pid, {})
+                for k, v in d.items():
+                    if not k.startswith("acs_"):
+                        rec.setdefault(k, {})[str(y)] = v
+    for y, res in hmda.items():
+        for lvl in ("state", "county", "metro"):
+            for pid, d in res.get(lvl, {}).items():
+                rec = A[lvl].setdefault(pid, {})
+                for k, v in d.items():
+                    rec.setdefault(k, {})[str(y)] = tidy(v)
+    for lvl in A:
+        growth_scores(A[lvl])
 
-    def combine(cbsa):
-        cs = metro_counties.get(cbsa, [])
-        ps = [(pop.get(c, {}).get("pop") or 0, c) for c in cs]
-        total = sum(p for p, _ in ps)
-        if not total:
-            return None, None
-        agg_pop = {k: sum((pop.get(c, {}).get(k) or 0) for c in cs) for k in ("pop", "pop_prev", "pop_2020", "births", "deaths", "natural", "dom_mig", "intl_mig")}
-        agg_pop["series"] = {}
-        for c in cs:
-            for k, v in (pop.get(c, {}).get("series") or {}).items():
-                agg_pop["series"][k] = agg_pop["series"].get(k, 0) + v
-        wi = [(p, inc[c]) for p, c in ps if c in inc and inc[c].get("income")]
-        wt = sum(p for p, _ in wi)
-        agg_inc = {"income": sum(p * i["income"] for p, i in wi) / wt, "poverty": sum(p * (i["poverty"] or 0) for p, i in wi) / wt} if wt else None
-        return agg_inc, agg_pop
+    def yearly_tax(a, z):
+        """Property tax on the typical home: that year's tax rate x the home value that December."""
+        rates = a.get("prop_tax_rate")
+        if not rates or not z:
+            return
+        for y, r in rates.items():
+            hv = z.get(f"{y}-12") or latest({k: v for k, v in z.items() if k <= f"{y}-12"})[1]
+            if hv:
+                a.setdefault("prop_tax", {})[y] = tidy(hv * r / 100)
 
     places = {"state": {}, "metro": {}, "county": {}}
     hist = {"state": {}, "metro": {}, "county": {}}
     HSTART = "2000-01"
+    srcs = lambda d, lvl, pid: (d.get(lvl) or {}).get(pid, {}).get("series")
+
+    def build(lvl, pid, name, st, extra, fc_key):
+        a = A[lvl].get(pid, {})
+        la = latest_annual(a)
+        z = srcs(zv, lvl, pid)
+        yearly_tax(a, z)
+        m = metrics_for(z, srcs(zr, lvl, pid), rt[lvl].get(pid), la.get("income"), rate, forecast.get(fc_key),
+                        srcs(zs, lvl, pid), srcs(zc, lvl, pid), srcs(zrs, lvl, pid), la.get("units"), la.get("prop_tax_rate"))
+        v = {**{k: x for k, x in la.items() if k not in ("prop_tax",)}, **m}
+        if not v:
+            return
+        places[lvl][pid] = {"n": name, "s": st, "v": v, **extra}
+        b = {}
+        for key, src in (("hv", zv), ("sfr", zs), ("condo", zc), ("rent", zr), ("rent_sfr", zrs)):
+            s = srcs(src, lvl, pid)
+            if s:
+                b[key] = trim_series(s, HSTART)
+        rr = rt[lvl].get(pid)
+        if rr:
+            for k in ("inv", "dom", "cut", "lp", "newl", "pend"):
+                if rr.get(k):
+                    b[k] = trim_series(rr[k], HSTART)
+        if fc_key in fc_hist:
+            b["fc"] = fc_hist[fc_key]
+        if a:
+            b["a"] = a
+        hist[lvl][pid] = b
 
     for fips, (abbr, name) in STATES.items():
-        m = metrics_for(zv["state"].get(fips, {}).get("series"), None, rt["state"].get(fips), inc.get(fips), pop.get(fips), rate)
-        places["state"][fips] = {"n": name, "s": abbr, "v": m}
-        hist["state"].setdefault("all", {})[fips] = series_bundle(zv["state"].get(fips), None, rt["state"].get(fips), HSTART, pop.get(fips))
-
+        build("state", fips, name, abbr, {}, None)
     for cbsa, name in metro_names.items():
-        ai, ap = combine(cbsa)
-        m = metrics_for(zv["metro"].get(cbsa, {}).get("series"), zr["metro"].get(cbsa, {}).get("series"), rt["metro"].get(cbsa), ai, ap, rate, forecast.get(cbsa))
-        if not m:
-            continue
-        st = name.rsplit(", ", 1)[-1].split("-")[0]
-        places["metro"][cbsa] = {"n": name, "s": st, "v": m, "c": sorted(metro_counties.get(cbsa, []))}
-        hist["metro"].setdefault(st, {})[cbsa] = series_bundle(zv["metro"].get(cbsa), zr["metro"].get(cbsa), rt["metro"].get(cbsa), HSTART, ap)
-
-    county_ids = set(zv["county"]) | set(rt["county"]) | {k for k in pop if len(k) == 5}
+        build("metro", cbsa, name, name.rsplit(", ", 1)[-1].split("-")[0], {"c": sorted(metro_counties.get(cbsa, []))}, cbsa)
+    county_ids = set(zv["county"]) | set(rt["county"]) | {k for k in R if len(k) == 5}
     for fips in sorted(county_ids):
         if fips[:2] not in STATES:
             continue
         cbsa = county_to_cbsa.get(fips)
-        m = metrics_for(zv["county"].get(fips, {}).get("series"), zr["county"].get(fips, {}).get("series"), rt["county"].get(fips),
-                        inc.get(fips), pop.get(fips), rate, forecast.get(cbsa))
-        if not m:
-            continue
-        name = county_name(fips, zv, rt, pop)
-        places["county"][fips] = {"n": name, "s": STATES[fips[:2]][0], "v": m, **({"m": cbsa} if cbsa else {})}
-        hist["county"].setdefault(STATES[fips[:2]][0], {})[fips] = series_bundle(zv["county"].get(fips), zr["county"].get(fips), rt["county"].get(fips), HSTART, pop.get(fips))
+        build("county", fips, county_name(fips, zv, rt, pop_names), STATES[fips[:2]][0], {"m": cbsa} if cbsa else {}, cbsa)
 
-    us_inc = inc.get("US", {})
-    zillow_month = max((max(r["series"]) for r in zv["state"].values() if r["series"]), default=None)
     realtor_month = max((max(r["inv"]) for r in rt["state"].values() if r["inv"]), default=None)
     meta = {
         "built": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "months": {"zillow": zillow_month, "realtor": realtor_month, "income": inc["_year"], "population": pop["_year"]},
+        "months": {"zillow": zillow_month, "realtor": realtor_month, "income": inc_year, "population": pop_year},
+        "years": {"pop": pop_year, "age": age_year, "income": inc_year, "permits": permit_year, "units": unit_year, "temp": temp_year,
+                  "votes": vote_year, "acs": acs_year, "hmda": hmda_year_},
         "mortgage": {"rate": rate, "date": rate_day, "history": trim_series(rate_hist, "2000-01")},
-        "us": {"income": us_inc.get("income"), "poverty": us_inc.get("poverty")},
         "counts": {k: len(v) for k, v in places.items()},
     }
     for lvl, ps in places.items():
         write_json(os.path.join(OUT, f"{lvl}.json"), ps)
-        for group in hist[lvl].values():  # one small file per place, loaded when you click it
-            for pid, bundle in group.items():
-                write_json(os.path.join(OUT, "hist", lvl, f"{pid}.json"), bundle)
+        for pid, bundle in hist[lvl].items():  # one small file per place, loaded when you click it
+            write_json(os.path.join(OUT, "hist", lvl, f"{pid}.json"), bundle)
     print(f"Done: {meta['counts']} - Zillow {zillow_month}, Realtor.com {realtor_month}, mortgage {rate}% ({rate_day})")
 
     # ZIP codes: the biggest files, so the state/metro/county data is let go of first.
-    del zv, zr, rt, hist
-    zip_count, zip_breaks = build_zips(county_to_cbsa, inc, rate, forecast)
+    county_income = {pid: latest_annual(a).get("income") for pid, a in A["county"].items()}
+    acs_zip = {y: res.get("zip", {}) for y, res in acs.items() if res.get("zip")}
+    del zv, zs, zc, zr, zrs, rt, hist, A, R
+    zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, forecast, acs_zip, area)
     meta["counts"]["zip"] = zip_count
     meta["zipBreaks"] = zip_breaks
     write_json(os.path.join(OUT, "meta.json"), meta)
@@ -563,18 +1274,6 @@ def fetch_file(url, name):
     raise last
 
 
-def dense(series_dict):
-    """{YYYY-MM: v} -> (first month index, array of floats, NaN where missing)."""
-    if not series_dict:
-        return None
-    idx = {mi(k): v for k, v in series_dict.items()}
-    lo, hi = min(idx), max(idx)
-    a = array("f", [float("nan")] * (hi - lo + 1))
-    for i, v in idx.items():
-        a[i - lo] = v
-    return (lo, a)
-
-
 def compact(d, start):
     """{YYYY-MM: v} -> [first month, [v, v, null, ...]]: a third of the size of month-labelled values."""
     keys = sorted(k for k in d if k >= start)
@@ -596,7 +1295,9 @@ def to_dict(d, start="0000"):
 
 
 def zillow_zip(path):
-    data = fetch(f"{ZILLOW}/{path}", f"zillow_{path.replace('/', '_')}")
+    data = try_fetch(f"{ZILLOW}/{path}", f"zillow_{path.replace('/', '_')}")
+    if not data:
+        return {}, {}
     r = rows(data)
     head = next(r)
     col = {h: i for i, h in enumerate(head)}
@@ -616,6 +1317,7 @@ def zillow_zip(path):
             a[m - lo] = v
         out[z] = (lo, a)
         info[z] = (row[col.get("City", 0)] if "City" in col else "", row[col["State"]] if "State" in col else "")
+    del data
     return out, info
 
 
@@ -677,7 +1379,6 @@ def zcta_counties():
 # ----- ZIP shapes: read the Census shapefile with plain Python, simplify, and pack per state -----
 def read_shapefile(zip_path):
     import struct
-    import zipfile
     with zipfile.ZipFile(zip_path) as zf:
         shp_name = next(n for n in zf.namelist() if n.endswith(".shp"))
         dbf = zf.read(shp_name[:-4] + ".dbf")
@@ -790,6 +1491,8 @@ def scale_breaks(vals, diverging):
     if diverging:
         a = sorted(abs(v) for v in vals)
         t = [nice(q(a, p)) for p in (0.2, 0.5, 0.8)]
+        if not t[0]:
+            t[0] = t[1] / 2 or a[-1] / 10 or 0.1
         for i in (1, 2):
             if t[i] <= t[i - 1]:
                 t[i] = t[i - 1] * 1.5 or 1
@@ -802,18 +1505,23 @@ def scale_breaks(vals, diverging):
     return [round(x, 6) for x in b]
 
 
+# Data points coloured blue-to-red around zero (same list as the "d: 1" entries in index.html).
 DIVERGING = {"hv_yoy", "hv_mom", "hv_5y", "fc_1y", "overvalued", "from_2022_peak", "crash_2007", "buy_vs_rent", "inv_yoy",
-             "inv_vs_2019", "newl_yoy", "dom_yoy", "lp_yoy", "rent_yoy"}
+             "inv_vs_2019", "newl_yoy", "dom_yoy", "lp_yoy", "rent_yoy", "sfr_yoy", "condo_yoy", "inv_mom", "sales_yoy",
+             "sales_vs_2019", "rent_overvalued"}
 
 
-def build_zips(county_to_cbsa, inc, rate, forecast):
+def build_zips(county_to_cbsa, county_income, rate, forecast, acs_zip, area):
     print("ZIP codes: Zillow, Realtor.com, Census shapes")
     zhv, zinfo = zillow_zip("zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
+    zsfr, _ = zillow_zip("zhvi/Zip_zhvi_uc_sfr_tier_0.33_0.67_sm_sa_month.csv")
+    zcondo, _ = zillow_zip("zhvi/Zip_zhvi_uc_condo_tier_0.33_0.67_sm_sa_month.csv")
     zrent, _ = zillow_zip("zori/Zip_zori_uc_sfrcondomfr_sm_month.csv")
     rtz, rnames = realtor_zip()
     zc = zcta_counties()
     shapes = read_shapefile(fetch_file("https://www2.census.gov/geo/tiger/GENZ2020/shp/cb_2020_us_zcta520_500k.zip", "zcta_shapes.zip"))
-    print(f"  {len(zhv)} Zillow ZIPs, {len(rtz)} Realtor.com ZIPs, {len(shapes)} shapes")
+    print(f"  {len(zhv)} Zillow ZIPs, {len(rtz)} Realtor.com ZIPs, {len(shapes)} shapes, ACS years {sorted(acs_zip)}")
+    acs_years_ = sorted(acs_zip)
 
     by_state, index, hist_groups, all_vals = {}, {}, {}, {}
     for z in sorted(set(zhv) | set(rtz)):
@@ -821,13 +1529,27 @@ def build_zips(county_to_cbsa, inc, rate, forecast):
         if not county or county[:2] not in STATES or z not in shapes:
             continue
         st = STATES[county[:2]][0]
-        hv_d, rent_d = to_dict(zhv.get(z)), to_dict(zrent.get(z))
+        hv_d, rent_d, sfr_d, condo_d = to_dict(zhv.get(z)), to_dict(zrent.get(z)), to_dict(zsfr.get(z)), to_dict(zcondo.get(z))
         rt_d = {k: to_dict(rtz[z].get(k)) for k in REALTOR_FIELDS} if z in rtz else None
-        v = metrics_for(hv_d, rent_d, rt_d, inc.get(county), None, rate, forecast.get(county_to_cbsa.get(county)))
-        v.pop("income", None)
-        v.pop("poverty", None)
+        # Yearly survey data for the ZIP itself (needs the Census key); income falls back to the county's.
+        a = {}
+        for y in acs_years_:
+            for k, v in acs_zip[y].get(z, {}).items():
+                key = {"acs_income": "income", "acs_pop": "pop"}.get(k, k)
+                a.setdefault(key, {})[str(y)] = v
+        if a.get("pop") and area.get("z" + z):
+            a["density"] = {y: tidy(p / area["z" + z]) for y, p in a["pop"].items()}
+        la = latest_annual(a)
+        income = la.get("income") or county_income.get(county)
+        if a.get("prop_tax_rate") and hv_d:
+            for y, r in a["prop_tax_rate"].items():
+                hv = hv_d.get(f"{y}-12") or latest({k: v for k, v in hv_d.items() if k <= f"{y}-12"})[1]
+                if hv:
+                    a.setdefault("prop_tax", {})[y] = tidy(hv * r / 100)
+        v = metrics_for(hv_d, rent_d, rt_d, income, rate, forecast.get(county_to_cbsa.get(county)), sfr_d, condo_d, None, None, la.get("prop_tax_rate"))
         if not v:
             continue
+        v.update({k: x for k, x in la.items() if k not in ("prop_tax",)})
         city = (zinfo.get(z) or ("", ""))[0] or (rnames.get(z, "").rsplit(",", 1)[0].title())
         rec = {"c": city, "k": county}
         if county_to_cbsa.get(county):
@@ -838,15 +1560,16 @@ def build_zips(county_to_cbsa, inc, rate, forecast):
         for k, x in v.items():
             all_vals.setdefault(k, []).append(x)
         b = {}
-        if hv_d:
-            b["hv"] = compact(hv_d, "2008-01")
-        if rent_d:
-            b["rent"] = compact(rent_d, "2015-01")
+        for key, d, start in (("hv", hv_d, "2008-01"), ("sfr", sfr_d, "2008-01"), ("condo", condo_d, "2008-01"), ("rent", rent_d, "2015-01")):
+            if d:
+                b[key] = compact(d, start)
         if rt_d:
             five_years = im(mi(max(rt_d["inv"])) - 60) if rt_d.get("inv") else "2016-01"
-            for k in ("inv", "dom", "cut", "lp", "newl"):
+            for k in ("inv", "dom", "cut", "lp", "newl", "pend"):
                 if rt_d.get(k):
                     b[k] = compact(rt_d[k], five_years)
+        if a:
+            b["a"] = a
         hist_groups.setdefault(z[:3], {})[z] = {k: x for k, x in b.items() if x}
 
     for st, recs in by_state.items():
@@ -857,30 +1580,6 @@ def build_zips(county_to_cbsa, inc, rate, forecast):
     write_json(os.path.join(OUT, "zip", "index.json"), index)
     breaks = {k: scale_breaks(vals, k in DIVERGING) for k, vals in all_vals.items()}
     return len(index), breaks
-
-
-def series_bundle(zrec, zrrec, rtrec, start, poprec=None):
-    b = {}
-    if poprec and poprec.get("series"):
-        b["pop"] = poprec["series"]
-    if zrec and zrec.get("series"):
-        b["hv"] = trim_series(zrec["series"], start)
-    if zrrec and zrrec.get("series"):
-        b["rent"] = trim_series(zrrec["series"], start)
-    if rtrec:
-        for k in ("inv", "dom", "cut", "lp", "newl"):
-            if rtrec.get(k):
-                b[k] = trim_series(rtrec[k], start)
-    return b
-
-
-def county_name(fips, zv, rt, pop):
-    z = zv["county"].get(fips)
-    if z:
-        return z["name"]
-    if pop.get(fips, {}).get("name"):
-        return pop[fips]["name"]
-    return f"County {fips}"
 
 
 if __name__ == "__main__":
