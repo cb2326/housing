@@ -56,7 +56,7 @@ NAME_TO_FIPS = {n.lower(): f for f, (a, n) in STATES.items()}
 
 
 # ---------- downloading ----------
-def fetch(url, name=None):
+def fetch(url, name=None, headers=None, timeout=180, tries=3):
     """Download a file (cached for 20 hours under .cache/ so local test runs are quick). Returns bytes."""
     os.makedirs(CACHE, exist_ok=True)
     path = os.path.join(CACHE, name or url.rsplit("/", 1)[-1])
@@ -64,10 +64,10 @@ def fetch(url, name=None):
         with open(path, "rb") as f:
             return f.read()
     last = None
-    for attempt in range(3):
+    for attempt in range(tries):
         try:
             print(f"  downloading {url}", flush=True)
-            data = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=180).read()
+            data = urllib.request.urlopen(urllib.request.Request(url, headers=headers or UA), timeout=timeout).read()
             if url.endswith(".gz"):
                 data = gzip.decompress(data)
             with open(path, "wb") as f:
@@ -233,14 +233,29 @@ def census_income():
 
 
 def mortgage_rate():
-    """Latest weekly 30-year fixed rate (Freddie Mac via FRED) and its monthly history."""
-    data = fetch("https://fred.stlouisfed.org/graph/fredgraph.csv?id=MORTGAGE30US", "fred_mortgage.csv")
-    monthly = {}
-    for row in list(rows(data))[1:]:
-        if len(row) == 2 and (v := num(row[1])) is not None:
-            monthly[row[0][:7]] = v
-    last_day = list(rows(data))[-1][0]
-    return monthly, monthly[max(monthly)], last_day
+    """Latest weekly 30-year fixed rate (Freddie Mac's weekly survey) and its monthly history.
+    Tries FRED first, then Freddie Mac's own file. FRED stalls requests that look like a web browser,
+    so this one identifies plainly as a program."""
+    plain = {"User-Agent": "HousingMapBuilder/1.0"}
+    weekly = []  # (YYYY-MM-DD, rate)
+    try:
+        data = fetch("https://fred.stlouisfed.org/graph/fredgraph.csv?id=MORTGAGE30US", "fred_mortgage.csv", plain, timeout=40, tries=2)
+        weekly = [(r[0], num(r[1])) for r in list(rows(data))[1:] if len(r) == 2 and num(r[1]) is not None]
+    except Exception as e:
+        print(f"  (FRED unavailable: {e}); trying Freddie Mac")
+    if not weekly:
+        data = fetch("https://www.freddiemac.com/pmms/docs/PMMS_history.csv", "pmms_history.csv", plain, timeout=60, tries=2)
+        r = rows(data)
+        head = [h.strip().lower() for h in next(r)]
+        di, vi = head.index("date"), head.index("pmms30")
+        for row in r:
+            if len(row) > vi and (v := num(row[vi])) is not None:
+                m, d, y = (row[di].split("/") + ["", "", ""])[:3]
+                if y:
+                    weekly.append((f"{y}-{int(m):02d}-{int(d):02d}", v))
+        weekly.sort()
+    monthly = {day[:7]: v for day, v in weekly}
+    return monthly, weekly[-1][1], weekly[-1][0]
 
 
 # ---------- metric math ----------
