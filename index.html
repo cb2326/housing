@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Housing Map</title>
+<meta name="description" content="US housing market map: home values, forecasts, inventory, rents, income and population by state, metro and county.">
+<meta name="theme-color" content="#4f46e5">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234f46e5'/%3E%3Cpath d='M14 34 32 18l18 16v14a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2z' fill='%23f6efe3'/%3E%3Cpath d='M26 50V38h12v12' fill='%23a5b4fc'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  /* Crisp white: white panels, soft gray lines, indigo accent. */
+  :root {
+    color-scheme: light;
+    --bg: #f5f6f8; --panel: #ffffff; --panel-2: #f3f4f6; --line: #e5e7eb; --text: #111827; --muted: #6b7280;
+    --accent: #4f46e5; --accent-soft: #eef2ff; --warm: #f59e0b;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 8px 24px -10px rgba(16, 24, 40, .18);
+    --serif: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    --sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    --na: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans); overflow: hidden; }
+  button, input { font: inherit; color: inherit; }
+  .app { display: grid; grid-template-columns: 300px 1fr; height: 100dvh; }
+
+  /* ---------- sidebar: data points ---------- */
+  .side { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; z-index: 5; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 10px; }
+  .brand svg { width: 34px; height: 34px; flex: none; }
+  .brand h1 { margin: 0; font: 600 21px/1.1 var(--serif); }
+  .brand small { display: block; color: var(--muted); font: 12px var(--sans); margin-top: 2px; }
+  .dp-search { margin: 4px 14px 10px; position: relative; }
+  .dp-search input { width: 100%; padding: 8px 12px 8px 32px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+  .dp-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); }
+  .groups { overflow-y: auto; flex: 1; padding: 0 8px 16px; }
+  .group { border-top: 1px solid var(--line); }
+  .group > button { width: 100%; display: flex; justify-content: space-between; align-items: center; background: none; border: 0; padding: 12px 8px; cursor: pointer; font-weight: 600; text-align: left; }
+  .group > button::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .15s; margin-right: 4px; }
+  .group.open > button::after { transform: rotate(-135deg); }
+  .group ul { list-style: none; margin: 0 0 8px; padding: 0; display: none; }
+  .group.open ul { display: block; }
+  .metric { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+  .metric:hover { background: var(--accent-soft); }
+  .metric input { accent-color: var(--accent); margin: 0; flex: none; }
+  .metric span { flex: 1; }
+  .metric.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .metric .info { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted); font: 600 11px/16px var(--serif); text-align: center; background: var(--panel); }
+  .metric .info:hover { color: var(--accent); border-color: var(--accent); }
+  .side-foot { padding: 10px 16px 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
+  .side-foot a { color: inherit; }
+
+  /* ---------- map + floating controls ---------- */
+  .stage { position: relative; min-width: 0; overflow: hidden; }
+  #map { position: absolute; inset: 0; background: var(--bg); }
+  .leaflet-container { font: inherit; background: var(--bg); }
+  .topbar { position: absolute; top: 14px; left: 14px; right: 14px; z-index: 500; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; pointer-events: none; }
+  .topbar > * { pointer-events: auto; }
+  .place-search { position: relative; flex: 1 1 320px; max-width: 520px; }
+  .place-search input { width: 100%; padding: 12px 16px 12px 42px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); }
+  .place-search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .place-search > svg { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); }
+  .results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; display: none; }
+  .results.show { display: block; }
+  .results button { display: flex; width: 100%; justify-content: space-between; gap: 10px; padding: 9px 14px; border: 0; background: none; cursor: pointer; text-align: left; }
+  .results button:hover, .results button.sel { background: var(--accent-soft); }
+  .results small { color: var(--muted); text-transform: capitalize; }
+  .seg { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px; box-shadow: var(--shadow); }
+  .seg button { border: 0; background: none; padding: 7px 14px; border-radius: 999px; cursor: pointer; font-weight: 600; color: var(--muted); }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .pill-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 9px 14px; cursor: pointer; font-weight: 600; box-shadow: var(--shadow); display: inline-flex; gap: 7px; align-items: center; }
+  .pill-btn.on { border-color: var(--accent); color: var(--accent); }
+  .pill-btn svg { width: 16px; height: 16px; }
+  .menu-btn { display: none; }
+
+  .legend { position: absolute; right: 14px; bottom: 22px; z-index: 500; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 8px; box-shadow: var(--shadow); width: 300px; max-width: calc(100% - 28px); }
+  .legend h3 { margin: 0 0 2px; font: 600 15px var(--serif); }
+  .legend .asof { color: var(--muted); font-size: 11.5px; margin-bottom: 8px; }
+  .legend .bar { display: flex; gap: 2px; }
+  .legend .bar i { flex: 1; height: 12px; }
+  .legend .bar i:first-child { border-radius: 4px 0 0 4px; } .legend .bar i:last-child { border-radius: 0 4px 4px 0; }
+  .legend .ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .legend .na { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .legend .na i { width: 12px; height: 12px; border-radius: 3px; background: var(--na); }
+  .cmode { display: flex; align-items: center; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .cmode span { margin-right: 4px; }
+  .cmode button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; color: var(--text); }
+  .cmode button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .zip-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 520; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; box-shadow: var(--shadow); text-align: center; max-width: 300px; display: none; }
+  .zip-hint.show { display: block; }
+  .zip-hint b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .zip-hint span { color: var(--muted); font-size: 13px; }
+  .zip-loading { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); z-index: 520; background: var(--text); color: #fff; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; display: none; }
+  .zip-loading.show { display: block; }
+  .brand h1, .legend h3, .drawer header h2, .sec h4, .tv-head h3, .kpi b { letter-spacing: -0.01em; }
+  .tip { position: absolute; z-index: 600; pointer-events: none; background: #1d1b17; color: #f4eee4; border-radius: 10px; padding: 9px 11px; font-size: 12.5px; min-width: 190px; box-shadow: 0 10px 24px rgba(0, 0, 0, .3); display: none; }
+  .tip b { display: block; font-size: 13.5px; margin-bottom: 4px; }
+  .tip .row { display: flex; justify-content: space-between; gap: 14px; font-variant-numeric: tabular-nums; }
+  .tip .row span:first-child { color: #c9c0b2; }
+  .tip .hint { color: #a59b8b; font-size: 11px; margin-top: 5px; font-style: italic; }
+
+  /* ---------- detail drawer ---------- */
+  .drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 600px; max-width: 100%; z-index: 700; background: var(--panel); border-left: 1px solid var(--line); box-shadow: var(--shadow); transform: translateX(102%); transition: transform .22s ease; display: flex; flex-direction: column; }
+  .drawer.open { transform: none; }
+  @media (min-width: 821px) {
+    .stage.panel-open .topbar, .stage.panel-open .legend { right: 614px; }
+    .stage .topbar, .stage .legend { transition: right .22s ease; }
+  }
+  .drawer header { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: flex-start; }
+  .drawer header h2 { margin: 0; font: 700 26px/1.15 var(--serif); flex: 1; color: var(--accent); letter-spacing: -0.02em; }
+  .drawer header h2 small { color: var(--muted); font-weight: 500; letter-spacing: 0; }
+  .metric-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 2px 0 8px; }
+  .mpick { position: relative; flex: 1; min-width: 0; }
+  .mpick select { appearance: none; -webkit-appearance: none; width: 100%; border: 0; background: transparent; font: 650 20px var(--sans); color: var(--text); padding: 4px 26px 4px 0; cursor: pointer; text-overflow: ellipsis; }
+  .mpick::after { content: ""; position: absolute; right: 6px; top: 50%; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+  .mpick select:focus-visible { outline: 2px solid var(--accent); border-radius: 8px; }
+  .mnow { text-align: right; flex: none; }
+  .mnow b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .mnow span { font-size: 11.5px; color: var(--muted); }
+  .chart-ctrl { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .seg-sm { display: inline-flex; background: var(--panel-2); border-radius: 999px; padding: 3px; }
+  .seg-sm button { border: 0; background: none; border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .seg-sm button.on { background: var(--text); color: #fff; }
+  .chart-empty { background: var(--panel-2); border-radius: 14px; padding: 26px 18px; text-align: center; margin: 6px 0; }
+  .chart-empty b { display: block; font-size: 26px; margin-bottom: 6px; }
+  .chart-empty span { color: var(--muted); font-size: 13px; }
+  .snap-h { margin: 18px 0 8px; font: 600 15px var(--sans); }
+  .kpis { grid-template-columns: repeat(3, 1fr) !important; }
+  button.kpi { border: 1px solid transparent; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+  button.kpi:hover { border-color: var(--line); }
+  button.kpi.on { border-color: var(--accent); background: var(--accent-soft); }
+  .sec tr[data-metric] { cursor: pointer; }
+  .sec tr[data-metric]:hover td { color: var(--accent); }
+  .drawer header small { display: block; color: var(--muted); font: 12.5px var(--sans); margin-top: 3px; }
+  .x { border: 0; background: var(--panel-2); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; flex: none; }
+  .drawer .body { overflow-y: auto; padding: 14px 18px 24px; }
+  .kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+  .kpi { background: var(--panel-2); border-radius: 12px; padding: 9px 11px; }
+  .kpi span { display: block; color: var(--muted); font-size: 11.5px; }
+  .kpi b { font: 600 18px var(--serif); font-variant-numeric: tabular-nums; }
+  .kpi em { font-style: normal; font-size: 12px; margin-left: 4px; }
+  .up { color: #059669; } .down { color: #dc2626; }
+  .chart-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+  .chart-tabs button, .ranges button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  .chart-tabs button.on, .ranges button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .ranges { display: flex; gap: 4px; justify-content: flex-end; margin-bottom: 4px; }
+  .chart { position: relative; }
+  .chart svg { width: 100%; height: auto; display: block; }
+  .chart .ctip { position: absolute; pointer-events: none; background: #1d1b17; color: #f4eee4; font-size: 12px; padding: 5px 8px; border-radius: 7px; white-space: nowrap; display: none; transform: translate(-50%, -110%); font-variant-numeric: tabular-nums; }
+  .sec { margin-top: 18px; }
+  .sec h4 { margin: 0 0 6px; font: 600 15px var(--serif); }
+  .sec table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .sec td { padding: 5px 0; border-bottom: 1px dashed var(--line); }
+  .sec td:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .sec tr.cur td { color: var(--accent); }
+  .note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+
+  /* ---------- table view ---------- */
+  .table-view { position: absolute; inset: 72px 14px 14px; z-index: 650; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); display: none; flex-direction: column; overflow: hidden; }
+  .table-view.show { display: flex; }
+  .tv-head { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .tv-head h3 { margin: 0; font: 600 17px var(--serif); flex: 1; }
+  .tv-head input { padding: 7px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); width: 220px; max-width: 100%; }
+  .tv-scroll { overflow: auto; flex: 1; }
+  .tv-scroll table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tv-scroll th { position: sticky; top: 0; background: var(--panel-2); text-align: right; padding: 8px 12px; cursor: pointer; white-space: nowrap; font-weight: 600; border-bottom: 1px solid var(--line); }
+  .tv-scroll th:first-child, .tv-scroll td:first-child { text-align: left; }
+  .tv-scroll th.sorted { color: var(--accent); }
+  .tv-scroll td { padding: 7px 12px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tv-scroll tr:hover td { background: var(--accent-soft); cursor: pointer; }
+  .tv-scroll td.rank { color: var(--muted); width: 1%; }
+  .tv-foot { padding: 8px 14px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
+
+  .info-pop { position: fixed; z-index: 900; max-width: 280px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 12.5px; display: none; }
+  .loading { position: absolute; inset: 0; z-index: 800; display: grid; place-items: center; background: var(--bg); color: var(--muted); font: 16px var(--serif); }
+  .leaflet-control-attribution { font-size: 10px; background: color-mix(in srgb, var(--panel) 85%, transparent) !important; color: var(--muted); }
+  .leaflet-control-attribution a { color: var(--muted); }
+  .leaflet-control-zoom a { background: var(--panel); color: var(--text); border-color: var(--line) !important; }
+
+  /* ---------- phones ---------- */
+  @media (max-width: 820px) {
+    .app { grid-template-columns: 1fr; }
+    .side { position: fixed; left: 0; top: 0; bottom: 0; width: min(320px, 88vw); transform: translateX(-102%); transition: transform .22s; box-shadow: var(--shadow); z-index: 900; }
+    .side.open { transform: none; }
+    .menu-btn { display: inline-flex; }
+    .topbar { top: 10px; left: 10px; right: 10px; gap: 8px; }
+    .place-search { flex-basis: 100%; max-width: none; order: -1; }
+    .seg button { padding: 6px 8px; font-size: 13px; }
+    .pill-btn { padding: 8px 12px; font-size: 13px; }
+    #tableBtn .btxt { display: none; }
+    #tableBtn { padding: 8px 10px; }
+    .legend { left: 10px; right: 10px; bottom: 12px; width: auto; }
+    .kpis { grid-template-columns: repeat(2, 1fr) !important; }
+    .drawer header h2 { font-size: 20px !important; }
+    .mpick select { font-size: 17px; }
+    .drawer { width: 100%; top: 42%; border-left: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; transform: translateY(102%); }
+    .drawer.open { transform: none; }
+    .drawer header { padding: 12px 16px 10px; }
+    .drawer header h2 { font-size: 19px; }
+    .table-view { inset: 120px 8px 8px; }
+    .leaflet-control-zoom { display: none; }
+  }
+  .scrim { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, .3); z-index: 850; }
+  .scrim.show { display: block; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side" aria-label="Data points">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#4f46e5"/><path d="M14 34 32 18l18 16v14a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2z" fill="#f6efe3"/><path d="M26 50V38h12v12" fill="#a5b4fc"/></svg>
+      <div><h1>Housing Map</h1><small id="asof">Loading data…</small></div>
+    </div>
+    <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="dpSearch" type="search" placeholder="Search data points" aria-label="Search data points"></label>
+    <div class="groups" id="groups"></div>
+    <div class="side-foot">Data: Zillow Research, Realtor.com, U.S. Census Bureau, Freddie Mac (via FRED). Updated monthly. Personal use; not financial advice.</div>
+  </aside>
+  <main class="stage">
+    <div id="map"></div>
+    <div class="topbar">
+      <button class="pill-btn menu-btn" id="menuBtn" type="button" aria-label="Data points"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Data</button>
+      <div class="place-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="placeSearch" type="search" placeholder="Search a state, metro, county or ZIP" autocomplete="off" aria-label="Search places">
+        <div class="results" id="results"></div>
+      </div>
+      <div class="seg" id="levels" role="tablist" aria-label="Map level">
+        <button data-level="state" type="button">State</button><button data-level="metro" type="button">Metro</button><button data-level="county" type="button" class="on">County</button><button data-level="zip" type="button">Zip</button>
+      </div>
+      <button class="pill-btn" id="tableBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg><span class="btxt">Table</span></button>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="zip-hint" id="zipHint"><b>Zoom in to see ZIP codes</b><span>There are 32,000+ of them, so they appear once you zoom into a state, or search a ZIP code above.</span></div>
+    <div class="zip-loading" id="zipLoading">Loading ZIP codes…</div>
+    <div class="tip" id="tip"></div>
+    <section class="table-view" id="tableView" aria-label="Table view">
+      <div class="tv-head"><h3 id="tvTitle"></h3><input id="tvFilter" type="search" placeholder="Filter places"><button class="x" id="tvClose" type="button" aria-label="Close table">✕</button></div>
+      <div class="tv-scroll" id="tvScroll"></div>
+      <div class="tv-foot" id="tvFoot"></div>
+    </section>
+    <aside class="drawer" id="drawer" aria-label="Place details">
+      <header><h2 id="dTitle"></h2><button class="x" id="dClose" type="button" aria-label="Close">✕</button></header>
+      <div class="body" id="dBody"></div>
+    </aside>
+    <div class="loading" id="loading">Loading the map…</div>
+  </main>
+</div>
+<div class="scrim" id="scrim"></div>
+<div class="info-pop" id="infoPop"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+// ---------- data points ----------
+// fmt: usd, pct (already in %), num, ratio, days. div: diverging scale centred on 0 (else light-to-dark).
+const M = {
+  hv:            { l: 'Home Value', f: 'usd', i: 'Typical home value (Zillow Home Value Index, mid-tier homes).', s: 'hv' },
+  hv_yoy:        { l: 'Home Value Growth (YoY)', f: 'pct', d: 1, i: 'Change in typical home value over the last 12 months.', s: 'hv' },
+  hv_mom:        { l: 'Home Value Growth (MoM)', f: 'pct2', d: 1, i: 'Change in typical home value over the last month.', s: 'hv' },
+  hv_5y:         { l: 'Home Value Growth (5-Year)', f: 'pct', d: 1, i: 'Change in typical home value over the last 5 years.', s: 'hv' },
+  fc_1y:         { l: 'Home Price Forecast (1-Year)', f: 'pct', d: 1, i: "Zillow's forecast for home values 12 months ahead. Published for metros; counties show their metro's forecast.", s: 'hv' },
+  overvalued:    { l: 'Overvalued %', f: 'pct', d: 1, i: "How far today's home value sits above (+) or below (−) its long-term 2000–2019 trend line, extended to today. A rough gauge, not a prediction.", s: 'hv' },
+  from_2022_peak:{ l: '% Change from 2022 Peak', f: 'pct', d: 1, i: "Today's home value compared with its highest month in 2022.", s: 'hv' },
+  crash_2007:    { l: '% Crash 2007–12', f: 'pct', d: 1, i: 'Drop from the 2005–08 peak to the 2008–13 low during the last housing crash.', s: 'hv' },
+  hv_income:     { l: 'Home Value / Income', f: 'ratio', i: 'Typical home value divided by median household income. Around 3 to 4 has historically been considered affordable.', s: 'hv' },
+  mtg_pmt:       { l: 'Mortgage Payment', f: 'usd', i: 'Monthly principal and interest on the typical home: 20% down, 30-year fixed at the current national rate. Taxes and insurance not included.', s: 'hv' },
+  mtg_pct_income:{ l: 'Mortgage Payment % of Income', f: 'pct', i: 'The mortgage payment above as a share of median household income.', s: 'hv' },
+  salary_needed: { l: 'Salary to Afford a House', f: 'usd', i: 'Yearly income at which the mortgage payment above is 30% of gross pay.', s: 'hv' },
+  buy_vs_rent:   { l: 'Buy vs Rent Differential', f: 'usd', d: 1, i: 'Mortgage payment minus typical rent, per month. Positive means owning costs more than renting.', s: 'rent' },
+  inv:           { l: 'For Sale Inventory', f: 'num', i: 'Active listings for sale (Realtor.com).', s: 'inv' },
+  inv_yoy:       { l: 'Inventory Growth (YoY)', f: 'pct', d: 1, i: 'Change in active listings versus the same month last year.', s: 'inv' },
+  inv_vs_2019:   { l: 'Inventory vs Pre-Pandemic', f: 'pct', d: 1, i: 'Active listings compared with the same month in 2017–2019. Negative means a shortage versus normal.', s: 'inv' },
+  newl:          { l: 'New Listing Count', f: 'num', i: 'Homes newly listed for sale this month.', s: 'newl' },
+  newl_yoy:      { l: 'New Listings (YoY)', f: 'pct', d: 1, i: 'Change in new listings versus the same month last year.', s: 'newl' },
+  dom:           { l: 'Days on Market', f: 'days', i: 'Median days homes stay listed (Realtor.com).', s: 'dom' },
+  dom_yoy:       { l: 'Days on Market (YoY)', f: 'pct', d: 1, i: 'Change in median days on market versus a year ago.', s: 'dom' },
+  cut:           { l: 'Price Cut %', f: 'pct', i: 'Share of active listings with a price reduction this month.', s: 'cut' },
+  lp:            { l: 'Median Listing Price', f: 'usd', i: 'Median asking price of active listings.', s: 'lp' },
+  lp_yoy:        { l: 'Median Listing Price (YoY)', f: 'pct', d: 1, i: 'Change in median asking price versus a year ago.', s: 'lp' },
+  months_supply: { l: 'Listings per Pending Sale', f: 'ratio', i: 'Active listings divided by pending sales: a rough months-of-supply gauge. Higher favours buyers.', s: 'inv' },
+  rent:          { l: 'Typical Rent', f: 'usd', i: 'Typical asking rent (Zillow Observed Rent Index, all rentals).', s: 'rent' },
+  rent_yoy:      { l: 'Rent Growth (YoY)', f: 'pct', d: 1, i: 'Change in typical rent over the last 12 months.', s: 'rent' },
+  price_rent:    { l: 'Home Value to Rent Ratio', f: 'ratio', i: 'Home value divided by a year of rent. Higher means buying is expensive relative to renting.', s: 'rent' },
+  gross_yield:   { l: 'Gross Rental Yield', f: 'pct2', i: 'A year of typical rent as a share of home value, before costs (a rough cap-rate stand-in).', s: 'rent' },
+  rent_pct_income:{ l: 'Rent as % of Income', f: 'pct', i: 'A year of typical rent as a share of median household income.', s: 'rent' },
+  income:        { l: 'Median Household Income', f: 'usd', i: 'Census Small Area Income & Poverty Estimates. Metros are a population-weighted blend of their counties.', s: 'hv' },
+  poverty:       { l: 'Poverty Rate', f: 'pct', i: 'Share of people below the poverty line (Census SAIPE).', s: 'hv' },
+  pop:           { l: 'Population', f: 'num', i: 'Census population estimate (July of the latest year).', s: 'hv' },
+  pop_growth:    { l: 'Population Growth (1-Year)', f: 'pct2', d: 1, i: 'Population change over the latest year.', s: 'hv' },
+  pop_growth_5y: { l: 'Population Growth (since 2020)', f: 'pct', d: 1, i: 'Population change since 2020.', s: 'hv' },
+  births_pct:    { l: 'Birth %', f: 'pct2', i: 'Births in the latest year as a share of population.', s: 'hv' },
+  deaths_pct:    { l: 'Death %', f: 'pct2', i: 'Deaths in the latest year as a share of population.', s: 'hv' },
+  natural_pct:   { l: 'Natural Population Increase %', f: 'pct2', d: 1, i: 'Births minus deaths, as a share of population.', s: 'hv' },
+  dom_mig_pct:   { l: 'Domestic Migration %', f: 'pct2', d: 1, i: 'Net people moving in from (or out to) other US places, as a share of population.', s: 'hv' },
+  intl_mig_pct:  { l: 'International Migration %', f: 'pct2', d: 1, i: 'Net international migration as a share of population.', s: 'hv' },
+};
+const GROUPS = [
+  ['Popular', ['hv', 'hv_yoy', 'fc_1y', 'inv', 'overvalued', 'dom', 'cut', 'mtg_pct_income', 'inv_vs_2019']],
+  ['Home Price & Affordability', ['hv', 'hv_yoy', 'hv_mom', 'hv_5y', 'fc_1y', 'overvalued', 'from_2022_peak', 'crash_2007', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'buy_vs_rent']],
+  ['Market Trends', ['inv', 'inv_yoy', 'inv_vs_2019', 'newl', 'newl_yoy', 'dom', 'dom_yoy', 'cut', 'lp', 'lp_yoy', 'months_supply']],
+  ['Rent & Investing', ['rent', 'rent_yoy', 'price_rent', 'gross_yield', 'rent_pct_income', 'buy_vs_rent']],
+  ['Income & Population', ['income', 'poverty', 'pop', 'pop_growth', 'pop_growth_5y', 'births_pct', 'deaths_pct', 'natural_pct', 'dom_mig_pct', 'intl_mig_pct']],
+];
+const SERIES = { hv: ['Home value', 'usd'], rent: ['Rent', 'usd'], inv: ['Inventory', 'num'], dom: ['Days on market', 'days'], cut: ['Price cuts', 'share'], lp: ['List price', 'usd'], newl: ['New listings', 'num'] };
+
+// Colour ramps: one hue light-to-dark for amounts,
+// cool-to-warm through a neutral grey for changes that can go either way.
+// One vivid scale for everything: deep blue (low / falling) through white to red (high / rising).
+const RAMP = ['#1d3fd8', '#6b7ff2', '#b9b9f4', '#f4f2f5', '#f9c3ad', '#f27a5c', '#dc2626'];
+const SEQ = RAMP, DIV = RAMP;
+
+// ---------- formatting ----------
+const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+function fmt(v, f, short) {
+  if (v == null || !isFinite(v)) return '—';
+  const sign = v < 0 ? '−' : '';
+  const a = Math.abs(v);
+  switch (f) {
+    case 'usd': return sign + '$' + (short && a >= 1e6 ? (a / 1e6).toFixed(a >= 1e7 ? 1 : 2) + 'M' : short && a >= 1e4 ? Math.round(a / 1e3) + 'K' : nf0.format(a));
+    case 'pct': return sign + a.toFixed(1) + '%';
+    case 'pct2': return sign + a.toFixed(2) + '%';
+    case 'share': return (v * 100).toFixed(1) + '%';
+    case 'ratio': return sign + a.toFixed(1) + '×';
+    case 'days': return nf0.format(v) + ' days';
+    default: return sign + (short && a >= 1e6 ? (a / 1e6).toFixed(1) + 'M' : short && a >= 1e4 ? Math.round(a / 1e3) + 'K' : nf0.format(a));
+  }
+}
+const signed = (v, f) => v == null ? '—' : (v > 0 ? '+' : '') + fmt(v, f);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ymLabel = k => k ? `${MON[+k.slice(5, 7) - 1]} ${k.slice(0, 4)}` : '';
+
+// ---------- state ----------
+const saved = (() => { try { return JSON.parse(localStorage.getItem('hm-ui')) || {}; } catch (e) { return {}; } })();
+const ui = { scaleMode: saved.scaleMode === 'national' ? 'national' : 'view', metric: M[saved.metric] ? saved.metric : 'hv_yoy', level: ['state', 'metro', 'county', 'zip'].includes(saved.level) ? saved.level : 'county', open: new Set(saved.open || ['Popular']) };
+const saveUi = () => { try { localStorage.setItem('hm-ui', JSON.stringify({ metric: ui.metric, level: ui.level, open: [...ui.open], scaleMode: ui.scaleMode })); } catch (e) {} };
+const D = { meta: null, state: null, metro: null, county: null, zip: {} };
+let topo, layers = {}, map, scale = null;
+
+// Connecticut's data now uses planning regions; the map shapes still use its 8 old counties. Each old county
+// is shown with the region that covers most of it.
+const CT_OLD_TO_NEW = { '09001': '09190', '09003': '09110', '09005': '09160', '09007': '09130', '09009': '09170', '09011': '09180', '09013': '09110', '09015': '09150' };
+const dataId = (level, id) => level === 'county' && CT_OLD_TO_NEW[id] ? CT_OLD_TO_NEW[id] : id;
+
+// ---------- sidebar ----------
+function renderGroups() {
+  const q = document.getElementById('dpSearch').value.trim().toLowerCase();
+  document.getElementById('groups').innerHTML = GROUPS.map(([name, keys]) => {
+    const list = keys.filter(k => !q || M[k].l.toLowerCase().includes(q));
+    if (!list.length) return '';
+    const open = q || ui.open.has(name);
+    return `<div class="group ${open ? 'open' : ''}"><button type="button" data-group="${esc(name)}">${esc(name)}</button><ul>${list.map(k =>
+      `<li><label class="metric ${ui.metric === k ? 'on' : ''}"><input type="radio" name="metric" value="${k}" ${ui.metric === k ? 'checked' : ''}><span>${esc(M[k].l)}</span><button class="info" type="button" data-info="${k}" aria-label="About ${esc(M[k].l)}">i</button></label></li>`).join('')}</ul></div>`;
+  }).join('') || '<p class="note" style="padding:8px">No data points match.</p>';
+}
+document.getElementById('groups').addEventListener('click', e => {
+  const info = e.target.closest('[data-info]');
+  if (info) { e.preventDefault(); showInfo(info); return; }
+  const g = e.target.closest('[data-group]');
+  if (g) { const n = g.dataset.group; ui.open.has(n) ? ui.open.delete(n) : ui.open.add(n); renderGroups(); saveUi(); }
+});
+document.getElementById('groups').addEventListener('change', e => {
+  if (e.target.name === 'metric') { ui.metric = e.target.value; renderGroups(); restyle(); saveUi(); closeSide(); if (openPlace) renderDrawer(); }
+});
+document.getElementById('dpSearch').addEventListener('input', renderGroups);
+function showInfo(btn) {
+  const pop = document.getElementById('infoPop'), r = btn.getBoundingClientRect();
+  pop.innerHTML = `<b>${esc(M[btn.dataset.info].l)}</b><br>${esc(M[btn.dataset.info].i)}`;
+  pop.style.display = 'block';
+  pop.style.left = Math.min(r.right + 8, innerWidth - 290) + 'px';
+  pop.style.top = Math.min(r.top - 6, innerHeight - pop.offsetHeight - 10) + 'px';
+}
+document.addEventListener('click', e => { if (!e.target.closest('[data-info]')) document.getElementById('infoPop').style.display = 'none'; });
+
+// Phones: the data points slide in from the left.
+const side = document.getElementById('side'), scrim = document.getElementById('scrim');
+document.getElementById('menuBtn').addEventListener('click', () => { side.classList.add('open'); scrim.classList.add('show'); });
+function closeSide() { side.classList.remove('open'); scrim.classList.remove('show'); }
+scrim.addEventListener('click', closeSide);
+
+// ---------- colour scale ----------
+function quantile(sorted, p) {
+  if (!sorted.length) return 0;
+  const i = (sorted.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+function niceRound(v) {
+  if (!v) return 0;
+  const a = Math.abs(v), p = Math.pow(10, Math.floor(Math.log10(a)) - 1);
+  return Math.round(v / p) * p;
+}
+// Seven colour steps from a list of values: amounts split into equal-sized groups, changes split
+// symmetrically around zero.
+function breaksFrom(vals, diverging) {
+  vals = vals.filter(v => v != null && isFinite(v)).sort((a, b) => a - b);
+  if (!vals.length) return [];
+  if (diverging) {
+    const abs = vals.map(Math.abs).sort((a, b) => a - b);
+    const t = [0.2, 0.5, 0.8].map(p => niceRound(quantile(abs, p)));
+    if (!t[0]) t[0] = t[1] / 2 || abs[abs.length - 1] / 10 || 0.1;
+    for (let i = 1; i < 3; i++) if (t[i] <= t[i - 1]) t[i] = t[i - 1] * 1.5;
+    return [-t[2], -t[1], -t[0], t[0], t[1], t[2]];
+  }
+  const b = [1, 2, 3, 4, 5, 6].map(i => niceRound(quantile(vals, i / 7)));
+  for (let i = 1; i < b.length; i++) if (b[i] <= b[i - 1]) b[i] = b[i - 1] + Math.abs(b[i - 1] || 1) * 0.01;
+  return b;
+}
+// Colours can compare every place in the country ("Nationwide") or only the places on screen ("On screen"),
+// which shows more contrast inside one region (e.g. home values across Southern California).
+function viewValues(key) {
+  const view = map.getBounds(), vals = [];
+  eachShape(ui.level, l => {
+    const p = D[ui.level][dataId(ui.level, l.feature.id)];
+    if (!p || p.v[key] == null) return;
+    const b = l._bb || (l._bb = l.getBounds());
+    if (view.intersects(b)) vals.push(p.v[key]);
+  });
+  return vals;
+}
+function buildScale() {
+  const key = ui.metric, def = M[key], colors = def.d ? DIV : SEQ;
+  if (ui.scaleMode === 'view' && map) {
+    const vals = viewValues(key);
+    if (vals.length >= 8) { scale = { breaks: breaksFrom(vals, def.d), colors, key, count: vals.length, mode: 'view' }; return; }
+  }
+  if (ui.level === 'zip') {
+    // Nationwide ZIP colours come from all 32,000 ZIPs (worked out by the data builder), not just the ones loaded.
+    const b = (D.meta.zipBreaks || {})[key];
+    scale = { breaks: b || [], colors, key, count: null, mode: 'national' };
+    return;
+  }
+  const vals = Object.values(D[ui.level]).map(p => p.v[key]);
+  scale = { breaks: breaksFrom(vals, def.d), colors, key, count: vals.filter(v => v != null).length, mode: 'national' };
+}
+function colorFor(v) {
+  if (v == null || !isFinite(v) || !scale || !scale.breaks.length) return null;
+  let i = 0;
+  while (i < scale.breaks.length && v >= scale.breaks[i]) i++;
+  return scale.colors[i];
+}
+function renderLegend() {
+  const def = M[ui.metric], f = def.f === 'pct2' ? 'pct' : def.f;
+  const meta = D.meta || { months: {} };
+  const src = ['inv', 'inv_yoy', 'inv_vs_2019', 'newl', 'newl_yoy', 'dom', 'dom_yoy', 'cut', 'lp', 'lp_yoy', 'months_supply'].includes(ui.metric) ? `Realtor.com, ${ymLabel(meta.months.realtor)}`
+    : ['income', 'poverty'].includes(ui.metric) ? `Census, ${meta.months.income}`
+    : ui.metric.startsWith('pop') || ui.metric.endsWith('_pct') && !['mtg_pct_income', 'rent_pct_income'].includes(ui.metric) ? `Census, ${meta.months.population}`
+    : ui.metric === 'fc_1y' ? `Zillow forecast from ${ymLabel(meta.months.zillow)}`
+    : `Zillow, ${ymLabel(meta.months.zillow)}${['mtg_pmt', 'mtg_pct_income', 'salary_needed', 'buy_vs_rent'].includes(ui.metric) ? ` · rate ${meta.mortgage ? meta.mortgage.rate : ''}%` : ''}`;
+  const noun = { county: 'counties', metro: 'metros', state: 'states', zip: 'ZIP codes' }[ui.level];
+  const count = !scale.breaks.length ? `not available for ${noun}`
+    : scale.mode === 'view' ? `${scale.count} ${noun} on screen`
+    : ui.level === 'zip' ? 'all ZIP codes nationwide' : `${scale.count} ${noun} nationwide`;
+  const sw = `<div class="cmode" role="group" aria-label="Colour comparison"><span>Colors:</span><button type="button" data-mode="national" class="${ui.scaleMode !== 'view' ? 'on' : ''}">Nationwide</button><button type="button" data-mode="view" class="${ui.scaleMode === 'view' ? 'on' : ''}">On screen</button></div>`;
+  const ticks = scale.breaks.length ? [scale.breaks[0], def.d ? 0 : scale.breaks[Math.floor(scale.breaks.length / 2)], scale.breaks[scale.breaks.length - 1]] : null;
+  document.getElementById('legend').innerHTML = `<h3>${esc(def.l)}</h3><div class="asof">${esc(src)} · ${count}</div>
+    <div class="bar">${scale.colors.map(c => `<i style="background:${c}"></i>`).join('')}</div>
+    ${ticks ? `<div class="ticks"><span>&lt; ${fmt(ticks[0], f, true)}</span><span>${fmt(ticks[1], f, true)}</span><span>&gt; ${fmt(ticks[2], f, true)}</span></div>` : ''}
+    <div class="na"><i></i>No data</div>${sw}`;
+}
+document.getElementById('legend').addEventListener('click', e => {
+  const b = e.target.closest('[data-mode]');
+  if (b) { ui.scaleMode = b.dataset.mode; saveUi(); restyle(); }
+});
+
+// ---------- map ----------
+function styleFor(level, id) {
+  const p = D[level][dataId(level, id)];
+  const c = p ? colorFor(p.v[ui.metric]) : null;
+  const strong = level === 'state';
+  if (level === 'zip') {
+    // Zoomed in, ZIP borders get bolder and the fill lighter, so streets and town names show through.
+    const z = map ? map.getZoom() : 8;
+    const close = z >= 9.5;
+    return { fillColor: c || '#e5e7eb', fillOpacity: c ? (z >= 11 ? 0.45 : 0.62) : 0.15, color: close ? '#1f2937' : '#ffffff',
+      weight: z >= 12 ? 1.8 : close ? 1.1 : z >= 8 ? 0.7 : 0.4, opacity: close ? 0.55 : 1 };
+  }
+  return { fillColor: c || '#e5e7eb', fillOpacity: c ? 0.62 : 0.15, color: '#1f2937', weight: strong ? 1.2 : level === 'metro' ? 0.9 : 0.5, opacity: strong ? 0.7 : 0.5 };
+}
+const dark = () => false; // Crisp white is a light theme everywhere
+function eachShape(level, fn) {
+  if (level === 'zip') Object.values(zipLayers).forEach(g => g.eachLayer(fn));
+  else if (layers[level]) layers[level].eachLayer(fn);
+}
+function restyle() {
+  buildScale();
+  renderLegend();
+  eachShape(ui.level, l => l.setStyle(styleFor(ui.level, l.feature.id)));
+  if (tableOpen) renderTable();
+}
+function setLevel(level) {
+  ui.level = level;
+  document.querySelectorAll('#levels button').forEach(b => b.classList.toggle('on', b.dataset.level === level));
+  for (const [k, l] of Object.entries(layers)) {
+    if (k === 'stateLines') continue;
+    if (k === level) l.addTo(map); else map.removeLayer(l);
+  }
+  if (layers.stateLines) layers.stateLines.bringToFront();
+  if (openPlace && openPlace.level !== level) closeDrawer();
+  restyle(); saveUi();
+  if (level === 'zip') ensureZips(); else { zipHint.classList.remove('show'); }
+}
+
+// ---------- ZIP codes: loaded state by state as you zoom in ----------
+const zipLayers = {}, zipLoading = {}, zipHint = document.getElementById('zipHint');
+const ZIP_MIN_ZOOM = 6.5;
+const abbrOf = fips => D.state[fips] && D.state[fips].s;
+// Shapes are stored as delta-encoded integers (1/10,000 of a degree) to keep the files small.
+function decodeShape(polys) {
+  return { type: 'MultiPolygon', coordinates: polys.map(rings => rings.map(flat => {
+    const pts = []; let x = 0, y = 0;
+    for (let i = 0; i < flat.length; i += 2) { x += flat[i]; y += flat[i + 1]; pts.push([x / 1e4, y / 1e4]); }
+    return pts;
+  })) };
+}
+let zipPending = 0;
+async function loadZipState(st) {
+  if (zipLayers[st]) return zipLayers[st];
+  if (zipLoading[st]) return zipLoading[st];
+  zipPending++;
+  document.getElementById('zipLoading').classList.add('show');
+  zipLoading[st] = (async () => {
+    try {
+      const [recs, shapes] = await Promise.all([fetch(`data/zip/${st}.json`).then(r => r.json()), fetch(`data/zip/shapes/${st}.json`).then(r => r.json())]);
+      for (const [z, rec] of Object.entries(recs)) { rec.s = st; rec.z = z; D.zip[z] = rec; }
+      const feats = Object.entries(shapes).map(([z, polys]) => ({ type: 'Feature', id: z, properties: {}, geometry: decodeShape(polys) }));
+      zipLayers[st] = makeLayer('zip', feats);
+      if (ui.level === 'zip') { buildScale(); zipLayers[st].addTo(map); if (layers.stateLines) layers.stateLines.bringToFront(); if (selLayer) selLayer.bringToFront(); }
+      if (tableOpen && ui.level === 'zip') renderTable();
+      return zipLayers[st];
+    } catch (e) { delete zipLoading[st]; return null; }
+    finally { if (--zipPending === 0) document.getElementById('zipLoading').classList.remove('show'); }
+  })();
+  return zipLoading[st];
+}
+function ensureZips() {
+  if (ui.level !== 'zip') return;
+  // Show only the loaded states that are on screen; load the rest when zoomed in far enough.
+  const view = map.getBounds(), near = map.getZoom() >= ZIP_MIN_ZOOM;
+  const visible = [];
+  layers.state.eachLayer(l => { const st = abbrOf(l.feature.id); if (st && view.intersects(l.getBounds())) visible.push(st); });
+  for (const [st, g] of Object.entries(zipLayers)) { if (visible.includes(st) && near) g.addTo(map); else map.removeLayer(g); }
+  zipHint.classList.toggle('show', !near);
+  if (near) visible.slice(0, 8).forEach(st => loadZipState(st));
+}
+document.getElementById('levels').addEventListener('click', e => { const b = e.target.closest('[data-level]'); if (b) setLevel(b.dataset.level); });
+
+const tip = document.getElementById('tip');
+function showTip(e, level, id) {
+  const p = D[level][dataId(level, id)];
+  if (!p) { tip.style.display = 'none'; return; }
+  const v = p.v, k = ui.metric;
+  const extra = ['hv', 'hv_yoy', 'inv_yoy', 'dom'].filter(x => x !== k).slice(0, 3);
+  tip.innerHTML = `<b>${esc(placeName(level, p))}</b>
+    <div class="row"><span>${esc(M[k].l)}</span><span>${M[k].d ? signed(v[k], M[k].f) : fmt(v[k], M[k].f)}</span></div>
+    ${extra.map(x => `<div class="row"><span>${esc(M[x].l)}</span><span>${M[x].d ? signed(v[x], M[x].f) : fmt(v[x], M[x].f)}</span></div>`).join('')}
+    <div class="hint">Click for history and every data point</div>`;
+  tip.style.display = 'block';
+  const r = document.querySelector('.stage').getBoundingClientRect();
+  let x = e.originalEvent.clientX - r.left + 14, y = e.originalEvent.clientY - r.top + 14;
+  if (x + tip.offsetWidth > r.width - 8) x -= tip.offsetWidth + 28;
+  if (y + tip.offsetHeight > r.height - 8) y -= tip.offsetHeight + 28;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+const placeName = (level, p) => level === 'county' ? `${p.n}, ${p.s}` : level === 'zip' ? `${zipOf(p)}${p.c ? ' · ' + p.c : ''}, ${p.s}` : p.n;
+const zipOf = p => p.z || '';
+
+function makeLayer(level, features) {
+  return L.geoJSON(features, {
+    style: f => styleFor(level, f.id),
+    onEachFeature: (f, l) => {
+      l.on('mousemove', e => { if (matchMedia('(hover: hover)').matches) showTip(e, level, f.id); l.setStyle({ weight: 2.2, color: '#111827' }); l.bringToFront(); });
+      l.on('mouseout', () => { tip.style.display = 'none'; l.setStyle(styleFor(level, f.id)); if (layers.stateLines) layers.stateLines.bringToFront(); });
+      l.on('click', () => { tip.style.display = 'none'; openDetail(level, dataId(level, f.id)); });
+    },
+  });
+}
+
+async function init() {
+  map = L.map('map', { zoomControl: true, preferCanvas: true, minZoom: 3, maxZoom: 14, zoomSnap: 0.25, worldCopyJump: false }).setView([38.5, -96], 4.4);
+  map.zoomControl.setPosition('bottomleft');
+  map.createPane('labels'); map.getPane('labels').style.zIndex = 650; map.getPane('labels').style.pointerEvents = 'none';
+  // Background: Esri's colourful topographic map (no key needed); the coloured areas sit on it see-through.
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Basemap &copy; Esri, HERE, Garmin, USGS, &copy; OpenStreetMap contributors', maxNativeZoom: 18 }).addTo(map);
+  if (innerWidth < 820) map.setView([39, -97], 3.4);
+
+  const get = u => fetch(u).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
+  try {
+    [topo, D.meta, D.state, D.metro, D.county] = await Promise.all([
+      get('https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/counties-10m.json'), get('data/meta.json'), get('data/state.json'), get('data/metro.json'), get('data/county.json')]);
+  } catch (e) {
+    document.getElementById('loading').textContent = 'Couldn’t load the data. Check your connection and refresh.';
+    return;
+  }
+  document.getElementById('asof').textContent = `Updated ${D.meta.built.slice(0, 10)}`;
+
+  const counties = topojson.feature(topo, topo.objects.counties).features;
+  const states = topojson.feature(topo, topo.objects.states).features;
+  // Metros are drawn by merging their counties' shapes.
+  const geomById = {};
+  topo.objects.counties.geometries.forEach(g => { geomById[g.id] = g; });
+  const metroOf = {};
+  for (const [fips, p] of Object.entries(D.county)) if (p.m) metroOf[fips] = p.m;
+  for (const [old, neu] of Object.entries(CT_OLD_TO_NEW)) if (metroOf[neu]) metroOf[old] = metroOf[neu];
+  const groups = {};
+  for (const id in geomById) if (metroOf[id]) (groups[metroOf[id]] ||= []).push(geomById[id]);
+  const metros = Object.entries(groups).filter(([id]) => D.metro[id]).map(([id, gs]) => ({ type: 'Feature', id, properties: {}, geometry: topojson.merge(topo, gs) }));
+
+  buildScale();
+  layers.county = makeLayer('county', counties);
+  layers.metro = makeLayer('metro', metros);
+  layers.state = makeLayer('state', states.filter(f => D.state[f.id]));
+  layers.stateLines = L.geoJSON(topojson.mesh(topo, topo.objects.states, (a, b) => a !== b), { style: { color: '#111827', weight: 1.8, opacity: 0.85, fill: false }, interactive: false }).addTo(map);
+  // After every pan or zoom: load ZIPs that came into view, and recolour (On screen colours and ZIP borders depend on the view).
+  let moveTimer;
+  map.on('moveend', () => { ensureZips(); clearTimeout(moveTimer); moveTimer = setTimeout(() => { if (ui.scaleMode === 'view' || ui.level === 'zip') restyle(); }, 120); });
+  buildSearchIndex();
+  renderGroups();
+  setLevel(ui.level);
+  document.getElementById('loading').remove();
+}
+
+// ---------- place search ----------
+let index = [], zipIndexLoaded = null;
+function buildSearchIndex() {
+  index = [];
+  for (const level of ['state', 'metro', 'county']) for (const [id, p] of Object.entries(D[level])) {
+    index.push({ level, id, label: placeName(level, p), key: placeName(level, p).toLowerCase() });
+  }
+}
+// The ZIP list (32,000 entries) is fetched the first time you use the search box.
+function loadZipIndex() {
+  zipIndexLoaded ||= fetch('data/zip/index.json').then(r => r.json()).then(zi => {
+    for (const [z, [city, st]] of Object.entries(zi)) {
+      const label = `${z} · ${city ? city + ', ' : ''}${st}`;
+      index.push({ level: 'zip', id: z, st, label, key: label.toLowerCase() });
+    }
+  }).catch(() => { zipIndexLoaded = null; });
+  return zipIndexLoaded;
+}
+const LEVEL_ORDER = ['state', 'metro', 'county', 'zip'];
+const searchEl = document.getElementById('placeSearch'), resultsEl = document.getElementById('results');
+let hits = [], sel = 0;
+searchEl.addEventListener('focus', loadZipIndex);
+searchEl.addEventListener('input', async () => {
+  const q = searchEl.value.trim().toLowerCase();
+  if (q.length < 2) { resultsEl.classList.remove('show'); return; }
+  if (/\d/.test(q)) await loadZipIndex();
+  if (searchEl.value.trim().toLowerCase() !== q) return; // typed on while loading
+  const words = q.split(/\s+/);
+  hits = index.filter(x => words.every(w => x.key.includes(w)))
+    .sort((a, b) => (b.key.startsWith(q) - a.key.startsWith(q)) || (LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level)) || a.key.length - b.key.length)
+    .slice(0, 8);
+  sel = 0;
+  resultsEl.innerHTML = hits.length ? hits.map((h, i) => `<button type="button" data-i="${i}" class="${i === 0 ? 'sel' : ''}"><span>${esc(h.label)}</span><small>${h.level}</small></button>`).join('') : '<div class="note" style="padding:10px 14px">No matches</div>';
+  resultsEl.classList.add('show');
+});
+searchEl.addEventListener('keydown', e => {
+  if (!resultsEl.classList.contains('show') || !hits.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sel = (sel + (e.key === 'ArrowDown' ? 1 : hits.length - 1)) % hits.length; resultsEl.querySelectorAll('button').forEach((b, i) => b.classList.toggle('sel', i === sel)); }
+  if (e.key === 'Enter') { e.preventDefault(); pick(hits[sel]); }
+  if (e.key === 'Escape') resultsEl.classList.remove('show');
+});
+resultsEl.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) pick(hits[+b.dataset.i]); });
+document.addEventListener('click', e => { if (!e.target.closest('.place-search')) resultsEl.classList.remove('show'); });
+async function pick(h) {
+  resultsEl.classList.remove('show');
+  searchEl.value = h.label;
+  searchEl.blur();
+  if (ui.level !== h.level) setLevel(h.level);
+  if (h.level === 'zip') await loadZipState(h.st);
+  zoomTo(h.level, h.id);
+  openDetail(h.level, h.id);
+}
+function shapesOf(level, id) {
+  const ids = level === 'county' ? [id, ...Object.keys(CT_OLD_TO_NEW).filter(o => CT_OLD_TO_NEW[o] === id)] : [id];
+  const out = [];
+  eachShape(level, l => { if (ids.includes(l.feature.id)) out.push(l); });
+  return out;
+}
+function zoomTo(level, id) {
+  let bounds = null;
+  shapesOf(level, id).forEach(l => { bounds = bounds ? bounds.extend(l.getBounds()) : l.getBounds(); });
+  if (!bounds) return;
+  const wide = innerWidth > 820;
+  map.flyToBounds(bounds, { maxZoom: level === 'state' ? 6 : level === 'zip' ? 9 : 7.5, paddingTopLeft: [40, wide ? 80 : 120], paddingBottomRight: wide ? [640, 40] : [40, innerHeight * 0.6] });
+}
+
+// ---------- detail drawer ----------
+let openPlace = null, hist = null, chartKey = null, chartRange = 'all';
+const drawer = document.getElementById('drawer');
+async function openDetail(level, id) {
+  const p = D[level][id];
+  if (!p) return;
+  openPlace = { level, id };
+  outline(level, id);
+  chartKey = M[ui.metric].s;
+  hist = null;
+  renderDrawer();
+  drawer.classList.add('open');
+  document.querySelector('.stage').classList.add('panel-open');
+  try {
+    if (level === 'zip') {
+      // ZIP histories come bundled by the first three digits, stored as [first month, [values…]].
+      const bundle = await fetch(`data/hist/zip/${id.slice(0, 3)}.json`).then(r => r.ok ? r.json() : {});
+      hist = {};
+      for (const [k, s] of Object.entries(bundle[id] || {})) hist[k] = expand(s);
+    } else hist = await fetch(`data/hist/${level}/${id}.json`).then(r => r.ok ? r.json() : {});
+  } catch (e) { hist = {}; }
+  if (openPlace && openPlace.id === id) renderDrawer();
+}
+function expand([start, vals]) {
+  const out = {};
+  let y = +start.slice(0, 4), m = +start.slice(5, 7);
+  for (const v of vals) {
+    if (v != null) out[`${y}-${String(m).padStart(2, '0')}`] = v;
+    if (++m > 12) { m = 1; y++; }
+  }
+  return out;
+}
+// The selected place gets a bold outline on the map.
+let selLayer = null;
+function outline(level, id) {
+  if (selLayer) { map.removeLayer(selLayer); selLayer = null; }
+  if (!level) return;
+  const feats = shapesOf(level, id).map(l => l.feature);
+  selLayer = L.geoJSON(feats, { interactive: false, style: { color: '#111827', weight: 3, fill: false, opacity: 0.95 } }).addTo(map);
+}
+function closeDrawer() { drawer.classList.remove('open'); document.querySelector('.stage').classList.remove('panel-open'); openPlace = null; outline(); }
+document.getElementById('dClose').addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+// ----- every data point gets its own history, worked out from the raw monthly series -----
+const backKey = (k, n) => { let y = +k.slice(0, 4), m = +k.slice(5, 7) - n; while (m <= 0) { m += 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; };
+function pctSeries(s, n) {
+  const out = {};
+  for (const k in s) { const o = s[backKey(k, n)]; if (o) out[k] = (s[k] / o - 1) * 100; }
+  return out;
+}
+const mapSeries = (s, fn) => { const out = {}; for (const k in s) { const v = fn(s[k], k); if (v != null && isFinite(v)) out[k] = v; } return out; };
+const rateAt = k => { const h = D.meta.mortgage.history; if (h[k] != null) return h[k]; const prev = Object.keys(h).filter(m => m <= k).sort().pop(); return prev ? h[prev] : D.meta.mortgage.rate; };
+const pmt = (price, rate) => { const r = rate / 1200; return price * 0.8 * r / (1 - Math.pow(1 + r, -360)); };
+function trendGapSeries(s) {
+  const keys = Object.keys(s).sort(), pts = keys.map((k, i) => [i, k]).filter(([i, k]) => k < '2020-01' && s[k] > 0);
+  if (pts.length < 120) return null;
+  const n = pts.length, mx = pts.reduce((a, [i]) => a + i, 0) / n, my = pts.reduce((a, [, k]) => a + Math.log(s[k]), 0) / n;
+  let sxy = 0, sxx = 0;
+  for (const [i, k] of pts) { sxy += (i - mx) * (Math.log(s[k]) - my); sxx += (i - mx) ** 2; }
+  const slope = sxy / sxx, out = {};
+  keys.forEach((k, i) => { out[k] = (s[k] / Math.exp(my + slope * (i - mx)) - 1) * 100; });
+  return out;
+}
+function seriesFor(key, h) {
+  if (!h) return null;
+  const hv = h.hv, rent = h.rent;
+  switch (key) {
+    case 'hv': return hv;
+    case 'hv_yoy': return hv && pctSeries(hv, 12);
+    case 'hv_mom': return hv && pctSeries(hv, 1);
+    case 'hv_5y': return hv && pctSeries(hv, 60);
+    case 'overvalued': return hv && trendGapSeries(hv);
+    case 'from_2022_peak': { if (!hv) return null; const peak = Math.max(...Object.keys(hv).filter(k => k.startsWith('2022')).map(k => hv[k])); return isFinite(peak) ? mapSeries(hv, (v, k) => k >= '2022-01' ? (v / peak - 1) * 100 : null) : null; }
+    case 'mtg_pmt': return hv && mapSeries(hv, (v, k) => pmt(v, rateAt(k)));
+    case 'salary_needed': return hv && mapSeries(hv, (v, k) => pmt(v, rateAt(k)) * 12 / 0.3);
+    case 'buy_vs_rent': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? pmt(hv[k], rateAt(k)) - r : null);
+    case 'rent': return rent;
+    case 'rent_yoy': return rent && pctSeries(rent, 12);
+    case 'price_rent': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? hv[k] / (r * 12) : null);
+    case 'gross_yield': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? r * 12 / hv[k] * 100 : null);
+    case 'inv': return h.inv;
+    case 'inv_yoy': return h.inv && pctSeries(h.inv, 12);
+    case 'inv_vs_2019': return h.inv && mapSeries(h.inv, (v, k) => { const b = [2017, 2018, 2019].map(y => h.inv[`${y}${k.slice(4)}`]).filter(Boolean); return b.length && k >= '2020-01' ? (v / (b.reduce((a, c) => a + c, 0) / b.length) - 1) * 100 : null; });
+    case 'newl': return h.newl;
+    case 'newl_yoy': return h.newl && pctSeries(h.newl, 12);
+    case 'dom': return h.dom;
+    case 'dom_yoy': return h.dom && pctSeries(h.dom, 12);
+    case 'cut': return h.cut && mapSeries(h.cut, v => v * 100);
+    case 'lp': return h.lp;
+    case 'lp_yoy': return h.lp && pctSeries(h.lp, 12);
+    case 'pop': return h.pop;
+    case 'pop_growth': return h.pop && pctSeries(h.pop, 12);
+    default: return null;
+  }
+}
+
+let chartMode = 'yearly';
+chartRange = '10';
+const fmtV = (k, v) => M[k].d ? signed(v, M[k].f) : fmt(v, M[k].f);
+function setMetric(k) { ui.metric = k; renderGroups(); restyle(); saveUi(); if (openPlace) renderDrawer(); }
+
+function renderDrawer() {
+  const { level, id } = openPlace, p = D[level][id], v = p.v, k = ui.metric, def = M[k];
+  const county = level === 'zip' && D.county[p.k] ? `${D.county[p.k].n}, ${D.county[p.k].s}` : '';
+  const metro = (level === 'county' || level === 'zip') && p.m && D.metro[p.m] ? D.metro[p.m].n : '';
+  const kind = level === 'metro' ? 'Metro area' : level === 'county' ? 'County' : level === 'zip' ? 'ZIP code' : 'State';
+  document.getElementById('dTitle').innerHTML = `${esc(placeName(level, p))}<small>${kind}${[county, metro].filter(Boolean).map(x => ` · ${esc(x)}`).join('')}</small>`;
+  const series = hist ? seriesFor(k, hist) : null;
+  const options = GROUPS.slice(1).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].map(x => `<option value="${x}" ${x === k ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('');
+  const tile = x => `<button type="button" class="kpi ${x === k ? 'on' : ''}" data-metric="${x}"><span>${esc(M[x].l)}</span><b>${fmtV(x, v[x])}</b></button>`;
+  const toggles = `<div class="chart-ctrl"><div class="seg-sm">${[['yearly', 'Yearly'], ['monthly', 'Monthly']].map(([m, l]) => `<button type="button" class="${chartMode === m ? 'on' : ''}" data-cmode="${m}">${l}</button>`).join('')}</div>
+    <div class="seg-sm">${[['5', '5Y'], ['10', '10Y'], ['20', '20Y'], ['all', 'All']].map(([r, l]) => `<button type="button" class="${chartRange === r ? 'on' : ''}" data-range="${r}">${l}</button>`).join('')}</div></div>`;
+  const chart = hist == null ? '<p class="note chart-empty">Loading history…</p>'
+    : series && Object.keys(series).length > 1 ? `<div class="chart" id="chart">${chartSvg(series, def)}<div class="ctip"></div></div>`
+    : `<div class="chart-empty"><b>${fmtV(k, v[k])}</b><span>${v[k] == null ? 'No data for this place.' : 'Only the latest value is published for this data point, so there is no history to chart.'}</span></div>`;
+  document.getElementById('dBody').innerHTML = `
+    <div class="metric-head"><label class="mpick"><select id="mPick" aria-label="Data point">${options}</select></label>
+      <div class="mnow"><b>${fmtV(k, v[k])}</b><span>now</span></div></div>
+    ${toggles}
+    ${chart}
+    <h4 class="snap-h">Market snapshot</h4>
+    <div class="kpis">${['hv', 'hv_yoy', 'fc_1y', 'inv', 'hv_5y', 'overvalued'].map(tile).join('')}</div>`;
+}
+document.getElementById('dBody').addEventListener('click', e => {
+  const m = e.target.closest('[data-metric]'); if (m) { setMetric(m.dataset.metric); return; }
+  const c = e.target.closest('[data-cmode]'); if (c) { chartMode = c.dataset.cmode; renderDrawer(); return; }
+  const r = e.target.closest('[data-range]'); if (r) { chartRange = r.dataset.range; renderDrawer(); }
+});
+document.getElementById('dBody').addEventListener('change', e => { if (e.target.id === 'mPick') setMetric(e.target.value); });
+
+// History chart for the selected data point. Yearly = the same month each year (labelled), Monthly = every month.
+function chartSvg(series, def) {
+  const f = def.f;
+  let keys = Object.keys(series).sort();
+  const last = keys[keys.length - 1];
+  if (chartRange !== 'all') { const cut = `${+last.slice(0, 4) - +chartRange}${last.slice(4)}`; keys = keys.filter(k => k >= cut); }
+  if (chartMode === 'yearly') { const yearly = keys.filter(k => k.slice(5) === last.slice(5)); if (yearly.length >= 2) keys = yearly; }
+  if (keys.length < 2) return '<p class="note">Not enough history for this range.</p>';
+  const vals = keys.map(k => series[k]);
+  const W = 560, H = 280, L0 = 56, R0 = 14, T0 = 22, B0 = 26;
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (def.d) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+  const pad = (hi - lo) * 0.1 || Math.abs(hi) * 0.05 || 1; lo -= pad; hi += pad;
+  if (!def.d && lo > 0 && lo < (hi - lo) * 0.3) lo = 0;
+  const x = i => L0 + (W - L0 - R0) * i / (keys.length - 1), y = v => T0 + (H - T0 - B0) * (1 - (v - lo) / (hi - lo));
+  const step = niceStep((hi - lo) / 5);
+  const ticks = []; for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) ticks.push(Math.abs(t) < step / 1e6 ? 0 : t);
+  const years = [...new Set(keys.map(k => k.slice(0, 4)))];
+  const every = Math.ceil(years.length / 10);
+  const yearly = chartMode === 'yearly';
+  const xt = keys.map((k, i) => [k, i]).filter(([k, i]) => yearly ? i % every === 0 || i === keys.length - 1 : k.endsWith('-01') && years.indexOf(k.slice(0, 4)) % every === 0);
+  const path = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const base = def.d ? y(0) : H - B0;
+  const area = `${path}L${x(vals.length - 1).toFixed(1)},${base}L${x(0)},${base}Z`;
+  const labels = yearly && keys.length <= 14;
+  const short = v => f === 'usd' ? fmt(v, 'usd', true) : f.startsWith('pct') ? (v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '%' : f === 'ratio' ? v.toFixed(1) + '×' : fmt(v, f === 'days' ? 'num' : f, true);
+  const first = vals[0], lastV = vals[vals.length - 1];
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.l)} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}" data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi })}'>
+    <defs><linearGradient id="cfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    ${ticks.map(t => `<line x1="${L0}" x2="${W - R0}" y1="${y(t)}" y2="${y(t)}" stroke="${def.d && t === 0 ? '#374151' : 'var(--line)'}" stroke-width="${def.d && t === 0 ? 1.4 : 1}"/><text x="${L0 - 8}" y="${y(t) + 3.5}" text-anchor="end" font-size="11" fill="var(--muted)">${short(t)}</text>`).join('')}
+    ${xt.map(([k, i]) => `<text x="${x(i)}" y="${H - 7}" text-anchor="middle" font-size="11" fill="var(--muted)">${yearly ? k.slice(0, 4) : k.slice(0, 4)}</text>`).join('')}
+    <path d="${area}" fill="url(#cfill)"/>
+    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${yearly ? vals.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="4.5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`).join('') : `<circle cx="${x(vals.length - 1)}" cy="${y(lastV)}" r="4.5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`}
+    ${labels ? vals.map((v, i) => `<text x="${x(i)}" y="${y(v) - 10}" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--text)" paint-order="stroke" stroke="var(--panel)" stroke-width="3">${short(v)}</text>`).join('') : ''}
+    <line class="xh" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
+    <circle class="xd" r="5" fill="var(--warm)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
+    <rect x="${L0}" y="${T0}" width="${W - L0 - R0}" height="${H - T0 - B0}" fill="transparent"/>
+  </svg><p class="note" style="margin-top:4px">${ymLabel(keys[0])} → ${ymLabel(keys[keys.length - 1])}: ${fmtV(ui.metric, first)} → ${fmtV(ui.metric, lastV)}${!def.d && first > 0 ? ` (${signed((lastV / first - 1) * 100, 'pct')})` : ''}</p>`;
+}
+function niceStep(raw) {
+  const p = Math.pow(10, Math.floor(Math.log10(raw || 1))), n = raw / p;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+}
+document.getElementById('dBody').addEventListener('mousemove', e => {
+  const svg = e.target.closest('.chart svg'); if (!svg) return;
+  const keys = JSON.parse(svg.dataset.keys), vals = JSON.parse(svg.dataset.vals), d = JSON.parse(svg.dataset.dims), f = svg.dataset.f;
+  const r = svg.getBoundingClientRect(), sx = (e.clientX - r.left) * d.W / r.width;
+  const i = Math.max(0, Math.min(keys.length - 1, Math.round((sx - d.L0) / (d.W - d.L0 - d.R0) * (keys.length - 1))));
+  const cx = d.L0 + (d.W - d.L0 - d.R0) * i / (keys.length - 1), cy = d.T0 + (d.H - d.T0 - d.B0) * (1 - (vals[i] - d.lo) / (d.hi - d.lo));
+  const xh = svg.querySelector('.xh'), xd = svg.querySelector('.xd');
+  xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.setAttribute('visibility', 'visible');
+  xd.setAttribute('cx', cx); xd.setAttribute('cy', cy); xd.setAttribute('visibility', 'visible');
+  const t = svg.parentElement.querySelector('.ctip');
+  t.textContent = `${ymLabel(keys[i])}: ${fmt(vals[i], f)}`;
+  t.style.display = 'block'; t.style.left = (cx * r.width / d.W) + 'px'; t.style.top = (cy * r.height / d.H) + 'px';
+});
+document.getElementById('dBody').addEventListener('mouseleave', () => {
+  document.querySelectorAll('.chart .ctip').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.chart .xh, .chart .xd').forEach(el => el.setAttribute('visibility', 'hidden'));
+}, true);
+
+// ---------- table view ----------
+let tableOpen = false, sortKey = null, sortDir = -1;
+const TABLE_COLS = ['hv', 'hv_yoy', 'fc_1y', 'inv_yoy', 'dom', 'cut', 'income'];
+document.getElementById('tableBtn').addEventListener('click', () => { tableOpen = !tableOpen; document.getElementById('tableView').classList.toggle('show', tableOpen); document.getElementById('tableBtn').classList.toggle('on', tableOpen); if (tableOpen) renderTable(); });
+document.getElementById('tvClose').addEventListener('click', () => { tableOpen = false; document.getElementById('tableView').classList.remove('show'); document.getElementById('tableBtn').classList.remove('on'); });
+document.getElementById('tvFilter').addEventListener('input', () => renderTable());
+function renderTable() {
+  const cols = [ui.metric, ...TABLE_COLS.filter(c => c !== ui.metric)];
+  const k = sortKey && cols.includes(sortKey) ? sortKey : ui.metric;
+  const q = document.getElementById('tvFilter').value.trim().toLowerCase();
+  let list = Object.entries(D[ui.level]).map(([id, p]) => ({ id, p, name: placeName(ui.level, p) })).filter(r => !q || r.name.toLowerCase().includes(q));
+  list.sort((a, b) => {
+    const x = a.p.v[k], y = b.p.v[k];
+    if (x == null && y == null) return a.name.localeCompare(b.name);
+    if (x == null) return 1; if (y == null) return -1;
+    return (x - y) * sortDir;
+  });
+  const shown = list.slice(0, 400);
+  document.getElementById('tvTitle').textContent = `${M[ui.metric].l} · ${ui.level === 'county' ? 'Counties' : ui.level === 'metro' ? 'Metros' : ui.level === 'zip' ? 'ZIP codes in the states you’ve opened' : 'States'}`;
+  document.getElementById('tvScroll').innerHTML = `<table><thead><tr><th>Place</th>${cols.map(c => `<th data-sort="${c}" class="${c === k ? 'sorted' : ''}">${esc(M[c].l)}${c === k ? (sortDir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('')}</tr></thead><tbody>${
+    shown.map(r => `<tr data-id="${r.id}"><td>${esc(r.name)}</td>${cols.map(c => `<td>${M[c].d ? signed(r.p.v[c], M[c].f) : fmt(r.p.v[c], M[c].f)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  document.getElementById('tvFoot').textContent = (ui.level === 'zip' && !list.length ? 'Zoom into a state on the map (or search a ZIP) to list its ZIP codes · ' : '') + `${list.length} places${list.length > shown.length ? ` · showing the first ${shown.length} (filter to narrow)` : ''} · click a column to sort, a row to open it`;
+}
+document.getElementById('tvScroll').addEventListener('click', e => {
+  const th = e.target.closest('[data-sort]');
+  if (th) { if (sortKey === th.dataset.sort) sortDir = -sortDir; else { sortKey = th.dataset.sort; sortDir = -1; } renderTable(); return; }
+  const tr = e.target.closest('tr[data-id]');
+  if (tr) { zoomTo(ui.level, tr.dataset.id); openDetail(ui.level, tr.dataset.id); }
+});
+
+init();
+</script>
+</body>
+</html>
