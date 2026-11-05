@@ -105,12 +105,21 @@
   .tip .hint { color: #a59b8b; font-size: 11px; margin-top: 5px; font-style: italic; }
 
   /* ---------- detail drawer ---------- */
-  .drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 600px; max-width: 100%; z-index: 700; background: var(--panel); border-left: 1px solid var(--line); box-shadow: var(--shadow); transform: translateX(102%); transition: transform .22s ease; display: flex; flex-direction: column; }
+  /* The detail panel opens on the left, next to the data points, and the map moves over to its right. */
+  .stage { --pw: min(820px, 62%); }
+  .drawer { position: absolute; top: 0; left: 0; bottom: 0; width: var(--pw); max-width: 100%; z-index: 700; background: var(--panel); border-right: 1px solid var(--line); box-shadow: var(--shadow); transform: translateX(-102%); transition: transform .22s ease; display: flex; flex-direction: column; }
   .drawer.open { transform: none; }
   @media (min-width: 821px) {
-    .stage.panel-open .topbar, .stage.panel-open .legend { right: 614px; }
-    .stage .topbar, .stage .legend { transition: right .22s ease; }
+    .stage.panel-open .topbar { left: calc(var(--pw) + 14px); }
+    .stage.panel-open .leaflet-left { left: var(--pw); }
+    .stage.panel-open .zip-hint { left: calc(50% + var(--pw) / 2); }
+    .stage .topbar, .stage .leaflet-left { transition: left .22s ease; }
   }
+  /* Place names and values printed on the map */
+  .plabel { width: 0 !important; height: 0 !important; }
+  .plabel .in { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; font: 600 11px/1.2 var(--sans); color: #111827; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff, 0 0 1px #fff; pointer-events: none; }
+  .plabel .in b { display: block; font-weight: 600; }
+  .plabel .in span { display: block; font-weight: 700; font-variant-numeric: tabular-nums; }
   .drawer header { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: flex-start; }
   .drawer header h2 { margin: 0; font: 700 26px/1.15 var(--serif); flex: 1; color: var(--accent); letter-spacing: -0.02em; }
   .drawer header h2 small { color: var(--muted); font-weight: 500; letter-spacing: 0; }
@@ -192,13 +201,13 @@
     .place-search { flex-basis: 100%; max-width: none; order: -1; }
     .seg button { padding: 6px 8px; font-size: 13px; }
     .pill-btn { padding: 8px 12px; font-size: 13px; }
-    #tableBtn .btxt { display: none; }
-    #tableBtn { padding: 8px 10px; }
+    #tableBtn .btxt, #labelBtn .btxt { display: none; }
+    #tableBtn, #labelBtn { padding: 8px 10px; }
     .legend { left: 10px; right: 10px; bottom: 12px; width: auto; }
     .kpis { grid-template-columns: repeat(2, 1fr) !important; }
     .drawer header h2 { font-size: 20px !important; }
     .mpick select { font-size: 17px; }
-    .drawer { width: 100%; top: 42%; border-left: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; transform: translateY(102%); }
+    .drawer { width: 100%; top: 42%; border-right: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; transform: translateY(102%); }
     .drawer.open { transform: none; }
     .drawer header { padding: 12px 16px 10px; }
     .drawer header h2 { font-size: 19px; }
@@ -219,7 +228,7 @@
     <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="dpSearch" type="search" placeholder="Search data points" aria-label="Search data points"></label>
     <div class="groups" id="groups"></div>
-    <div class="side-foot">Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, Freddie Mac (via FRED). Updated monthly. Personal use; not financial advice.</div>
+    <div class="side-foot">Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, CFPB (HMDA), NOAA, MIT Election Lab, Freddie Mac. Updated twice a month. Personal use; not financial advice.</div>
   </aside>
   <main class="stage">
     <div id="map"></div>
@@ -234,6 +243,7 @@
         <button data-level="state" type="button">State</button><button data-level="metro" type="button">Metro</button><button data-level="county" type="button" class="on">County</button><button data-level="zip" type="button">Zip</button>
       </div>
       <button class="pill-btn" id="tableBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg><span class="btxt">Table</span></button>
+      <button class="pill-btn" id="labelBtn" type="button" aria-pressed="true" title="Show names and values on the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg><span class="btxt">Labels</span></button>
     </div>
     <div class="legend" id="legend"></div>
     <div class="zip-hint" id="zipHint"><b>Zoom in to see ZIP codes</b><span>There are 32,000+ of them, so they appear once you zoom into a state, or search a ZIP code above.</span></div>
@@ -258,56 +268,135 @@
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script>
 // ---------- data points ----------
-// fmt: usd, pct (already in %), num, ratio, days. div: diverging scale centred on 0 (else light-to-dark).
+// f (format): usd, pct (already in %), pct2 (2 decimals), num, ratio (×), r2 (plain, 2 decimals), days, deg, dens, yrs, score.
+// d: diverging scale centred on 0 (else light-to-dark). src: where it comes from (shown under the legend).
 const M = {
-  hv:            { l: 'Home Value', f: 'usd', i: 'Typical home value (Zillow Home Value Index, mid-tier homes).', s: 'hv' },
-  hv_yoy:        { l: 'Home Value Growth (YoY)', f: 'pct', d: 1, i: 'Change in typical home value over the last 12 months.', s: 'hv' },
-  hv_mom:        { l: 'Home Value Growth (MoM)', f: 'pct2', d: 1, i: 'Change in typical home value over the last month.', s: 'hv' },
-  hv_5y:         { l: 'Home Value Growth (5-Year)', f: 'pct', d: 1, i: 'Change in typical home value over the last 5 years.', s: 'hv' },
-  fc_1y:         { l: 'Home Price Forecast (1-Year)', f: 'pct', d: 1, i: "Zillow's forecast for home values 12 months ahead. Published for metros; counties show their metro's forecast.", s: 'hv' },
-  overvalued:    { l: 'Overvalued %', f: 'pct', d: 1, i: "How far today's home value sits above (+) or below (−) its long-term 2000–2019 trend line, extended to today. A rough gauge, not a prediction.", s: 'hv' },
-  from_2022_peak:{ l: '% Change from 2022 Peak', f: 'pct', d: 1, i: "Today's home value compared with its highest month in 2022.", s: 'hv' },
-  crash_2007:    { l: '% Crash 2007–12', f: 'pct', d: 1, i: 'Drop from the 2005–08 peak to the 2008–13 low during the last housing crash.', s: 'hv' },
-  hv_income:     { l: 'Home Value / Income', f: 'ratio', i: 'Typical home value divided by median household income. Around 3 to 4 has historically been considered affordable.', s: 'hv' },
-  mtg_pmt:       { l: 'Mortgage Payment', f: 'usd', i: 'Monthly principal and interest on the typical home: 20% down, 30-year fixed at the current national rate. Taxes and insurance not included.', s: 'hv' },
-  mtg_pct_income:{ l: 'Mortgage Payment % of Income', f: 'pct', i: 'The mortgage payment above as a share of median household income.', s: 'hv' },
-  salary_needed: { l: 'Salary to Afford a House', f: 'usd', i: 'Yearly income at which the mortgage payment above is 30% of gross pay.', s: 'hv' },
-  buy_vs_rent:   { l: 'Buy vs Rent Differential', f: 'usd', d: 1, i: 'Mortgage payment minus typical rent, per month. Positive means owning costs more than renting.', s: 'rent' },
-  inv:           { l: 'For Sale Inventory', f: 'num', i: 'Active listings for sale (Realtor.com).', s: 'inv' },
-  inv_yoy:       { l: 'Inventory Growth (YoY)', f: 'pct', d: 1, i: 'Change in active listings versus the same month last year.', s: 'inv' },
-  inv_vs_2019:   { l: 'Inventory vs Pre-Pandemic', f: 'pct', d: 1, i: 'Active listings compared with the same month in 2017–2019. Negative means a shortage versus normal.', s: 'inv' },
-  newl:          { l: 'New Listing Count', f: 'num', i: 'Homes newly listed for sale this month.', s: 'newl' },
-  newl_yoy:      { l: 'New Listings (YoY)', f: 'pct', d: 1, i: 'Change in new listings versus the same month last year.', s: 'newl' },
-  dom:           { l: 'Days on Market', f: 'days', i: 'Median days homes stay listed (Realtor.com).', s: 'dom' },
-  dom_yoy:       { l: 'Days on Market (YoY)', f: 'pct', d: 1, i: 'Change in median days on market versus a year ago.', s: 'dom' },
-  cut:           { l: 'Price Cut %', f: 'pct', i: 'Share of active listings with a price reduction this month.', s: 'cut' },
-  lp:            { l: 'Median Listing Price', f: 'usd', i: 'Median asking price of active listings.', s: 'lp' },
-  lp_yoy:        { l: 'Median Listing Price (YoY)', f: 'pct', d: 1, i: 'Change in median asking price versus a year ago.', s: 'lp' },
-  months_supply: { l: 'Listings per Pending Sale', f: 'ratio', i: 'Active listings divided by pending sales: a rough months-of-supply gauge. Higher favours buyers.', s: 'inv' },
-  rent:          { l: 'Typical Rent', f: 'usd', i: 'Typical asking rent (Zillow Observed Rent Index, all rentals).', s: 'rent' },
-  rent_yoy:      { l: 'Rent Growth (YoY)', f: 'pct', d: 1, i: 'Change in typical rent over the last 12 months.', s: 'rent' },
-  price_rent:    { l: 'Home Value to Rent Ratio', f: 'ratio', i: 'Home value divided by a year of rent. Higher means buying is expensive relative to renting.', s: 'rent' },
-  gross_yield:   { l: 'Gross Rental Yield', f: 'pct2', i: 'A year of typical rent as a share of home value, before costs (a rough cap-rate stand-in).', s: 'rent' },
-  rent_pct_income:{ l: 'Rent as % of Income', f: 'pct', i: 'A year of typical rent as a share of median household income.', s: 'rent' },
-  income:        { l: 'Median Household Income', f: 'usd', i: 'Census Small Area Income & Poverty Estimates. Metros are a population-weighted blend of their counties.', s: 'hv' },
-  poverty:       { l: 'Poverty Rate', f: 'pct', i: 'Share of people below the poverty line (Census SAIPE).', s: 'hv' },
-  pop:           { l: 'Population', f: 'num', i: 'Census population estimate (July of the latest year).', s: 'hv' },
-  pop_growth:    { l: 'Population Growth (1-Year)', f: 'pct2', d: 1, i: 'Population change over the latest year.', s: 'hv' },
-  pop_growth_5y: { l: 'Population Growth (since 2020)', f: 'pct', d: 1, i: 'Population change since 2020.', s: 'hv' },
-  births_pct:    { l: 'Birth %', f: 'pct2', i: 'Births in the latest year as a share of population.', s: 'hv' },
-  deaths_pct:    { l: 'Death %', f: 'pct2', i: 'Deaths in the latest year as a share of population.', s: 'hv' },
-  natural_pct:   { l: 'Natural Population Increase %', f: 'pct2', d: 1, i: 'Births minus deaths, as a share of population.', s: 'hv' },
-  dom_mig_pct:   { l: 'Domestic Migration %', f: 'pct2', d: 1, i: 'Net people moving in from (or out to) other US places, as a share of population.', s: 'hv' },
-  intl_mig_pct:  { l: 'International Migration %', f: 'pct2', d: 1, i: 'Net international migration as a share of population.', s: 'hv' },
+  // home prices (Zillow)
+  hv:            { l: 'Home Value', f: 'usd', src: 'zillow', i: 'Typical home value (Zillow Home Value Index, mid-tier homes of all kinds).' },
+  hv_yoy:        { l: 'Home Value Growth (YoY)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical home value over the last 12 months.' },
+  hv_mom:        { l: 'Home Value Growth (MoM)', f: 'pct2', d: 1, src: 'zillow', i: 'Change in typical home value over the last month.' },
+  hv_5y:         { l: 'Home Value Growth (5-Year)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical home value over the last 5 years.' },
+  fc_1y:         { l: 'Home Price Forecast (1-Year)', f: 'pct', d: 1, src: 'forecast', i: "Zillow's forecast for home values 12 months ahead. Published for metros; counties and ZIPs show their metro's forecast. The chart shows each forecast since this map started saving them." },
+  overvalued:    { l: 'Overvalued %', f: 'pct', d: 1, src: 'zillow', i: "How far today's home value sits above (+) or below (−) its long-term 2000–2019 trend line, extended to today. A rough gauge, not a prediction." },
+  from_2022_peak:{ l: '% Change from 2022 Peak', f: 'pct', d: 1, src: 'zillow', i: "Today's home value compared with its highest month in 2022." },
+  crash_2007:    { l: '% Crash from 2007–12', f: 'pct', d: 1, src: 'zillow', i: 'Drop from the 2005–08 peak to the 2008–13 low during the last housing crash. The chart shows the slide from the peak.' },
+  hv_income:     { l: 'Home Value / Income Ratio', f: 'ratio', src: 'zillow', i: 'Typical home value divided by median household income. Around 3 to 4 has historically been considered affordable.' },
+  sfr:           { l: 'Single Family Value', f: 'usd', src: 'zillow', i: 'Typical value of single-family houses only (Zillow).' },
+  sfr_yoy:       { l: 'Single Family Value Growth (YoY)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical single-family house value over the last 12 months.' },
+  condo:         { l: 'Condo Value', f: 'usd', src: 'zillow', i: 'Typical value of condos and co-ops (Zillow).' },
+  condo_yoy:     { l: 'Condo Value Growth (YoY)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical condo value over the last 12 months.' },
+  mtg_pmt:       { l: 'Mortgage Payment', f: 'usd', src: 'zillow', i: 'Monthly principal and interest on the typical home: 20% down, 30-year fixed at the national rate of the time. Taxes and insurance not included.' },
+  mtg_pct_income:{ l: 'Mtg Payment as % of Income', f: 'pct', src: 'zillow', i: 'The mortgage payment above as a share of median household income.' },
+  salary_needed: { l: 'Salary to Afford a House', f: 'usd', src: 'zillow', i: 'Yearly income at which the mortgage payment above is 30% of gross pay.' },
+  prop_tax:      { l: 'Property Tax Annual', f: 'usd', src: 'acs', i: 'Yearly property tax on the typical home: the local tax rate below times the typical home value.' },
+  prop_tax_rate: { l: 'Property Tax Rate', f: 'pct2', src: 'acs', i: 'Median property tax paid by homeowners divided by the median home value they report (Census American Community Survey).' },
+  buy_vs_rent:   { l: 'Buy v Rent Differential', f: 'usd', d: 1, src: 'zillow', i: 'Mortgage payment minus typical rent, per month. Positive means owning costs more than renting.' },
+  // market trends (Realtor.com)
+  inv:           { l: 'For Sale Inventory', f: 'num', src: 'realtor', i: 'Active listings for sale (Realtor.com).' },
+  inv_yoy:       { l: 'Sale Inventory Growth (YoY)', f: 'pct', d: 1, src: 'realtor', i: 'Change in active listings versus the same month last year.' },
+  inv_mom:       { l: 'Sale Inventory Growth (MoM)', f: 'pct', d: 1, src: 'realtor', i: 'Change in active listings versus last month.' },
+  inv_vs_2019:   { l: 'Inventory Surplus/Deficit', f: 'pct', d: 1, src: 'realtor', i: 'Active listings compared with the same month in 2017–2019. Negative means a shortage versus normal.' },
+  sales:         { l: 'Home Sales', f: 'num', src: 'realtor', i: 'Homes under contract (pending sales) this month, from Realtor.com: the most up-to-date count of sales for every place.' },
+  sales_yoy:     { l: 'Home Sales Growth (YoY)', f: 'pct', d: 1, src: 'realtor', i: 'Change in pending home sales versus the same month last year.' },
+  sales_vs_2019: { l: 'Home Sales Surplus/Deficit', f: 'pct', d: 1, src: 'realtor', i: 'Pending home sales compared with the same month in 2017–2019.' },
+  cut:           { l: 'Price Cut %', f: 'pct', src: 'realtor', i: 'Share of active listings with a price reduction this month.' },
+  dom:           { l: 'Days on Market', f: 'days', src: 'realtor', i: 'Median days homes stay listed (Realtor.com).' },
+  dom_yoy:       { l: 'Days on Market Growth (YoY)', f: 'pct', d: 1, src: 'realtor', i: 'Change in median days on market versus a year ago.' },
+  inv_pct_houses:{ l: 'Inventory as % of Houses', f: 'pct2', src: 'realtor', i: 'Active listings as a share of all housing units (Census estimates).' },
+  lp:            { l: 'Median Listing Price', f: 'usd', src: 'realtor', i: 'Median asking price of active listings.' },
+  lp_yoy:        { l: 'Median Listing Price (YoY)', f: 'pct', d: 1, src: 'realtor', i: 'Change in median asking price versus a year ago.' },
+  newl:          { l: 'New Listing Count', f: 'num', src: 'realtor', i: 'Homes newly listed for sale this month.' },
+  newl_yoy:      { l: 'New Listing Count (YoY)', f: 'pct', d: 1, src: 'realtor', i: 'Change in new listings versus the same month last year.' },
+  months_supply: { l: 'Listings per Pending Sale', f: 'ratio', src: 'realtor', i: 'Active listings divided by pending sales: a rough months-of-supply gauge. Higher favours buyers.' },
+  // socioeconomic
+  income:        { l: 'Median Household Income', f: 'usd', src: 'income', i: 'Census Small Area Income & Poverty Estimates (ZIP codes: American Community Survey). Metros are a population-weighted blend of their counties.' },
+  income_growth: { l: 'Income Growth', f: 'pct', d: 1, src: 'income', i: 'Change in median household income over the latest year.' },
+  poverty:       { l: 'Poverty Rate', f: 'pct', src: 'income', i: 'Share of people below the poverty line (Census SAIPE).' },
+  college:       { l: 'College Degree Rate', f: 'pct', src: 'acs', i: "Share of adults 25 and over with a bachelor's degree or higher." },
+  remote:        { l: 'Remote Work %', f: 'pct', src: 'acs', i: 'Share of workers who mainly work from home.' },
+  homeown:       { l: 'Homeownership Rate', f: 'pct', src: 'acs', i: 'Share of occupied homes lived in by their owners.' },
+  mortgaged:     { l: 'Mortgaged Home %', f: 'pct', src: 'acs', i: 'Share of owner-occupied homes that have a mortgage.' },
+  family_hh:     { l: 'Family Households %', f: 'pct', src: 'acs', i: 'Share of households that are families (related people living together).' },
+  single_hh:     { l: 'Single Households %', f: 'pct', src: 'acs', i: 'Share of households made up of one person living alone.' },
+  u18_pct:       { l: 'Population Under 18 %', f: 'pct', src: 'age', i: 'Share of residents under 18 (Census population estimates).' },
+  a2544_pct:     { l: 'Population 25-44 %', f: 'pct', src: 'age', i: 'Share of residents aged 25 to 44: the prime first-time-buyer ages.' },
+  a65_pct:       { l: 'Population 65+ %', f: 'pct', src: 'age', i: 'Share of residents 65 and over.' },
+  a75_pct:       { l: 'Population 75+ %', f: 'pct', src: 'age', i: 'Share of residents 75 and over.' },
+  density:       { l: 'Population Density (/sq mi)', f: 'dens', src: 'pop', i: 'Residents per square mile of land.' },
+  temp:          { l: 'Weather (Avg Temperature)', f: 'deg', src: 'temp', i: 'Average temperature over the year, °F (NOAA). Metros average their counties by area.' },
+  units:         { l: 'Housing Units', f: 'num', src: 'units', i: 'Homes of every kind, occupied or not: Census estimates to 2020, then added to with each year’s building permits.' },
+  units_growth:  { l: 'Housing Unit Growth Rate', f: 'pct2', d: 1, src: 'units', i: 'Change in housing units over the latest year.' },
+  vote_r:        { l: 'Vote Republican %', f: 'pct', src: 'votes', i: 'Republican share of the presidential vote.' },
+  vote_d:        { l: 'Vote Democrat %', f: 'pct', src: 'votes', i: 'Democratic share of the presidential vote.' },
+  // population and demographics
+  pop:           { l: 'Population', f: 'num', src: 'pop', i: 'Census population estimate (July of each year).' },
+  pop_growth:    { l: 'Population Growth', f: 'pct2', d: 1, src: 'pop', i: 'Population change over the latest year.' },
+  pop_growth_5y: { l: 'Population Growth (5-Year)', f: 'pct', d: 1, src: 'pop', i: 'Population change over the last 5 years.' },
+  med_age:       { l: 'Median Age', f: 'yrs', src: 'age', i: 'Half of residents are older, half younger. Metros and states: an average of their counties weighted by population.' },
+  births:        { l: 'Births', f: 'num', src: 'pop', i: 'Babies born in the year.' },
+  births_pct:    { l: 'Birth %', f: 'pct2', src: 'pop', i: 'Births as a share of population.' },
+  deaths:        { l: 'Deaths', f: 'num', src: 'pop', i: 'Deaths in the year.' },
+  deaths_pct:    { l: 'Death %', f: 'pct2', src: 'pop', i: 'Deaths as a share of population.' },
+  birth_death:   { l: 'Birth / Death Ratio', f: 'r2', src: 'pop', i: 'Births per death. Below 1 means more deaths than births.' },
+  natural:       { l: 'Natural Population Increase', f: 'num', d: 1, src: 'pop', i: 'Births minus deaths.' },
+  natural_pct:   { l: 'Natural Population Increase %', f: 'pct2', d: 1, src: 'pop', i: 'Births minus deaths, as a share of population.' },
+  dom_mig:       { l: 'Domestic Migration', f: 'num', d: 1, src: 'pop', i: 'People moving in from other US places minus people moving out to them.' },
+  dom_mig_pct:   { l: 'Domestic Migration %', f: 'pct2', d: 1, src: 'pop', i: 'Net domestic migration as a share of population.' },
+  intl_mig:      { l: 'International Migration', f: 'num', d: 1, src: 'pop', i: 'Net migration from abroad.' },
+  intl_mig_pct:  { l: 'International Migration %', f: 'pct2', d: 1, src: 'pop', i: 'Net international migration as a share of population.' },
+  r_u18_65:      { l: 'Pop Ratio Under 18 to 65+', f: 'r2', src: 'age', i: 'Residents under 18 for every resident 65 and over.' },
+  r_u18_75:      { l: 'Pop Ratio Under 18 to 75+', f: 'r2', src: 'age', i: 'Residents under 18 for every resident 75 and over.' },
+  r_2544_65:     { l: 'Pop Ratio 25-44 to 65+', f: 'r2', src: 'age', i: 'Residents aged 25–44 (future buyers) for every resident 65 and over (future sellers).' },
+  r_2544_75:     { l: 'Pop Ratio 25-44 to 75+', f: 'r2', src: 'age', i: 'Residents aged 25–44 for every resident 75 and over.' },
+  own_2544_pct:  { l: 'Homeowners 25-44 %', f: 'pct', src: 'acs', i: 'Share of owner households headed by someone aged 25–44.' },
+  own_65_pct:    { l: 'Homeowners 65+ %', f: 'pct', src: 'acs', i: 'Share of owner households headed by someone 65 or older.' },
+  own_75_pct:    { l: 'Homeowners 75+ %', f: 'pct', src: 'acs', i: 'Share of owner households headed by someone 75 or older.' },
+  rent_2544_pct: { l: 'Renters 25-44 %', f: 'pct', src: 'acs', i: 'Share of renter households headed by someone aged 25–44.' },
+  r_rent2544_own65: { l: 'Renters 25-44 / Owners 65+', f: 'r2', src: 'acs', i: 'Renter households aged 25–44 (likely future buyers) for every owner household 65+ (likely future sellers).' },
+  r_rent2544_own75: { l: 'Renters 25-44 / Owners 75+', f: 'r2', src: 'acs', i: 'Renter households aged 25–44 for every owner household 75+.' },
+  // mortgage quality (HMDA: home-purchase loans, first liens)
+  apps:          { l: 'Purchase Applications', f: 'num', src: 'hmda', i: 'Mortgage applications to buy a home during the year (HMDA).' },
+  origs:         { l: 'Purchase Originations', f: 'num', src: 'hmda', i: 'Home-purchase mortgages actually made during the year.' },
+  denial:        { l: 'Purchase Denial Rate', f: 'pct', src: 'hmda', i: 'Share of decided purchase applications that lenders turned down.' },
+  avg_rate:      { l: 'Average Interest Rate', f: 'pct2', src: 'hmda', i: 'Average interest rate on home-purchase mortgages made during the year.' },
+  conv_pct:      { l: 'Conventional Mortgage %', f: 'pct', src: 'hmda', i: 'Share of purchase mortgages that are conventional (not government-backed).' },
+  govt_pct:      { l: 'Govt-Backed Mortgage %', f: 'pct', src: 'hmda', i: 'Share backed by FHA, VA or USDA.' },
+  fha_pct:       { l: 'FHA Mortgage %', f: 'pct', src: 'hmda', i: 'Share insured by the FHA (popular with first-time buyers; low down payments).' },
+  va_pct:        { l: 'VA Mortgage %', f: 'pct', src: 'hmda', i: 'Share guaranteed by Veterans Affairs.' },
+  usda_pct:      { l: 'USDA Mortgage %', f: 'pct', src: 'hmda', i: 'Share backed by the USDA rural housing programs.' },
+  ltv:           { l: 'Purchase LTV', f: 'pct', src: 'hmda', i: 'Median loan-to-value: the loan as a share of the home price. 80% means a 20% down payment.' },
+  dti:           { l: 'Purchase DTI', f: 'pct', src: 'hmda', i: "Median debt-to-income: the buyer's monthly debts, including the new mortgage, as a share of income." },
+  dti43:         { l: 'Purchase DTI Above 43%', f: 'pct', src: 'hmda', i: 'Share of buyers whose debts take more than 43% of income: a traditional stretch limit.' },
+  buyer_income:  { l: 'Median Buyer Income', f: 'usd', src: 'hmda', i: 'Median yearly income of people who got a purchase mortgage.' },
+  loan_amt:      { l: 'Median Purchase Mortgage', f: 'usd', src: 'hmda', i: 'Median loan amount (rounded to $5,000).' },
+  price_med:     { l: 'Median Purchase Price', f: 'usd', src: 'hmda', i: 'Median value of the homes bought with a mortgage (rounded to $5,000).' },
+  second_pct:    { l: '2nd Home Purchase %', f: 'pct', src: 'hmda', i: 'Share of purchase mortgages for second homes.' },
+  investor_pct:  { l: 'Investor Purchase %', f: 'pct', src: 'hmda', i: 'Share of purchase mortgages for investment (rental) properties. Cash buyers are not counted.' },
+  si_pct:        { l: '2nd Home + Investor Purchase %', f: 'pct', src: 'hmda', i: 'Second homes plus investment properties, as a share of purchase mortgages.' },
+  // investor metrics
+  rent:          { l: 'Rental Rate', f: 'usd', src: 'zillow', i: 'Typical asking rent, all rentals (Zillow Observed Rent Index).' },
+  rent_sfr:      { l: 'Rent For Houses', f: 'usd', src: 'zillow', i: 'Typical asking rent for single-family houses (Zillow; published for metros).' },
+  rent_yoy:      { l: 'Rent Growth (YoY)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical rent over the last 12 months.' },
+  cap_rate:      { l: 'Cap Rate', f: 'pct2', src: 'zillow', i: 'A year of typical rent, minus 35% for taxes, insurance, upkeep and vacancy, divided by the typical home value. A rough estimate.' },
+  vacancy:       { l: 'Vacancy Rate', f: 'pct', src: 'acs', i: 'Rental vacancy: homes for rent that are empty, as a share of all rental homes.' },
+  price_rent:    { l: 'Home Value to Rent Ratio', f: 'ratio', src: 'zillow', i: 'Home value divided by a year of rent. Higher means buying is expensive relative to renting.' },
+  rent_overvalued:{ l: 'Overvalued % – Rental Market', f: 'pct', d: 1, src: 'zillow', i: "How far today's rent sits above (+) or below (−) its 2015–2019 trend line, extended to today. Rough." },
+  rent_pct_income:{ l: 'Rent as % of Income', f: 'pct', src: 'zillow', i: 'A year of typical rent as a share of median household income.' },
+  shadow:        { l: 'Shadow Inventory %', f: 'pct2', src: 'acs', i: 'Homes sitting empty that are not for sale or rent (not seasonal homes either), as a share of all homes: possible future supply.' },
+  permits:       { l: 'Building Permits', f: 'num', src: 'permits', i: 'New homes authorised by building permits during the year (Census).' },
+  permits_pct:   { l: 'Building Permits %', f: 'pct2', src: 'permits', i: 'New homes permitted during the year as a share of existing housing units.' },
+  gross_yield:   { l: 'Gross Rental Yield', f: 'pct2', src: 'zillow', i: 'A year of typical rent as a share of home value, before any costs.' },
+  growth_score:  { l: 'Long-Term Growth Score', f: 'score', src: 'pop', i: "This map's own 0–100 score: how a place ranks against others at the same level on 5-year population growth, net domestic migration and 5-year income growth (averaged). Higher = stronger long-term demand." },
 };
 const GROUPS = [
-  ['Popular', ['hv', 'hv_yoy', 'fc_1y', 'inv', 'overvalued', 'dom', 'cut', 'mtg_pct_income', 'inv_vs_2019']],
-  ['Home Price & Affordability', ['hv', 'hv_yoy', 'hv_mom', 'hv_5y', 'fc_1y', 'overvalued', 'from_2022_peak', 'crash_2007', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'buy_vs_rent']],
-  ['Market Trends', ['inv', 'inv_yoy', 'inv_vs_2019', 'newl', 'newl_yoy', 'dom', 'dom_yoy', 'cut', 'lp', 'lp_yoy', 'months_supply']],
-  ['Rent & Investing', ['rent', 'rent_yoy', 'price_rent', 'gross_yield', 'rent_pct_income', 'buy_vs_rent']],
-  ['Income & Population', ['income', 'poverty', 'pop', 'pop_growth', 'pop_growth_5y', 'births_pct', 'deaths_pct', 'natural_pct', 'dom_mig_pct', 'intl_mig_pct']],
+  ['Popular Data', ['hv', 'hv_yoy', 'inv', 'fc_1y', 'hv_5y', 'hv_mom', 'overvalued', 'dom', 'sales', 'cap_rate', 'growth_score']],
+  ['Home Price & Affordability', ['hv', 'hv_yoy', 'hv_5y', 'overvalued', 'hv_income', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'from_2022_peak', 'crash_2007', 'hv_mom', 'fc_1y']],
+  ['Market Trends', ['inv', 'inv_yoy', 'inv_vs_2019', 'sales', 'sales_yoy', 'sales_vs_2019', 'cut', 'dom', 'dom_yoy', 'inv_pct_houses', 'lp', 'lp_yoy', 'newl', 'newl_yoy', 'inv_mom', 'months_supply']],
+  ['Socioeconomic Data', ['income', 'income_growth', 'poverty', 'college', 'remote', 'homeown', 'mortgaged', 'family_hh', 'single_hh', 'u18_pct', 'a2544_pct', 'a65_pct', 'a75_pct', 'density', 'temp', 'units', 'units_growth', 'vote_r', 'vote_d']],
+  ['Population and Demographics', ['pop', 'pop_growth', 'pop_growth_5y', 'med_age', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'r_u18_65', 'r_u18_75', 'r_2544_65', 'r_2544_75', 'own_2544_pct', 'own_65_pct', 'own_75_pct', 'rent_2544_pct', 'r_rent2544_own65', 'r_rent2544_own75']],
+  ['Mortgage Quality', ['apps', 'origs', 'denial', 'avg_rate', 'conv_pct', 'govt_pct', 'fha_pct', 'va_pct', 'usda_pct', 'ltv', 'dti', 'dti43', 'buyer_income', 'loan_amt', 'price_med', 'second_pct', 'investor_pct', 'si_pct']],
+  ['Investor Metrics', ['rent', 'rent_sfr', 'rent_yoy', 'cap_rate', 'vacancy', 'price_rent', 'rent_overvalued', 'rent_pct_income', 'shadow', 'permits', 'permits_pct', 'gross_yield', 'buy_vs_rent']],
 ];
-const SERIES = { hv: ['Home value', 'usd'], rent: ['Rent', 'usd'], inv: ['Inventory', 'num'], dom: ['Days on market', 'days'], cut: ['Price cuts', 'share'], lp: ['List price', 'usd'], newl: ['New listings', 'num'] };
 
 // Colour ramps: one hue light-to-dark for amounts,
 // cool-to-warm through a neutral grey for changes that can go either way.
@@ -327,19 +416,25 @@ function fmt(v, f, short) {
     case 'pct2': return sign + a.toFixed(2) + '%';
     case 'share': return (v * 100).toFixed(1) + '%';
     case 'ratio': return sign + a.toFixed(1) + '×';
-    case 'days': return nf0.format(v) + ' days';
+    case 'r2': return sign + a.toFixed(2);
+    case 'days': return nf0.format(v) + (short ? 'd' : ' days');
+    case 'deg': return sign + a.toFixed(1) + '°F';
+    case 'dens': return nf0.format(v) + (short ? '' : ' /sq mi');
+    case 'yrs': return a.toFixed(1) + (short ? '' : ' yrs');
+    case 'score': return String(Math.round(v));
     default: return sign + (short && a >= 1e6 ? (a / 1e6).toFixed(1) + 'M' : short && a >= 1e4 ? Math.round(a / 1e3) + 'K' : nf0.format(a));
   }
 }
 const signed = (v, f) => v == null ? '—' : (v > 0 ? '+' : '') + fmt(v, f);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const ymLabel = k => k ? `${MON[+k.slice(5, 7) - 1]} ${k.slice(0, 4)}` : '';
+const ymLabel = k => !k ? '' : String(k).length === 4 ? String(k) : `${MON[+k.slice(5, 7) - 1]} ${k.slice(0, 4)}`;
 
 // ---------- state ----------
 const saved = (() => { try { return JSON.parse(localStorage.getItem('hm-ui')) || {}; } catch (e) { return {}; } })();
-const ui = { scaleMode: saved.scaleMode === 'national' ? 'national' : 'view', metric: M[saved.metric] ? saved.metric : 'hv_yoy', level: ['state', 'metro', 'county', 'zip'].includes(saved.level) ? saved.level : 'county', open: new Set(saved.open || ['Popular']) };
-const saveUi = () => { try { localStorage.setItem('hm-ui', JSON.stringify({ metric: ui.metric, level: ui.level, open: [...ui.open], scaleMode: ui.scaleMode })); } catch (e) {} };
+const ui = { scaleMode: saved.scaleMode === 'national' ? 'national' : 'view', metric: M[saved.metric] ? saved.metric : 'hv_yoy', level: ['state', 'metro', 'county', 'zip'].includes(saved.level) ? saved.level : 'county', open: new Set(saved.open || ['Popular Data']) };
+const saveUi = () => { try { localStorage.setItem('hm-ui', JSON.stringify({ metric: ui.metric, level: ui.level, open: [...ui.open], scaleMode: ui.scaleMode, labels: labelsOn })); } catch (e) {} };
+if (ui.open.has('Popular')) { ui.open.delete('Popular'); ui.open.add('Popular Data'); }
 const D = { meta: null, state: null, metro: null, county: null, zip: {} };
 let topo, layers = {}, map, scale = null;
 
@@ -349,14 +444,19 @@ const CT_OLD_TO_NEW = { '09001': '09190', '09003': '09110', '09005': '09160', '0
 const dataId = (level, id) => level === 'county' && CT_OLD_TO_NEW[id] ? CT_OLD_TO_NEW[id] : id;
 
 // ---------- sidebar ----------
+// Data points with no data anywhere yet (e.g. survey data before a Census key is added) are left out of the lists.
+const HAS = new Set();
+const hasData = k => !HAS.size || HAS.has(k);
 function renderGroups() {
   const q = document.getElementById('dpSearch').value.trim().toLowerCase();
-  document.getElementById('groups').innerHTML = GROUPS.map(([name, keys]) => {
-    const list = keys.filter(k => !q || M[k].l.toLowerCase().includes(q));
+  // Each section has its own radio group, so a data point listed in two sections (e.g. Home Value under
+  // Popular Data and under Home Price & Affordability) shows as selected in both.
+  document.getElementById('groups').innerHTML = GROUPS.map(([name, keys], gi) => {
+    const list = keys.filter(k => hasData(k) && (!q || M[k].l.toLowerCase().includes(q)));
     if (!list.length) return '';
     const open = q || ui.open.has(name);
     return `<div class="group ${open ? 'open' : ''}"><button type="button" data-group="${esc(name)}">${esc(name)}</button><ul>${list.map(k =>
-      `<li><label class="metric ${ui.metric === k ? 'on' : ''}"><input type="radio" name="metric" value="${k}" ${ui.metric === k ? 'checked' : ''}><span>${esc(M[k].l)}</span><button class="info" type="button" data-info="${k}" aria-label="About ${esc(M[k].l)}">i</button></label></li>`).join('')}</ul></div>`;
+      `<li><label class="metric ${ui.metric === k ? 'on' : ''}"><input type="radio" name="metric-${gi}" value="${k}" ${ui.metric === k ? 'checked' : ''}><span>${esc(M[k].l)}</span><button class="info" type="button" data-info="${k}" aria-label="About ${esc(M[k].l)}">i</button></label></li>`).join('')}</ul></div>`;
   }).join('') || '<p class="note" style="padding:8px">No data points match.</p>';
 }
 document.getElementById('groups').addEventListener('click', e => {
@@ -366,7 +466,7 @@ document.getElementById('groups').addEventListener('click', e => {
   if (g) { const n = g.dataset.group; ui.open.has(n) ? ui.open.delete(n) : ui.open.add(n); renderGroups(); saveUi(); }
 });
 document.getElementById('groups').addEventListener('change', e => {
-  if (e.target.name === 'metric') { ui.metric = e.target.value; renderGroups(); restyle(); saveUi(); closeSide(); if (openPlace) renderDrawer(); }
+  if (e.target.name && e.target.name.startsWith('metric')) { ui.metric = e.target.value; renderGroups(); restyle(); saveUi(); closeSide(); if (openPlace) renderDrawer(); }
 });
 document.getElementById('dpSearch').addEventListener('input', renderGroups);
 function showInfo(btn) {
@@ -444,14 +544,25 @@ function colorFor(v) {
   while (i < scale.breaks.length && v >= scale.breaks[i]) i++;
   return scale.colors[i];
 }
+function sourceLine(k, meta, yr) {
+  const s = M[k].src;
+  if (s === 'realtor') return `Realtor.com, ${ymLabel(meta.months.realtor)}`;
+  if (s === 'forecast') return `Zillow forecast from ${ymLabel(meta.months.zillow)}`;
+  if (s === 'income') return `Census income estimates, ${yr.income || meta.months.income}`;
+  if (s === 'pop') return `Census population estimates, ${yr.pop || meta.months.population}`;
+  if (s === 'age') return `Census population estimates, ${yr.age || ''}`;
+  if (s === 'acs') return yr.acs ? `Census American Community Survey, ${yr.acs - 4}–${yr.acs}` : 'Census American Community Survey (not loaded yet)';
+  if (s === 'hmda') return yr.hmda ? `Mortgage applications (HMDA), ${yr.hmda}` : 'Mortgage data (HMDA) (not loaded yet)';
+  if (s === 'permits') return `Census building permits, ${yr.permits || ''}`;
+  if (s === 'units') return `Census housing estimates, ${yr.units || ''}`;
+  if (s === 'temp') return `NOAA, ${yr.temp || ''}`;
+  if (s === 'votes') return `Presidential election, ${yr.votes || ''}`;
+  return `Zillow, ${ymLabel(meta.months.zillow)}${['mtg_pmt', 'mtg_pct_income', 'salary_needed', 'buy_vs_rent'].includes(k) ? ` · rate ${meta.mortgage ? meta.mortgage.rate : ''}%` : ''}`;
+}
 function renderLegend() {
   const def = M[ui.metric], f = def.f === 'pct2' ? 'pct' : def.f;
-  const meta = D.meta || { months: {} };
-  const src = ['inv', 'inv_yoy', 'inv_vs_2019', 'newl', 'newl_yoy', 'dom', 'dom_yoy', 'cut', 'lp', 'lp_yoy', 'months_supply'].includes(ui.metric) ? `Realtor.com, ${ymLabel(meta.months.realtor)}`
-    : ['income', 'poverty'].includes(ui.metric) ? `Census, ${meta.months.income}`
-    : ui.metric.startsWith('pop') || ui.metric.endsWith('_pct') && !['mtg_pct_income', 'rent_pct_income'].includes(ui.metric) ? `Census, ${meta.months.population}`
-    : ui.metric === 'fc_1y' ? `Zillow forecast from ${ymLabel(meta.months.zillow)}`
-    : `Zillow, ${ymLabel(meta.months.zillow)}${['mtg_pmt', 'mtg_pct_income', 'salary_needed', 'buy_vs_rent'].includes(ui.metric) ? ` · rate ${meta.mortgage ? meta.mortgage.rate : ''}%` : ''}`;
+  const meta = D.meta || { months: {} }, yr = meta.years || {};
+  const src = sourceLine(ui.metric, meta, yr);
   const noun = { county: 'counties', metro: 'metros', state: 'states', zip: 'ZIP codes' }[ui.level];
   const count = !scale.breaks.length ? `not available for ${noun}`
     : scale.mode === 'view' ? `${scale.count} ${noun} on screen`
@@ -491,8 +602,79 @@ function restyle() {
   buildScale();
   renderLegend();
   eachShape(ui.level, l => l.setStyle(styleFor(ui.level, l.feature.id)));
+  updateLabels();
   if (tableOpen) renderTable();
 }
+
+// ---------- labels: each place's name and value, printed where there is room ----------
+let labelsOn = saved.labels !== false, labelLayer = null;
+const ringArea = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]); return a / 2; };
+function inRing(x, y, r) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
+// A spot inside the shape's biggest piece: its centre if that falls inside, else the middle of the widest
+// stretch of the shape along the centre's latitude (works for C-shaped places like Florida or Michigan).
+function anchorOf(l) {
+  if (l._anchor !== undefined) return l._anchor;
+  const g = l.feature.geometry, polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+  let best = null, bestA = 0;
+  for (const poly of polys) { const a = Math.abs(ringArea(poly[0])); if (a > bestA) { bestA = a; best = poly; } }
+  if (!best) return (l._anchor = null);
+  const r = best[0];
+  let cx = 0, cy = 0, a6 = 0;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const f = r[j][0] * r[i][1] - r[i][0] * r[j][1]; cx += (r[j][0] + r[i][0]) * f; cy += (r[j][1] + r[i][1]) * f; a6 += f * 3; }
+  let pt = a6 ? [cx / a6, cy / a6] : r[0];
+  const inside = (x, y) => inRing(x, y, best[0]) && !best.slice(1).some(h => inRing(x, y, h));
+  if (!inside(pt[0], pt[1])) {
+    const y = pt[1], xs = [];
+    for (const ring of best) for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [x1, y1] = ring[i], [x2, y2] = ring[j]; if ((y1 > y) !== (y2 > y)) xs.push(x1 + (y - y1) * (x2 - x1) / (y2 - y1)); }
+    xs.sort((p, q) => p - q);
+    let w = 0;
+    for (let i = 0; i + 1 < xs.length; i += 2) if (xs[i + 1] - xs[i] > w) { w = xs[i + 1] - xs[i]; pt = [(xs[i] + xs[i + 1]) / 2, y]; }
+  }
+  return (l._anchor = L.latLng(pt[1], pt[0]));
+}
+function labelName(level, p, wide) {
+  if (level === 'state') return wide ? p.n : p.s;
+  if (level === 'metro') return p.n.split(',')[0].split('-')[0];
+  if (level === 'zip') return p.z;
+  return p.n.replace(/ (County|Parish|Borough|Census Area|City and Borough|Municipality|Planning Region)$/, '');
+}
+const labelValue = (k, v) => v == null ? '—' : (M[k].d && v > 0 ? '+' : '') + fmt(v, M[k].f, true);
+function updateLabels() {
+  if (!labelLayer) return;
+  labelLayer.clearLayers();
+  if (!labelsOn || (ui.level === 'zip' && map.getZoom() < ZIP_MIN_ZOOM)) return;
+  const level = ui.level, k = ui.metric, size = map.getSize(), view = map.getBounds(), cand = [];
+  eachShape(level, l => {
+    const b = l._bb || (l._bb = l.getBounds());
+    if (!view.intersects(b)) return;
+    const p = D[level][dataId(level, l.feature.id)];
+    if (!p) return;
+    const ne = map.latLngToContainerPoint(b.getNorthEast()), sw = map.latLngToContainerPoint(b.getSouthWest());
+    const w = ne.x - sw.x, h = sw.y - ne.y;
+    if (w < 34 || h < 22) return;
+    const a = anchorOf(l);
+    if (!a) return;
+    const pt = map.latLngToContainerPoint(a);
+    if (pt.x < 20 || pt.y < 60 || pt.x > size.x - 20 || pt.y > size.y - 10) return;
+    cand.push({ p, w, h, pt, a });
+  });
+  cand.sort((x, y) => y.w * y.h - x.w * x.h);
+  const placed = [];
+  for (const c of cand) {
+    if (placed.length >= 400) break;
+    const name = labelName(level, c.p, c.w > 130), val = labelValue(k, c.p.v[k]);
+    const tw = Math.max(name.length * 6.4, val.length * 6.8) + 6, th = 28;
+    if (tw > c.w * 1.15 || th > c.h * 1.2) continue;
+    const box = [c.pt.x - tw / 2, c.pt.y - th / 2, c.pt.x + tw / 2, c.pt.y + th / 2];
+    if (placed.some(q => box[0] < q[2] && box[2] > q[0] && box[1] < q[3] && box[3] > q[1])) continue;
+    placed.push(box);
+    L.marker(c.a, { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: 'plabel', iconSize: [0, 0], html: `<div class="in"><b>${esc(name)}</b><span>${esc(val)}</span></div>` }) }).addTo(labelLayer);
+  }
+}
+const labelBtn = document.getElementById('labelBtn');
+function syncLabelBtn() { labelBtn.classList.toggle('on', labelsOn); labelBtn.setAttribute('aria-pressed', labelsOn); }
+syncLabelBtn();
+labelBtn.addEventListener('click', () => { labelsOn = !labelsOn; syncLabelBtn(); saveUi(); updateLabels(); });
 function setLevel(level) {
   ui.level = level;
   document.querySelectorAll('#levels button').forEach(b => b.classList.toggle('on', b.dataset.level === level));
@@ -530,7 +712,7 @@ async function loadZipState(st) {
       for (const [z, rec] of Object.entries(recs)) { rec.s = st; rec.z = z; D.zip[z] = rec; }
       const feats = Object.entries(shapes).map(([z, polys]) => ({ type: 'Feature', id: z, properties: {}, geometry: decodeShape(polys) }));
       zipLayers[st] = makeLayer('zip', feats);
-      if (ui.level === 'zip') { buildScale(); zipLayers[st].addTo(map); if (layers.stateLines) layers.stateLines.bringToFront(); if (selLayer) selLayer.bringToFront(); }
+      if (ui.level === 'zip') { buildScale(); zipLayers[st].addTo(map); if (layers.stateLines) layers.stateLines.bringToFront(); if (selLayer) selLayer.bringToFront(); updateLabels(); }
       if (tableOpen && ui.level === 'zip') renderTable();
       return zipLayers[st];
     } catch (e) { delete zipLoading[st]; return null; }
@@ -585,6 +767,7 @@ async function init() {
   map = L.map('map', { zoomControl: true, preferCanvas: true, minZoom: 3, maxZoom: 14, zoomSnap: 0.25, worldCopyJump: false }).setView([38.5, -96], 4.4);
   map.zoomControl.setPosition('bottomleft');
   map.createPane('labels'); map.getPane('labels').style.zIndex = 650; map.getPane('labels').style.pointerEvents = 'none';
+  labelLayer = L.layerGroup().addTo(map);
   // Background: Esri's colourful topographic map (no key needed); the coloured areas sit on it see-through.
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Basemap &copy; Esri, HERE, Garmin, USGS, &copy; OpenStreetMap contributors', maxNativeZoom: 18 }).addTo(map);
   if (innerWidth < 820) map.setView([39, -97], 3.4);
@@ -598,6 +781,8 @@ async function init() {
     return;
   }
   document.getElementById('asof').textContent = `Updated ${D.meta.built.slice(0, 10)}`;
+  for (const level of ['state', 'metro', 'county']) for (const p of Object.values(D[level])) for (const k in p.v) HAS.add(k);
+  if (!hasData(ui.metric)) ui.metric = 'hv_yoy';
 
   const counties = topojson.feature(topo, topo.objects.counties).features;
   const states = topojson.feature(topo, topo.objects.states).features;
@@ -618,7 +803,7 @@ async function init() {
   layers.stateLines = L.geoJSON(topojson.mesh(topo, topo.objects.states, (a, b) => a !== b), { style: { color: '#111827', weight: 1.8, opacity: 0.85, fill: false }, interactive: false }).addTo(map);
   // After every pan or zoom: load ZIPs that came into view, and recolour (On screen colours and ZIP borders depend on the view).
   let moveTimer;
-  map.on('moveend', () => { ensureZips(); clearTimeout(moveTimer); moveTimer = setTimeout(() => { if (ui.scaleMode === 'view' || ui.level === 'zip') restyle(); }, 120); });
+  map.on('moveend', () => { ensureZips(); clearTimeout(moveTimer); moveTimer = setTimeout(() => { if (ui.scaleMode === 'view' || ui.level === 'zip') restyle(); else updateLabels(); }, 120); });
   buildSearchIndex();
   renderGroups();
   setLevel(ui.level);
@@ -687,19 +872,18 @@ function zoomTo(level, id) {
   let bounds = null;
   shapesOf(level, id).forEach(l => { bounds = bounds ? bounds.extend(l.getBounds()) : l.getBounds(); });
   if (!bounds) return;
-  const wide = innerWidth > 820;
-  map.flyToBounds(bounds, { maxZoom: level === 'state' ? 6 : level === 'zip' ? 9 : 7.5, paddingTopLeft: [40, wide ? 80 : 120], paddingBottomRight: wide ? [640, 40] : [40, innerHeight * 0.6] });
+  const wide = innerWidth > 820, pw = Math.min(820, document.querySelector('.stage').clientWidth * 0.62);
+  map.flyToBounds(bounds, { maxZoom: level === 'state' ? 6 : level === 'zip' ? 9 : 7.5, paddingTopLeft: [wide ? pw + 40 : 40, wide ? 80 : 120], paddingBottomRight: wide ? [40, 40] : [40, innerHeight * 0.6] });
 }
 
 // ---------- detail drawer ----------
-let openPlace = null, hist = null, chartKey = null, chartRange = 'all';
+let openPlace = null, hist = null, chartRange = 'all';
 const drawer = document.getElementById('drawer');
 async function openDetail(level, id) {
   const p = D[level][id];
   if (!p) return;
   openPlace = { level, id };
   outline(level, id);
-  chartKey = M[ui.metric].s;
   hist = null;
   renderDrawer();
   drawer.classList.add('open');
@@ -709,7 +893,7 @@ async function openDetail(level, id) {
       // ZIP histories come bundled by the first three digits, stored as [first month, [values…]].
       const bundle = await fetch(`data/hist/zip/${id.slice(0, 3)}.json`).then(r => r.ok ? r.json() : {});
       hist = {};
-      for (const [k, s] of Object.entries(bundle[id] || {})) hist[k] = expand(s);
+      for (const [k, s] of Object.entries(bundle[id] || {})) hist[k] = k === 'a' ? s : expand(s);
     } else hist = await fetch(`data/hist/${level}/${id}.json`).then(r => r.ok ? r.json() : {});
   } catch (e) { hist = {}; }
   if (openPlace && openPlace.id === id) renderDrawer();
@@ -745,9 +929,9 @@ function pctSeries(s, n) {
 const mapSeries = (s, fn) => { const out = {}; for (const k in s) { const v = fn(s[k], k); if (v != null && isFinite(v)) out[k] = v; } return out; };
 const rateAt = k => { const h = D.meta.mortgage.history; if (h[k] != null) return h[k]; const prev = Object.keys(h).filter(m => m <= k).sort().pop(); return prev ? h[prev] : D.meta.mortgage.rate; };
 const pmt = (price, rate) => { const r = rate / 1200; return price * 0.8 * r / (1 - Math.pow(1 + r, -360)); };
-function trendGapSeries(s) {
+function trendGapSeries(s, minPts = 120) {
   const keys = Object.keys(s).sort(), pts = keys.map((k, i) => [i, k]).filter(([i, k]) => k < '2020-01' && s[k] > 0);
-  if (pts.length < 120) return null;
+  if (pts.length < minPts) return null;
   const n = pts.length, mx = pts.reduce((a, [i]) => a + i, 0) / n, my = pts.reduce((a, [, k]) => a + Math.log(s[k]), 0) / n;
   let sxy = 0, sxx = 0;
   for (const [i, k] of pts) { sxy += (i - mx) * (Math.log(s[k]) - my); sxx += (i - mx) ** 2; }
@@ -755,36 +939,68 @@ function trendGapSeries(s) {
   keys.forEach((k, i) => { out[k] = (s[k] / Math.exp(my + slope * (i - mx)) - 1) * 100; });
   return out;
 }
-function seriesFor(key, h) {
+// Yearly data points arrive as {"2019": v, ...}; this finds the value for a month's year (or the closest earlier year).
+function annualAt(s, k) {
+  if (!s) return null;
+  const y = k.slice(0, 4);
+  if (s[y] != null) return s[y];
+  let best = null;
+  for (const x of Object.keys(s).sort()) { if (x <= y) best = s[x]; else { if (best == null) best = s[x]; break; } }
+  return best;
+}
+function vsPre(s) {
+  return s && mapSeries(s, (v, k) => { const b = [2017, 2018, 2019].map(y => s[`${y}${k.slice(4)}`]).filter(Boolean); return b.length && k >= '2020-01' ? (v / (b.reduce((a, c) => a + c, 0) / b.length) - 1) * 100 : null; });
+}
+const EXPENSES = 0.35; // same as build_data.py: share of rent for taxes, insurance, upkeep and vacancy
+function seriesFor(key, h, p) {
   if (!h) return null;
-  const hv = h.hv, rent = h.rent;
+  const hv = h.hv, rent = h.rent, a = h.a || {}, v = (p && p.v) || {};
+  // Income for any month: that year's figure, else (ZIPs without survey data) the income implied by today's ratio.
+  const income = k => annualAt(a.income, k) ?? (v.hv && v.hv_income ? v.hv / v.hv_income : null);
+  const per = (s, fn) => s && mapSeries(s, fn);
   switch (key) {
     case 'hv': return hv;
     case 'hv_yoy': return hv && pctSeries(hv, 12);
     case 'hv_mom': return hv && pctSeries(hv, 1);
     case 'hv_5y': return hv && pctSeries(hv, 60);
     case 'overvalued': return hv && trendGapSeries(hv);
-    case 'from_2022_peak': { if (!hv) return null; const peak = Math.max(...Object.keys(hv).filter(k => k.startsWith('2022')).map(k => hv[k])); return isFinite(peak) ? mapSeries(hv, (v, k) => k >= '2022-01' ? (v / peak - 1) * 100 : null) : null; }
-    case 'mtg_pmt': return hv && mapSeries(hv, (v, k) => pmt(v, rateAt(k)));
-    case 'salary_needed': return hv && mapSeries(hv, (v, k) => pmt(v, rateAt(k)) * 12 / 0.3);
+    case 'from_2022_peak': { if (!hv) return null; const peak = Math.max(...Object.keys(hv).filter(k => k.startsWith('2022')).map(k => hv[k])); return isFinite(peak) ? mapSeries(hv, (x, k) => k >= '2022-01' ? (x / peak - 1) * 100 : null) : null; }
+    case 'crash_2007': { if (!hv) return null; let peak = 0; const out = {}; for (const k of Object.keys(hv).sort()) { if (k < '2005-01' || k > '2013-12') continue; if (k <= '2008-12') peak = Math.max(peak, hv[k]); if (peak) out[k] = (hv[k] / peak - 1) * 100; } return out; }
+    case 'hv_income': return per(hv, (x, k) => income(k) ? x / income(k) : null);
+    case 'sfr': return h.sfr;
+    case 'sfr_yoy': return h.sfr && pctSeries(h.sfr, 12);
+    case 'condo': return h.condo;
+    case 'condo_yoy': return h.condo && pctSeries(h.condo, 12);
+    case 'mtg_pmt': return per(hv, (x, k) => pmt(x, rateAt(k)));
+    case 'mtg_pct_income': return per(hv, (x, k) => income(k) ? pmt(x, rateAt(k)) * 12 / income(k) * 100 : null);
+    case 'salary_needed': return per(hv, (x, k) => pmt(x, rateAt(k)) * 12 / 0.3);
     case 'buy_vs_rent': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? pmt(hv[k], rateAt(k)) - r : null);
+    case 'fc_1y': return h.fc;
     case 'rent': return rent;
+    case 'rent_sfr': return h.rent_sfr;
     case 'rent_yoy': return rent && pctSeries(rent, 12);
+    case 'rent_overvalued': return rent && trendGapSeries(rent, 48);
+    case 'rent_pct_income': return per(rent, (r, k) => income(k) ? r * 12 / income(k) * 100 : null);
     case 'price_rent': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? hv[k] / (r * 12) : null);
     case 'gross_yield': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? r * 12 / hv[k] * 100 : null);
+    case 'cap_rate': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? r * 12 * (1 - EXPENSES) / hv[k] * 100 : null);
     case 'inv': return h.inv;
     case 'inv_yoy': return h.inv && pctSeries(h.inv, 12);
-    case 'inv_vs_2019': return h.inv && mapSeries(h.inv, (v, k) => { const b = [2017, 2018, 2019].map(y => h.inv[`${y}${k.slice(4)}`]).filter(Boolean); return b.length && k >= '2020-01' ? (v / (b.reduce((a, c) => a + c, 0) / b.length) - 1) * 100 : null; });
+    case 'inv_mom': return h.inv && pctSeries(h.inv, 1);
+    case 'inv_vs_2019': return vsPre(h.inv);
+    case 'inv_pct_houses': return per(h.inv, (x, k) => { const u = annualAt(a.units, k); return u ? x / u * 100 : null; });
+    case 'sales': return h.pend;
+    case 'sales_yoy': return h.pend && pctSeries(h.pend, 12);
+    case 'sales_vs_2019': return vsPre(h.pend);
+    case 'months_supply': return h.inv && h.pend && mapSeries(h.inv, (x, k) => h.pend[k] ? x / h.pend[k] : null);
     case 'newl': return h.newl;
     case 'newl_yoy': return h.newl && pctSeries(h.newl, 12);
     case 'dom': return h.dom;
     case 'dom_yoy': return h.dom && pctSeries(h.dom, 12);
-    case 'cut': return h.cut && mapSeries(h.cut, v => v * 100);
+    case 'cut': return h.cut && mapSeries(h.cut, x => x * 100);
     case 'lp': return h.lp;
     case 'lp_yoy': return h.lp && pctSeries(h.lp, 12);
-    case 'pop': return h.pop;
-    case 'pop_growth': return h.pop && pctSeries(h.pop, 12);
-    default: return null;
+    default: return a[key] || null; // every yearly data point (Census, mortgages, permits, weather, votes…)
   }
 }
 
@@ -799,17 +1015,21 @@ function renderDrawer() {
   const metro = (level === 'county' || level === 'zip') && p.m && D.metro[p.m] ? D.metro[p.m].n : '';
   const kind = level === 'metro' ? 'Metro area' : level === 'county' ? 'County' : level === 'zip' ? 'ZIP code' : 'State';
   document.getElementById('dTitle').innerHTML = `${esc(placeName(level, p))}<small>${kind}${[county, metro].filter(Boolean).map(x => ` · ${esc(x)}`).join('')}</small>`;
-  const series = hist ? seriesFor(k, hist) : null;
-  const options = GROUPS.slice(1).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].map(x => `<option value="${x}" ${x === k ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('');
+  const series = hist ? seriesFor(k, hist, p) : null;
+  const skeys = series ? Object.keys(series).sort() : [];
+  const annual = skeys.length && skeys[0].length === 4;
+  const options = GROUPS.slice(1).filter(([g, keys]) => keys.some(hasData)).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].filter(hasData).map(x => `<option value="${x}" ${x === k ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('');
   const tile = x => `<button type="button" class="kpi ${x === k ? 'on' : ''}" data-metric="${x}"><span>${esc(M[x].l)}</span><b>${fmtV(x, v[x])}</b></button>`;
-  const toggles = `<div class="chart-ctrl"><div class="seg-sm">${[['yearly', 'Yearly'], ['monthly', 'Monthly']].map(([m, l]) => `<button type="button" class="${chartMode === m ? 'on' : ''}" data-cmode="${m}">${l}</button>`).join('')}</div>
+  // Yearly data points (Census, mortgages…) have one value a year, so the Yearly/Monthly switch only shows for monthly data.
+  const toggles = `<div class="chart-ctrl">${annual ? '<span class="note" style="margin:0">One value per year</span>' : `<div class="seg-sm">${[['yearly', 'Yearly'], ['monthly', 'Monthly']].map(([m, l]) => `<button type="button" class="${chartMode === m ? 'on' : ''}" data-cmode="${m}">${l}</button>`).join('')}</div>`}
     <div class="seg-sm">${[['5', '5Y'], ['10', '10Y'], ['20', '20Y'], ['all', 'All']].map(([r, l]) => `<button type="button" class="${chartRange === r ? 'on' : ''}" data-range="${r}">${l}</button>`).join('')}</div></div>`;
   const chart = hist == null ? '<p class="note chart-empty">Loading history…</p>'
-    : series && Object.keys(series).length > 1 ? `<div class="chart" id="chart">${chartSvg(series, def)}<div class="ctip"></div></div>`
-    : `<div class="chart-empty"><b>${fmtV(k, v[k])}</b><span>${v[k] == null ? 'No data for this place.' : 'Only the latest value is published for this data point, so there is no history to chart.'}</span></div>`;
+    : skeys.length > 1 ? `<div class="chart" id="chart">${chartSvg(series, def)}<div class="ctip"></div></div>`
+    : `<div class="chart-empty"><b>${fmtV(k, v[k])}</b><span>${v[k] == null ? `No ${esc(def.l)} data for this place.` : 'Only one value so far, so there is no history to chart yet.'}</span></div>`;
+  const asof = skeys.length ? ymLabel(skeys[skeys.length - 1]) : 'now';
   document.getElementById('dBody').innerHTML = `
     <div class="metric-head"><label class="mpick"><select id="mPick" aria-label="Data point">${options}</select></label>
-      <div class="mnow"><b>${fmtV(k, v[k])}</b><span>now</span></div></div>
+      <div class="mnow"><b>${fmtV(k, v[k])}</b><span>${esc(asof)}</span></div></div>
     ${toggles}
     ${chart}
     <h4 class="snap-h">Market snapshot</h4>
@@ -831,7 +1051,7 @@ function chartSvg(series, def) {
   if (chartMode === 'yearly') { const yearly = keys.filter(k => k.slice(5) === last.slice(5)); if (yearly.length >= 2) keys = yearly; }
   if (keys.length < 2) return '<p class="note">Not enough history for this range.</p>';
   const vals = keys.map(k => series[k]);
-  const W = 560, H = 280, L0 = 56, R0 = 14, T0 = 22, B0 = 26;
+  const W = 760, H = 380, L0 = 62, R0 = 18, T0 = 26, B0 = 28;
   let lo = Math.min(...vals), hi = Math.max(...vals);
   if (def.d) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
   const pad = (hi - lo) * 0.1 || Math.abs(hi) * 0.05 || 1; lo -= pad; hi += pad;
@@ -841,13 +1061,13 @@ function chartSvg(series, def) {
   const ticks = []; for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) ticks.push(Math.abs(t) < step / 1e6 ? 0 : t);
   const years = [...new Set(keys.map(k => k.slice(0, 4)))];
   const every = Math.ceil(years.length / 10);
-  const yearly = chartMode === 'yearly';
+  const yearly = chartMode === 'yearly' || keys[0].length === 4;
   const xt = keys.map((k, i) => [k, i]).filter(([k, i]) => yearly ? i % every === 0 || i === keys.length - 1 : k.endsWith('-01') && years.indexOf(k.slice(0, 4)) % every === 0);
   const path = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
   const base = def.d ? y(0) : H - B0;
   const area = `${path}L${x(vals.length - 1).toFixed(1)},${base}L${x(0)},${base}Z`;
   const labels = yearly && keys.length <= 14;
-  const short = v => f === 'usd' ? fmt(v, 'usd', true) : f.startsWith('pct') ? (v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '%' : f === 'ratio' ? v.toFixed(1) + '×' : fmt(v, f === 'days' ? 'num' : f, true);
+  const short = v => f === 'usd' ? fmt(v, 'usd', true) : f.startsWith('pct') ? (v < 0 ? '−' : '') + Math.abs(v).toFixed(Math.abs(hi - lo) < 3 ? 2 : 1) + '%' : f === 'ratio' ? v.toFixed(1) + '×' : fmt(v, f === 'days' ? 'num' : f, true);
   const first = vals[0], lastV = vals[vals.length - 1];
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.l)} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}" data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi })}'>
     <defs><linearGradient id="cfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
