@@ -203,16 +203,28 @@
     .pill-btn { padding: 8px 12px; font-size: 13px; }
     #tableBtn .btxt, #labelBtn .btxt { display: none; }
     #tableBtn, #labelBtn { padding: 8px 10px; }
-    .legend { left: 10px; right: 10px; bottom: 12px; width: auto; }
+    .legend { left: 10px; right: 10px; bottom: 30px; width: auto; padding: 7px 10px 6px; }
+    .legend h3 { font-size: 13.5px; }
+    .legend .asof { font-size: 10.5px; margin-bottom: 5px; }
+    .legend .na { display: none; }
+    .cmode { margin-top: 6px; padding-top: 6px; }
+    .topbar { gap: 6px; }
+    .seg { padding: 3px; }
+    .plabel .in { font-size: 10px; }
+    .metric { padding: 9px 8px; }
     .kpis { grid-template-columns: repeat(2, 1fr) !important; }
     .drawer header h2 { font-size: 20px !important; }
     .mpick select { font-size: 17px; }
-    .drawer { width: 100%; top: 42%; border-right: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; transform: translateY(102%); }
+    .drawer { width: 100%; top: 30%; border-right: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; transform: translateY(102%); }
     .drawer.open { transform: none; }
     .drawer header { padding: 12px 16px 10px; }
     .drawer header h2 { font-size: 19px; }
     .table-view { inset: 120px 8px 8px; }
     .leaflet-control-zoom { display: none; }
+  }
+  @media (max-width: 420px) {
+    .menu-btn { padding: 8px 10px; font-size: 0; gap: 0; }
+    .seg button { padding: 6px 7px; font-size: 12.5px; }
   }
   .scrim { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, .3); z-index: 850; }
   .scrim.show { display: block; }
@@ -276,7 +288,7 @@ const M = {
   hv_yoy:        { l: 'Home Value Growth (YoY)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical home value over the last 12 months.' },
   hv_mom:        { l: 'Home Value Growth (MoM)', f: 'pct2', d: 1, src: 'zillow', i: 'Change in typical home value over the last month.' },
   hv_5y:         { l: 'Home Value Growth (5-Year)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical home value over the last 5 years.' },
-  fc_1y:         { l: 'Home Price Forecast (1-Year)', f: 'pct', d: 1, src: 'forecast', i: "Zillow's forecast for home values 12 months ahead. Published for metros; counties and ZIPs show their metro's forecast. The chart shows each forecast since this map started saving them." },
+  fc_1y:         { l: 'Home Price Forecast (1-Year)', f: 'pct', d: 1, src: 'forecast', i: "Zillow's forecast for home values 12 months ahead. Zillow publishes it for metros and ZIP codes; counties show their metro's, and states an average of their metros weighted by population. The chart shows Zillow's past forecasts (saved copies go back to 2022)." },
   overvalued:    { l: 'Overvalued %', f: 'pct', d: 1, src: 'zillow', i: "How far today's home value sits above (+) or below (−) its long-term 2000–2019 trend line, extended to today. A rough gauge, not a prediction." },
   from_2022_peak:{ l: '% Change from 2022 Peak', f: 'pct', d: 1, src: 'zillow', i: "Today's home value compared with its highest month in 2022." },
   crash_2007:    { l: '% Crash from 2007–12', f: 'pct', d: 1, src: 'zillow', i: 'Drop from the 2005–08 peak to the 2008–13 low during the last housing crash. The chart shows the slide from the peak.' },
@@ -323,11 +335,11 @@ const M = {
   a65_pct:       { l: 'Population 65+ %', f: 'pct', src: 'age', i: 'Share of residents 65 and over.' },
   a75_pct:       { l: 'Population 75+ %', f: 'pct', src: 'age', i: 'Share of residents 75 and over.' },
   density:       { l: 'Population Density (/sq mi)', f: 'dens', src: 'pop', i: 'Residents per square mile of land.' },
-  temp:          { l: 'Weather (Avg Temperature)', f: 'deg', src: 'temp', i: 'Average temperature over the year, °F (NOAA). Metros average their counties by area.' },
+  temp:          { l: 'Weather (Avg Temperature)', f: 'deg', src: 'temp', i: 'Average temperature over the year, °F (NOAA). Metros average their counties by area; ZIP codes show their county’s.' },
   units:         { l: 'Housing Units', f: 'num', src: 'units', i: 'Homes of every kind, occupied or not: Census estimates to 2020, then added to with each year’s building permits.' },
   units_growth:  { l: 'Housing Unit Growth Rate', f: 'pct2', d: 1, src: 'units', i: 'Change in housing units over the latest year.' },
-  vote_r:        { l: 'Vote Republican %', f: 'pct', src: 'votes', i: 'Republican share of the presidential vote.' },
-  vote_d:        { l: 'Vote Democrat %', f: 'pct', src: 'votes', i: 'Democratic share of the presidential vote.' },
+  vote_r:        { l: 'Vote Republican %', f: 'pct', src: 'votes', i: 'Republican share of the presidential vote, by county (ZIP codes show their county’s).' },
+  vote_d:        { l: 'Vote Democrat %', f: 'pct', src: 'votes', i: 'Democratic share of the presidential vote, by county (ZIP codes show their county’s).' },
   // population and demographics
   pop:           { l: 'Population', f: 'num', src: 'pop', i: 'Census population estimate (July of each year).' },
   pop_growth:    { l: 'Population Growth', f: 'pct2', d: 1, src: 'pop', i: 'Population change over the latest year.' },
@@ -375,15 +387,15 @@ const M = {
   si_pct:        { l: '2nd Home + Investor Purchase %', f: 'pct', src: 'hmda', i: 'Second homes plus investment properties, as a share of purchase mortgages.' },
   // investor metrics
   rent:          { l: 'Rental Rate', f: 'usd', src: 'zillow', i: 'Typical asking rent, all rentals (Zillow Observed Rent Index).' },
-  rent_sfr:      { l: 'Rent For Houses', f: 'usd', src: 'zillow', i: 'Typical asking rent for single-family houses (Zillow; published for metros).' },
+  rent_sfr:      { l: 'Rent For Houses', f: 'usd', src: 'zillow', i: 'Typical asking rent for single-family houses. Zillow publishes this for metro areas only.' },
   rent_yoy:      { l: 'Rent Growth (YoY)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical rent over the last 12 months.' },
   cap_rate:      { l: 'Cap Rate', f: 'pct2', src: 'zillow', i: 'A year of typical rent, minus 35% for taxes, insurance, upkeep and vacancy, divided by the typical home value. A rough estimate.' },
   vacancy:       { l: 'Vacancy Rate', f: 'pct', src: 'acs', i: 'Rental vacancy: homes for rent that are empty, as a share of all rental homes.' },
   price_rent:    { l: 'Home Value to Rent Ratio', f: 'ratio', src: 'zillow', i: 'Home value divided by a year of rent. Higher means buying is expensive relative to renting.' },
-  rent_overvalued:{ l: 'Overvalued % – Rental Market', f: 'pct', d: 1, src: 'zillow', i: "How far today's rent sits above (+) or below (−) its 2015–2019 trend line, extended to today. Rough." },
+  rent_overvalued:{ l: 'Overvalued % – Rental Market', f: 'pct', d: 1, src: 'zillow', i: "How far today's rent sits above (+) or below (−) its 2015–2019 trend line, extended to today. Rough. Zillow publishes rents for metros, counties and ZIP codes (not states)." },
   rent_pct_income:{ l: 'Rent as % of Income', f: 'pct', src: 'zillow', i: 'A year of typical rent as a share of median household income.' },
   shadow:        { l: 'Shadow Inventory %', f: 'pct2', src: 'acs', i: 'Homes sitting empty that are not for sale or rent (not seasonal homes either), as a share of all homes: possible future supply.' },
-  permits:       { l: 'Building Permits', f: 'num', src: 'permits', i: 'New homes authorised by building permits during the year (Census).' },
+  permits:       { l: 'Building Permits', f: 'num', src: 'permits', i: 'New homes authorised by building permits during the year (Census). Published for counties, metros and states, not ZIP codes.' },
   permits_pct:   { l: 'Building Permits %', f: 'pct2', src: 'permits', i: 'New homes permitted during the year as a share of existing housing units.' },
   gross_yield:   { l: 'Gross Rental Yield', f: 'pct2', src: 'zillow', i: 'A year of typical rent as a share of home value, before any costs.' },
   growth_score:  { l: 'Long-Term Growth Score', f: 'score', src: 'pop', i: "This map's own 0–100 score: how a place ranks against others at the same level on 5-year population growth, net domestic migration and 5-year income growth (averaged). Higher = stronger long-term demand." },
@@ -770,7 +782,7 @@ async function init() {
   labelLayer = L.layerGroup().addTo(map);
   // Background: Esri's colourful topographic map (no key needed); the coloured areas sit on it see-through.
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Basemap &copy; Esri, HERE, Garmin, USGS, &copy; OpenStreetMap contributors', maxNativeZoom: 18 }).addTo(map);
-  if (innerWidth < 820) map.setView([39, -97], 3.4);
+  if (innerWidth < 820) map.fitBounds([[24.5, -124.8], [49.4, -66.9]], { paddingTopLeft: [4, 110], paddingBottomRight: [4, 120] });
 
   const get = u => fetch(u).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
   try {
@@ -1048,10 +1060,18 @@ function chartSvg(series, def) {
   let keys = Object.keys(series).sort();
   const last = keys[keys.length - 1];
   if (chartRange !== 'all') { const cut = `${+last.slice(0, 4) - +chartRange}${last.slice(4)}`; keys = keys.filter(k => k >= cut); }
-  if (chartMode === 'yearly') { const yearly = keys.filter(k => k.slice(5) === last.slice(5)); if (yearly.length >= 2) keys = yearly; }
+  // Yearly: one point per year, the month closest to the latest one (so a year with a gap still shows).
+  if (chartMode === 'yearly' && keys[0].length > 4) {
+    const target = +last.slice(5), byYear = {};
+    for (const k of keys) { const y = k.slice(0, 4), d = Math.abs(+k.slice(5) - target); if (!byYear[y] || d < byYear[y].d) byYear[y] = { k, d }; }
+    const yearly = Object.values(byYear).map(o => o.k).sort();
+    if (yearly.length >= 2) keys = yearly;
+  }
   if (keys.length < 2) return '<p class="note">Not enough history for this range.</p>';
   const vals = keys.map(k => series[k]);
-  const W = 760, H = 380, L0 = 62, R0 = 18, T0 = 26, B0 = 28;
+  // Phones get a smaller drawing so the numbers stay readable once it is fitted to the screen.
+  const narrow = innerWidth <= 820;
+  const W = narrow ? 400 : 760, H = narrow ? 290 : 380, L0 = narrow ? 50 : 62, R0 = narrow ? 12 : 18, T0 = 26, B0 = 28;
   let lo = Math.min(...vals), hi = Math.max(...vals);
   if (def.d) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
   const pad = (hi - lo) * 0.1 || Math.abs(hi) * 0.05 || 1; lo -= pad; hi += pad;
@@ -1060,13 +1080,13 @@ function chartSvg(series, def) {
   const step = niceStep((hi - lo) / 5);
   const ticks = []; for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) ticks.push(Math.abs(t) < step / 1e6 ? 0 : t);
   const years = [...new Set(keys.map(k => k.slice(0, 4)))];
-  const every = Math.ceil(years.length / 10);
+  const every = Math.ceil(years.length / (narrow ? 6 : 10));
   const yearly = chartMode === 'yearly' || keys[0].length === 4;
   const xt = keys.map((k, i) => [k, i]).filter(([k, i]) => yearly ? i % every === 0 || i === keys.length - 1 : k.endsWith('-01') && years.indexOf(k.slice(0, 4)) % every === 0);
   const path = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
   const base = def.d ? y(0) : H - B0;
   const area = `${path}L${x(vals.length - 1).toFixed(1)},${base}L${x(0)},${base}Z`;
-  const labels = yearly && keys.length <= 14;
+  const labels = yearly && keys.length <= (narrow ? 8 : 14);
   const short = v => f === 'usd' ? fmt(v, 'usd', true) : f.startsWith('pct') ? (v < 0 ? '−' : '') + Math.abs(v).toFixed(Math.abs(hi - lo) < 3 ? 2 : 1) + '%' : f === 'ratio' ? v.toFixed(1) + '×' : fmt(v, f === 'days' ? 'num' : f, true);
   const first = vals[0], lastV = vals[vals.length - 1];
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.l)} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}" data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi })}'>
