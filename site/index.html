@@ -112,6 +112,9 @@
 
   .legend { position: absolute; right: 14px; bottom: 22px; z-index: 500; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 8px; box-shadow: var(--shadow); width: 300px; max-width: calc(100% - 28px); }
   .legend h3 { margin: 0 0 2px; font: 600 15px var(--serif); }
+  .lg-support { position: absolute; right: 0; bottom: calc(100% + 8px); display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px 4px 8px; border-radius: 999px; background: #fbe9e3; border: 1px solid #f6b89b; color: #9c2f1c; font-size: 12px; font-weight: 600; text-decoration: none; box-shadow: var(--shadow); }
+  .lg-support:hover { background: #f8dccf; }
+  .lg-support svg { width: 13px; height: 13px; }
   .legend .asof { color: var(--muted); font-size: 11.5px; margin-bottom: 8px; }
   .legend .bar { display: flex; gap: 2px; }
   .legend .bar i { flex: 1; height: 12px; }
@@ -128,7 +131,12 @@
   .zip-hint.show { display: block; }
   .zip-hint b { display: block; font-size: 15px; margin-bottom: 4px; }
   .zip-hint span { color: var(--muted); font-size: 13px; }
-  .zip-banner { position: absolute; left: 50%; top: 74px; transform: translateX(-50%); z-index: 520; background: var(--panel); border: 1px solid #8ccdc0; border-radius: 999px; padding: 6px 14px; box-shadow: var(--shadow); display: none; gap: 10px; align-items: baseline; font-size: 13px; white-space: nowrap; }
+  .pill-btn.afford-pill { background: #e76f51; color: #fff; border-color: #e76f51; }
+  .pill-btn.afford-pill:hover { background: #d35d40; }
+  .ref-chk { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 6px; font-size: 12.5px; color: var(--text); cursor: pointer; user-select: none; }
+  .ref-chk input { accent-color: #126b60; width: 15px; height: 15px; margin: 0; }
+  .ref-sw { display: inline-block; width: 16px; border-top: 2.4px dashed #8a94a3; }
+  .zip-banner { position: absolute; left: 50%; top: 128px; transform: translateX(-50%); z-index: 520; background: var(--panel); border: 1px solid #8ccdc0; border-radius: 999px; padding: 6px 14px; box-shadow: var(--shadow); display: none; gap: 10px; align-items: baseline; font-size: 13px; white-space: nowrap; }
   .zip-banner.show { display: flex; }
   .zip-banner b { color: #06463f; }
   .zip-banner span { color: var(--muted); font-size: 12px; }
@@ -301,7 +309,9 @@
     .place-search { flex-basis: 100%; max-width: none; order: -1; }
     .seg button { padding: 6px 8px; font-size: 13px; }
     .pill-btn { padding: 8px 12px; font-size: 13px; }
-    #tableBtn .btxt, #labelBtn .btxt, #rankBtn .btxt, #timeBtn .btxt { display: none; }
+    #tableBtn .btxt, #labelBtn .btxt, #rankBtn .btxt, #timeBtn .btxt, #affordBtn .btxt { display: none; }
+    .zip-banner { max-width: calc(100% - 24px); white-space: normal; text-align: center; }
+    .zip-banner span { display: none; }
     .timebar { left: 10px; right: 10px; transform: none; width: auto; bottom: 150px; }
     .timebar span { display: none; }
     .topbar .support-btn { display: none; } /* on phones it lives in the Data menu */
@@ -369,11 +379,10 @@
         <button data-level="state" type="button">State</button><button data-level="metro" type="button">Metro</button><button data-level="county" type="button" class="on">County</button><button data-level="zip" type="button">Zip</button>
       </div>
       <button class="pill-btn" id="tableBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg><span class="btxt">Table</span></button>
+      <button class="pill-btn afford-pill" id="affordBtn" type="button" title="Enter your income and savings to see where you can afford a home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M12 17v-6M10 12.5c0-.8.9-1.5 2-1.5s2 .6 2 1.4-.9 1.1-2 1.4-2 .7-2 1.5.9 1.4 2 1.4 2-.6 2-1.4"/></svg><span class="btxt">What can I afford?</span></button>
       <button class="pill-btn" id="rankBtn" type="button" title="Ready-made top 25 lists"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21V11M16 21V7M12 21V3M4 21h16"/></svg><span class="btxt">Rankings</span></button>
       <button class="pill-btn" id="timeBtn" type="button" title="Replay home values on the map since 2000"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="btxt">Over time</span></button>
       <button class="pill-btn cmp-pill" id="cmpBtn" type="button" title="Compare up to 4 places side by side"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18V9M10 18V5M16 18v-7M3 21h18"/></svg><span class="btxt" id="cmpBtnTxt">Compare</span></button>
-      <button class="pill-btn" id="labelBtn" type="button" aria-pressed="true" title="Show names and values on the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg><span class="btxt">Labels</span></button>
-      <a class="pill-btn support-btn" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener" title="This map is free. If it helps you, you can support it on Ko-fi."><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span class="btxt">Support</span></a>
     </div>
     <div class="legend" id="legend"></div>
     <div class="zip-hint" id="zipHint"><b>Pick a county to see its ZIP codes</b><span>Click any county on the map, or search a county or ZIP code above.</span></div>
@@ -526,7 +535,7 @@ const M = {
   si_pct:        { l: 'Second-home and investor purchases', f: 'pct', src: 'hmda', i: 'Second homes plus investment properties, as a share of purchase mortgages.' },
   // investor metrics
   rent:          { l: 'Typical rent', f: 'usd', src: 'zillow', i: 'Typical asking rent, all rentals (Zillow Observed Rent Index).' },
-  rent_sfr:      { l: 'Typical rent for houses', f: 'usd', src: 'zillow', i: 'Typical asking rent for single-family houses. Zillow publishes this for metro areas only.' },
+  rent_sfr:      { l: 'Typical rent for houses', f: 'usd', src: 'zillow', i: "Typical asking rent for single-family houses. Zillow publishes this for metro areas; for counties and ZIP codes it is an estimate: the place's typical rent times its metro's house-to-all-homes rent ratio that month." },
   rent_yoy:      { l: 'Rent change (1 year)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical rent over the last 12 months.' },
   cap_rate:      { l: 'Cap rate (estimate)', f: 'pct2', src: 'zillow', i: 'A year of typical rent, minus 35% for taxes, insurance, upkeep and vacancy, divided by the typical home value. A rough estimate.' },
   vacancy:       { l: 'Rental vacancy', f: 'pct', src: 'acs', i: 'Rental vacancy: homes for rent that are empty, as a share of all rental homes.' },
@@ -804,7 +813,8 @@ function renderLegend() {
   document.getElementById('legend').innerHTML = `<h3>${esc(def.l)}</h3><div class="asof">${esc(src)} · ${count}</div>
     <div class="bar">${scale.colors.map(c => `<i style="background:${c}"></i>`).join('')}</div>
     ${ticks ? `<div class="ticks"><span>&lt; ${fmt(ticks[0], f, true)}</span><span>${fmt(ticks[1], f, true)}</span><span>&gt; ${fmt(ticks[2], f, true)}</span></div>` : ''}
-    <div class="na"><i></i>No data</div>${sw}`;
+    <div class="na"><i></i>No data</div>${sw}
+    <a class="lg-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener" title="This map is free. If it helps you, you can support it on Ko-fi."><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg>Support</a>`;
 }
 document.getElementById('legend').addEventListener('click', e => {
   const b = e.target.closest('[data-mode]');
@@ -843,7 +853,7 @@ function restyle() {
 }
 
 // ---------- labels: each place's name and value, printed where there is room ----------
-let labelsOn = saved.labels !== false, labelLayer = null;
+let labelsOn = true, labelLayer = null; // names and values always show (the Labels on/off button was removed)
 const ringArea = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]); return a / 2; };
 function inRing(x, y, r) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
 // A spot inside the shape's biggest piece: its centre if that falls inside, else the middle of the widest
@@ -907,10 +917,6 @@ function updateLabels() {
     L.marker(c.a, { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: 'plabel', iconSize: [0, 0], html: `<div class="in"><b>${esc(name)}</b><span>${esc(val)}</span></div>` }) }).addTo(labelLayer);
   }
 }
-const labelBtn = document.getElementById('labelBtn');
-function syncLabelBtn() { labelBtn.classList.toggle('on', labelsOn); labelBtn.setAttribute('aria-pressed', labelsOn); }
-syncLabelBtn();
-labelBtn.addEventListener('click', () => { labelsOn = !labelsOn; syncLabelBtn(); saveUi(); updateLabels(); });
 function setLevel(level) {
   ui.level = level;
   document.querySelectorAll('#levels button').forEach(b => b.classList.toggle('on', b.dataset.level === level));
@@ -981,6 +987,7 @@ async function showZipFocus() {
   const c = D.county[zipFocus];
   document.getElementById('zipBanner').innerHTML = `<b>${feats.length} ZIP codes in ${esc(c ? `${c.n}, ${c.s}` : 'this county')}</b><span>Click another county to switch</span>`;
   document.getElementById('zipBanner').classList.add('show');
+  placeZipBanner();
   zipHint.classList.remove('show');
   restyle();
   if (tableOpen) renderTable();
@@ -1173,6 +1180,13 @@ function zoomTo(level, id) {
 
 // ---------- detail drawer ----------
 let openPlace = null, hist = null, chartRange = 'all';
+// The "N ZIP codes in …" banner sits just below the buttons along the top of the map, however many rows they wrap onto.
+function placeZipBanner() {
+  const b = document.getElementById('zipBanner'), tb = document.querySelector('.topbar');
+  if (!b || !tb || !b.offsetParent) return;
+  b.style.top = Math.round(tb.getBoundingClientRect().bottom - b.offsetParent.getBoundingClientRect().top + 10) + 'px';
+}
+new ResizeObserver(placeZipBanner).observe(document.querySelector('.topbar'));
 const drawer = document.getElementById('drawer');
 async function openDetail(level, id) {
   const p = D[level][id];
@@ -1235,15 +1249,36 @@ function pctSeries(s, n) {
 const mapSeries = (s, fn) => { const out = {}; for (const k in s) { const v = fn(s[k], k); if (v != null && isFinite(v)) out[k] = v; } return out; };
 const rateAt = k => { const h = D.meta.mortgage.history; if (h[k] != null) return h[k]; const prev = Object.keys(h).filter(m => m <= k).sort().pop(); return prev ? h[prev] : D.meta.mortgage.rate; };
 const pmt = (price, rate) => { const r = rate / 1200; return price * 0.8 * r / (1 - Math.pow(1 + r, -360)); };
-function trendGapSeries(s, minPts = 120) {
+// The long-term trend line: a steady-growth curve fitted to the months before 2020, extended to today.
+// It is the "fair value" behind "Above or below long-term trend".
+function trendLine(s, minPts = 120) {
   const keys = Object.keys(s).sort(), pts = keys.map((k, i) => [i, k]).filter(([i, k]) => k < '2020-01' && s[k] > 0);
   if (pts.length < minPts) return null;
   const n = pts.length, mx = pts.reduce((a, [i]) => a + i, 0) / n, my = pts.reduce((a, [, k]) => a + Math.log(s[k]), 0) / n;
   let sxy = 0, sxx = 0;
   for (const [i, k] of pts) { sxy += (i - mx) * (Math.log(s[k]) - my); sxx += (i - mx) ** 2; }
   const slope = sxy / sxx, out = {};
-  keys.forEach((k, i) => { out[k] = (s[k] / Math.exp(my + slope * (i - mx)) - 1) * 100; });
+  keys.forEach((k, i) => { out[k] = Math.exp(my + slope * (i - mx)); });
   return out;
+}
+function trendGapSeries(s, minPts = 120) {
+  const t = trendLine(s, minPts);
+  return t && mapSeries(s, (v, k) => t[k] ? (v / t[k] - 1) * 100 : null);
+}
+// Reference lines a chart can show next to its data point (the checkbox above the chart).
+const REF_TREND = { hv: 120, sfr: 120, condo: 120, rent: 48 };
+const REF_CPI = new Set(['hv_yoy', 'sfr_yoy', 'condo_yoy', 'rent_yoy', 'sale_price_yoy', 'lp_yoy', 'pay_growth', 'income_growth']);
+let showRef = true;
+function refFor(k, h, p) {
+  if (REF_TREND[k]) { const s = seriesFor(k, h, p); const t = s && trendLine(s, REF_TREND[k]); return t && { s: t, l: 'Fair value (long-term trend)', short: 'Show fair value' }; }
+  if (REF_CPI.has(k) && D.meta.cpi && Object.keys(D.meta.cpi).length) {
+    let s = D.meta.cpi;
+    // Yearly data points compare with each year's December inflation.
+    const main = seriesFor(k, h, p), ks = main ? Object.keys(main) : [];
+    if (ks.length && ks[0].length === 4) { s = {}; for (const y of ks) { const v = D.meta.cpi[`${y}-12`] ?? D.meta.cpi[Object.keys(D.meta.cpi).filter(x => x.startsWith(y)).sort().pop()]; if (v != null) s[y] = v; } }
+    return { s, l: 'Inflation (CPI, 1 year)', short: 'Show inflation (CPI)', cpi: true };
+  }
+  return null;
 }
 // Yearly data points arrive as {"2019": v, ...}; this finds the value for a month's year (or the closest earlier year).
 function annualAt(s, k) {
@@ -1340,14 +1375,17 @@ function renderDrawer() {
   const toggles = `<div class="chart-ctrl">${annual ? '<span class="note" style="margin:0">One value per year</span>' : `<div class="seg-sm">${[['yearly', 'By year'], ['monthly', 'By month']].map(([m, l]) => `<button type="button" class="${chartMode === m ? 'on' : ''}" data-cmode="${m}">${l}</button>`).join('')}</div>`}
     <div class="ctrl-right"><div class="seg-sm">${[['5', '5Y'], ['10', '10Y'], ['20', '20Y'], ['all', 'All']].map(([r, l]) => `<button type="button" class="${chartRange === r ? 'on' : ''}" data-range="${r}">${l}</button>`).join('')}</div>
     ${skeys.length > 1 ? `<button type="button" class="dl-btn" data-export title="Download this chart as a PNG image" aria-label="Download chart as PNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14"/></svg><span>PNG</span></button>` : ''}</div></div>`;
+  const ref = hist && skeys.length > 1 ? refFor(k, hist, p) : null;
+  const refBox = ref ? `<label class="ref-chk"><input type="checkbox" id="refChk" ${showRef ? 'checked' : ''}><i class="ref-sw ${ref.cpi ? 'cpi' : ''}"></i>${esc(ref.short)}</label>` : '';
   const chart = hist == null ? '<p class="note chart-empty">Loading history…</p>'
-    : skeys.length > 1 ? `<div class="chart" id="chart">${chartSvg(series, def, overlayKey && overlayKey !== k ? seriesFor(overlayKey, hist, p) : null, overlayKey && overlayKey !== k ? M[overlayKey] : null)}<div class="ctip"></div></div>`
+    : skeys.length > 1 ? `<div class="chart" id="chart">${chartSvg(series, def, overlayKey && overlayKey !== k ? seriesFor(overlayKey, hist, p) : null, overlayKey && overlayKey !== k ? M[overlayKey] : null, showRef ? ref : null)}<div class="ctip"></div></div>`
     : `<div class="chart-empty"><b>${fmtV(k, v[k])}</b><span>${v[k] == null ? `No ${esc(def.l)} data for this place.` : 'Only one value so far, so there is no history to chart yet.'}</span></div>`;
   const asof = skeys.length ? ymLabel(skeys[skeys.length - 1]) : 'now';
   document.getElementById('dBody').innerHTML = `
     <div class="metric-head"><label class="mpick"><select id="mPick" aria-label="Data point">${options}</select></label>
       <div class="mnow"><b>${fmtV(k, v[k])}</b><span>${esc(asof)}</span></div></div>
     ${toggles}
+    ${refBox}
     ${skeys.length > 1 ? `<label class="ov-pick"><span>Compare with</span><select id="ovPick" aria-label="Compare with another data point"><option value="">— another data point —</option>${GROUPS.filter(([g, keys]) => keys.some(hasData)).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].filter(x => hasData(x) && x !== k).map(x => `<option value="${x}" ${x === overlayKey ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('')}</select>${overlayKey && overlayKey !== k ? '<button type="button" class="ov-x" data-ov-clear aria-label="Remove the second data point">✕</button>' : ''}</label>` : ''}
     ${chart}
     <h4 class="snap-h">At a glance</h4>
@@ -1377,6 +1415,7 @@ document.getElementById('dBody').addEventListener('click', e => {
 document.getElementById('dBody').addEventListener('change', e => {
   if (e.target.id === 'mPick') setMetric(e.target.value);
   if (e.target.id === 'ovPick') { overlayKey = e.target.value; renderDrawer(); }
+  if (e.target.id === 'refChk') { showRef = e.target.checked; renderDrawer(); }
 });
 
 // Where each data point comes from: shown under every chart (and on downloaded images), with a link.
@@ -1427,7 +1466,7 @@ function valueAt(s, k) {
 }
 
 // History chart for the selected data point. Yearly = the same month each year (labelled), Monthly = every month.
-function chartSvg(series, def, s2, def2) {
+function chartSvg(series, def, s2, def2, ref) {
   const f = def.f, f2 = def2 && def2.f;
   let keys = Object.keys(series).sort();
   const last = keys[keys.length - 1];
@@ -1443,9 +1482,11 @@ function chartSvg(series, def, s2, def2) {
   const vals = keys.map(k => series[k]);
   const vals2 = s2 ? keys.map(k => valueAt(s2, k)) : null;
   const has2 = vals2 && vals2.filter(v => v != null).length >= 1;
+  const valsR = ref ? keys.map(k => valueAt(ref.s, k)) : null;
+  const hasR = valsR && valsR.filter(v => v != null).length >= 2;
   // Phones get a smaller drawing so the numbers stay readable once it is fitted to the screen.
   const narrow = innerWidth <= 820;
-  const W = narrow ? 400 : 760, H = narrow ? 290 : 380, L0 = narrow ? 50 : 62, R0 = has2 ? (narrow ? 46 : 62) : (narrow ? 12 : 18), T0 = has2 ? 40 : 26, B0 = 28;
+  const W = narrow ? 400 : 760, H = narrow ? 290 : 380, L0 = narrow ? 50 : 62, R0 = has2 ? (narrow ? 46 : 62) : (narrow ? 12 : 18), T0 = has2 || hasR ? 40 : 26, B0 = 28;
   const range = (vs, d) => {
     let lo = Math.min(...vs), hi = Math.max(...vs);
     if (d) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
@@ -1453,7 +1494,7 @@ function chartSvg(series, def, s2, def2) {
     if (!d && lo > 0 && lo < (hi - lo) * 0.3) lo = 0;
     return [lo, hi];
   };
-  const [lo, hi] = range(vals, def.d);
+  const [lo, hi] = range(hasR ? [...vals, ...valsR.filter(v => v != null)] : vals, def.d);
   const [lo2, hi2] = has2 ? range(vals2.filter(v => v != null), def2.d) : [0, 1];
   const x = i => L0 + (W - L0 - R0) * i / (keys.length - 1), y = v => T0 + (H - T0 - B0) * (1 - (v - lo) / (hi - lo));
   const y2 = v => T0 + (H - T0 - B0) * (1 - (v - lo2) / (hi2 - lo2));
@@ -1472,17 +1513,24 @@ function chartSvg(series, def, s2, def2) {
   const shortF = (ff, a, b) => v => ff === 'usd' ? fmt(v, 'usd', true) : ff.startsWith('pct') ? (v < 0 ? '−' : '') + Math.abs(v).toFixed(Math.abs(b - a) < 3 ? 2 : 1) + '%' : ff === 'ratio' ? v.toFixed(1) + '×' : fmt(v, ff === 'days' ? 'num' : ff, true);
   const short = shortF(f, lo, hi), short2 = has2 ? shortF(f2, lo2, hi2) : null;
   const first = vals[0], lastV = vals[vals.length - 1];
-  const C2 = '#e76f51';
-  const legend = has2 ? `<g font-size="12" font-weight="600"><circle cx="${L0 + 6}" cy="14" r="5" fill="var(--accent)"/><text x="${L0 + 16}" y="18" fill="var(--text)">${esc(def.l)} (left)</text>
-      <circle cx="${W / 2 + 10}" cy="14" r="5" fill="${C2}"/><text x="${W / 2 + 20}" y="18" fill="var(--text)">${esc(def2.l)} (right)</text></g>` : '';
-  const src = `Source: ${sourceHtml(ui.metric, keys)}${has2 ? ` · ${sourceHtml(overlayKey, Object.keys(s2).sort().filter(x => x.slice(0, 4) >= keys[0].slice(0, 4) && x.slice(0, 4) <= last.slice(0, 4)))}` : ''}`;
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.l)} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}"${has2 ? ` data-vals2='${JSON.stringify(vals2)}' data-f2="${f2}"` : ''} data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi, lo2, hi2 })}'>
+  const C2 = '#e76f51', CR = '#8a94a3';
+  // Legend: the data point, then the reference line (same scale), then the second data point (right-hand scale).
+  const items = [[esc(def.l) + (has2 ? ' (left)' : ''), 'var(--accent)', '']];
+  if (hasR) items.push([esc(ref.l), CR, 'dash']);
+  if (has2) items.push([esc(def2.l) + ' (right)', C2, '']);
+  const colW = (W - L0) / items.length;
+  const legend = items.length > 1 ? `<g font-size="12" font-weight="600">${items.map(([t, c, dash], i) => { const x0 = L0 + i * colW; return `${dash ? `<line x1="${x0}" x2="${x0 + 14}" y1="14" y2="14" stroke="${c}" stroke-width="2.4" stroke-dasharray="4 3"/>` : `<circle cx="${x0 + 6}" cy="14" r="5" fill="${c}"/>`}<text x="${x0 + 19}" y="18" fill="var(--text)">${t}</text>`; }).join('')}</g>` : '';
+  const pathR = hasR ? valsR.map((v, i) => v == null ? '' : `${i && valsR[i - 1] != null ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('') : '';
+  const refSrc = hasR && ref.cpi ? `<a href="https://www.bls.gov/cpi/" target="_blank" rel="noopener">U.S. Bureau of Labor Statistics (CPI)</a>` : '';
+  const src = `Source: ${sourceHtml(ui.metric, keys)}${refSrc ? ` · Inflation: ${refSrc}` : ''}${has2 ? ` · ${sourceHtml(overlayKey, Object.keys(s2).sort().filter(x => x.slice(0, 4) >= keys[0].slice(0, 4) && x.slice(0, 4) <= last.slice(0, 4)))}` : ''}${hasR && !ref.cpi ? '<br>Fair value = the steady growth trend of 2000–2019 (2015–2019 for rent), extended to today. A rough guide, not an appraisal.' : ''}`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.l)} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}"${has2 ? ` data-vals2='${JSON.stringify(vals2)}' data-f2="${f2}"` : ''}${hasR ? ` data-valsr='${JSON.stringify(valsR)}' data-rl="${esc(ref.l)}"${ref.cpi ? ' data-cpi="1"' : ''}` : ''} data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi, lo2, hi2 })}'>
     <defs><linearGradient id="cfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
     ${legend}
     ${ticks.map(t => `<line x1="${L0}" x2="${W - R0}" y1="${y(t)}" y2="${y(t)}" stroke="${def.d && t === 0 ? '#374151' : 'var(--line)'}" stroke-width="${def.d && t === 0 ? 1.4 : 1}"/><text x="${L0 - 8}" y="${y(t) + 3.5}" text-anchor="end" font-size="11" fill="var(--muted)">${short(t)}</text>`).join('')}
     ${ticks2.map(t => `<text x="${W - R0 + 8}" y="${y2(t) + 3.5}" text-anchor="start" font-size="11" fill="${C2}">${short2(t)}</text>`).join('')}
     ${xt.map(([k, i]) => `<text x="${x(i)}" y="${H - 7}" text-anchor="middle" font-size="11" fill="var(--muted)">${k.slice(0, 4)}</text>`).join('')}
     <path d="${area}" fill="url(#cfill)"/>
+    ${hasR ? `<path d="${pathR}" fill="none" stroke="${CR}" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"/>` : ''}
     <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
     ${yearly ? vals.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="4.5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`).join('') : `<circle cx="${x(vals.length - 1)}" cy="${y(lastV)}" r="4.5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`}
     ${has2 ? `<path d="${path2}" fill="none" stroke="${C2}" stroke-width="2.2" stroke-dasharray="6 4" stroke-linejoin="round"/>${yearly ? vals2.map((v, i) => v == null ? '' : `<circle cx="${x(i)}" cy="${y2(v)}" r="4" fill="${C2}" stroke="var(--panel)" stroke-width="2"/>`).join('') : ''}` : ''}
@@ -1518,7 +1566,7 @@ function exportChart() {
     g.fillText(`${M[k].l}${svg.dataset.vals2 && overlayKey ? ` vs ${M[overlayKey].l}` : ''} · ${ymLabel(keys[0])} – ${ymLabel(keys[keys.length - 1])}`, 18, 54);
     g.drawImage(img, 0, TOP, W, H);
     g.fillStyle = '#6b7280'; g.font = `11px ${font}`;
-    g.fillText(`Source: ${sourceText(k, keys)}${svg.dataset.vals2 && overlayKey ? ` · ${sourceParts(overlayKey).name}` : ''}`, 18, TOP + H + 18);
+    g.fillText(`Source: ${sourceText(k, keys)}${svg.dataset.cpi ? ' · Inflation: U.S. Bureau of Labor Statistics (CPI)' : ''}${svg.dataset.vals2 && overlayKey ? ` · ${sourceParts(overlayKey).name}` : ''}`, 18, TOP + H + 18);
     g.fillStyle = '#126b60'; g.font = `600 11px ${font}`;
     g.textAlign = 'right'; g.fillText('Open Housing Atlas · cb2326.github.io/housing', W - 18, TOP + H + 18);
     c.toBlob(blob => {
@@ -1546,7 +1594,8 @@ document.getElementById('dBody').addEventListener('mousemove', e => {
   xd.setAttribute('cx', cx); xd.setAttribute('cy', cy); xd.setAttribute('visibility', 'visible');
   const t = svg.parentElement.querySelector('.ctip');
   const v2s = svg.dataset.vals2 ? JSON.parse(svg.dataset.vals2) : null;
-  t.textContent = `${ymLabel(keys[i])}: ${fmt(vals[i], f)}` + (v2s && v2s[i] != null ? ` · ${fmt(v2s[i], svg.dataset.f2)}` : '');
+  const vrs = svg.dataset.valsr ? JSON.parse(svg.dataset.valsr) : null;
+  t.textContent = `${ymLabel(keys[i])}: ${fmt(vals[i], f)}` + (vrs && vrs[i] != null ? ` · ${svg.dataset.cpi ? 'Inflation' : 'Fair value'} ${fmt(vrs[i], f)}` : '') + (v2s && v2s[i] != null ? ` · ${fmt(v2s[i], svg.dataset.f2)}` : '');
   t.style.display = 'block'; t.style.left = (cx * r.width / d.W) + 'px'; t.style.top = (cy * r.height / d.H) + 'px';
 });
 document.getElementById('dBody').addEventListener('mouseleave', () => {
@@ -1796,6 +1845,7 @@ const RANKS = [
 ];
 let rankKey = 'price_drop', zipRanks = null;
 const rankView = document.getElementById('rankView');
+document.getElementById('affordBtn').addEventListener('click', () => openAfford());
 document.getElementById('rankBtn').addEventListener('click', () => { const on = !rankView.classList.contains('show'); rankView.classList.toggle('show', on); document.getElementById('rankBtn').classList.toggle('on', on); if (on) renderRanks(); });
 document.getElementById('rankClose').addEventListener('click', () => { rankView.classList.remove('show'); document.getElementById('rankBtn').classList.remove('on'); });
 document.getElementById('rankPick').addEventListener('change', e => { rankKey = e.target.value; renderRanks(); });
