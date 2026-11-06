@@ -50,6 +50,9 @@ jobs:
       - name: Publish
         id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          # The site is large (a history file for every place), so give GitHub up to 45 minutes to copy it (default 10).
+          timeout: 2700000
 
       # Saves the once-a-year results (data_cache/) so later runs don't work them out again. On scheduled runs it also
       # notes the date: GitHub pauses scheduled jobs in repositories with no activity for 60 days.
