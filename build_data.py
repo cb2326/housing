@@ -2071,7 +2071,8 @@ def compact(d, start):
     vals = [None] * (hi - lo + 1)
     for k in keys:
         v = d[k]
-        vals[mi(k) - lo] = round(v) if abs(v) >= 1000 else round(v, 3)
+        v = round(v) if abs(v) >= 1000 else round(v, 3)
+        vals[mi(k) - lo] = int(v) if v == int(v) else v  # 35 rather than 35.0
     return [keys[0], vals]
 
 
