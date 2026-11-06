@@ -1763,8 +1763,8 @@ def main():
     print("Jobs and pay, flood insurance, noise")
     qcew, flood, noise = qcew_years(), flood_insurance(), noise_levels()
     for y, areas in qcew.items():
-        for area, (emp, pay) in areas.items():
-            lvl, pid = ("metro", area[1:] + "0") if area.startswith("C") else ("state", area[:2]) if area.endswith("000") else ("county", area)
+        for code, (emp, pay) in areas.items():  # (not "area": that name holds the land areas used for ZIP density)
+            lvl, pid = ("metro", code[1:] + "0") if code.startswith("C") else ("state", code[:2]) if code.endswith("000") else ("county", code)
             a = A[lvl].setdefault(pid, {})
             a.setdefault("jobs", {})[str(y)] = emp
             if pay:
