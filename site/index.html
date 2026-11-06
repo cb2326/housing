@@ -147,6 +147,14 @@
   .chart-empty b { display: block; font-size: 26px; margin-bottom: 6px; }
   .chart-empty span { color: var(--muted); font-size: 13px; }
   .snap-h { margin: 18px 0 8px; font: 600 15px var(--sans); }
+  .snap-h small { color: var(--muted); font-weight: 500; }
+  table.schools { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.schools th { text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  table.schools td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  table.schools td:nth-child(3), table.schools td:nth-child(4), table.schools th:nth-child(3), table.schools th:nth-child(4) { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .sbadge { display: inline-block; min-width: 26px; padding: 2px 0; border-radius: 7px; text-align: center; color: #fff; font-weight: 700; font-size: 12.5px; }
+  .sbadge.na { background: var(--panel-2); color: var(--muted); }
+  .tag { color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 0 4px; font-size: 10.5px; }
   .kpis { grid-template-columns: repeat(3, 1fr) !important; }
   button.kpi { border: 1px solid transparent; text-align: left; cursor: pointer; font: inherit; color: inherit; }
   button.kpi:hover { border-color: var(--line); }
@@ -336,6 +344,7 @@ const M = {
   income_growth: { l: 'Income Growth', f: 'pct', d: 1, src: 'income', i: 'Change in median household income over the latest year.' },
   poverty:       { l: 'Poverty Rate', f: 'pct', src: 'income', i: 'Share of people below the poverty line (Census SAIPE).' },
   college:       { l: 'College Degree Rate', f: 'pct', src: 'acs', i: "Share of adults 25 and over with a bachelor's degree or higher." },
+  school_score:  { l: 'School Rating (1–10)', f: 'rating', src: 'schools', i: "This map's own school rating, from state test results (share of students proficient in math and reading). Each public school is ranked 1–10 against the other schools in its state, since every state uses different tests; a ZIP, county or metro shows the average of its schools, weighted by students. Private schools don't take state tests and aren't included. Click a ZIP code to see its schools." },
   remote:        { l: 'Remote Work %', f: 'pct', src: 'acs', i: 'Share of workers who mainly work from home.' },
   homeown:       { l: 'Homeownership Rate', f: 'pct', src: 'acs', i: 'Share of occupied homes lived in by their owners.' },
   mortgaged:     { l: 'Mortgaged Home %', f: 'pct', src: 'acs', i: 'Share of owner-occupied homes that have a mortgage.' },
@@ -415,7 +424,7 @@ const GROUPS = [
   ['Popular Data', ['hv', 'hv_yoy', 'inv', 'fc_1y', 'hv_5y', 'hv_mom', 'overvalued', 'dom', 'sales', 'cap_rate', 'growth_score']],
   ['Home Price & Affordability', ['hv', 'hv_yoy', 'hv_5y', 'overvalued', 'hv_income', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'from_2022_peak', 'crash_2007', 'hv_mom', 'fc_1y']],
   ['Market Trends', ['inv', 'inv_yoy', 'inv_vs_2019', 'sales', 'sales_yoy', 'sales_vs_2019', 'cut', 'dom', 'dom_yoy', 'inv_pct_houses', 'lp', 'lp_yoy', 'newl', 'newl_yoy', 'inv_mom', 'months_supply']],
-  ['Socioeconomic Data', ['income', 'income_growth', 'poverty', 'college', 'remote', 'homeown', 'mortgaged', 'family_hh', 'single_hh', 'u18_pct', 'a2544_pct', 'a65_pct', 'a75_pct', 'density', 'temp', 'units', 'units_growth', 'vote_r', 'vote_d']],
+  ['Socioeconomic Data', ['income', 'income_growth', 'poverty', 'school_score', 'college', 'remote', 'homeown', 'mortgaged', 'family_hh', 'single_hh', 'u18_pct', 'a2544_pct', 'a65_pct', 'a75_pct', 'density', 'temp', 'units', 'units_growth', 'vote_r', 'vote_d']],
   ['Population and Demographics', ['pop', 'pop_growth', 'pop_growth_5y', 'med_age', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'r_u18_65', 'r_u18_75', 'r_2544_65', 'r_2544_75', 'own_2544_pct', 'own_65_pct', 'own_75_pct', 'rent_2544_pct', 'r_rent2544_own65', 'r_rent2544_own75']],
   ['Mortgage Quality', ['apps', 'origs', 'denial', 'avg_rate', 'conv_pct', 'govt_pct', 'fha_pct', 'va_pct', 'usda_pct', 'ltv', 'dti', 'dti43', 'buyer_income', 'loan_amt', 'price_med', 'second_pct', 'investor_pct', 'si_pct']],
   ['Investor Metrics', ['rent', 'rent_sfr', 'rent_yoy', 'cap_rate', 'vacancy', 'price_rent', 'rent_overvalued', 'rent_pct_income', 'shadow', 'permits', 'permits_pct', 'gross_yield', 'buy_vs_rent']],
@@ -445,6 +454,7 @@ function fmt(v, f, short) {
     case 'dens': return nf0.format(v) + (short ? '' : ' /sq mi');
     case 'yrs': return a.toFixed(1) + (short ? '' : ' yrs');
     case 'score': return String(Math.round(v));
+    case 'rating': return a.toFixed(1) + (short ? '' : ' / 10');
     default: return sign + (short && a >= 1e6 ? (a / 1e6).toFixed(1) + 'M' : short && a >= 1e4 ? Math.round(a / 1e3) + 'K' : nf0.format(a));
   }
 }
@@ -580,6 +590,7 @@ function sourceLine(k, meta, yr) {
   if (s === 'units') return `Census housing estimates, ${yr.units || ''}`;
   if (s === 'temp') return `NOAA, ${yr.temp || ''}`;
   if (s === 'votes') return `Presidential election, ${yr.votes || ''}`;
+  if (s === 'schools') return `State tests ${yr.schools ? `${yr.schools - 1}–${String(yr.schools).slice(2)}` : ''} (U.S. Dept. of Education)`;
   return `Zillow, ${ymLabel(meta.months.zillow)}${['mtg_pmt', 'mtg_pct_income', 'salary_needed', 'buy_vs_rent'].includes(k) ? ` · rate ${meta.mortgage ? meta.mortgage.rate : ''}%` : ''}`;
 }
 function renderLegend() {
@@ -795,7 +806,7 @@ async function init() {
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Basemap &copy; Esri, HERE, Garmin, USGS, &copy; OpenStreetMap contributors', maxNativeZoom: 18 }).addTo(map);
   if (innerWidth < 820) map.fitBounds([[24.5, -124.8], [49.4, -66.9]], { paddingTopLeft: [4, 110], paddingBottomRight: [4, 120] });
 
-  const get = u => fetch(u).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
+  const get = u => fetch(u, u.startsWith('data/') ? { cache: 'no-cache' } : {}).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
   try {
     [topo, D.meta, D.state, D.metro, D.county] = await Promise.all([
       get('https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/counties-10m.json'), get('data/meta.json'), get('data/state.json'), get('data/metro.json'), get('data/county.json')]);
@@ -805,6 +816,7 @@ async function init() {
   }
   document.getElementById('asof').textContent = `Updated ${D.meta.built.slice(0, 10)}`;
   for (const level of ['state', 'metro', 'county']) for (const p of Object.values(D[level])) for (const k in p.v) HAS.add(k);
+  for (const k in D.meta.zipBreaks || {}) HAS.add(k); // data points that only ZIP codes have
   if (!hasData(ui.metric)) ui.metric = 'hv_yoy';
 
   const counties = topojson.feature(topo, topo.objects.counties).features;
@@ -916,7 +928,7 @@ async function openDetail(level, id) {
       // ZIP histories come bundled by the first three digits, stored as [first month, [values…]].
       const bundle = await fetch(`data/hist/zip/${id.slice(0, 3)}.json`).then(r => r.ok ? r.json() : {});
       hist = {};
-      for (const [k, s] of Object.entries(bundle[id] || {})) hist[k] = k === 'a' ? s : expand(s);
+      for (const [k, s] of Object.entries(bundle[id] || {})) hist[k] = k === 'a' || k === 'sch' ? s : expand(s);
     } else hist = await fetch(`data/hist/${level}/${id}.json`).then(r => r.ok ? r.json() : {});
   } catch (e) { hist = {}; }
   if (openPlace && openPlace.id === id) renderDrawer();
@@ -1056,7 +1068,21 @@ function renderDrawer() {
     ${toggles}
     ${chart}
     <h4 class="snap-h">Market snapshot</h4>
-    <div class="kpis">${['hv', 'hv_yoy', 'fc_1y', 'inv', 'hv_5y', 'overvalued'].map(tile).join('')}</div>`;
+    <div class="kpis">${['hv', 'hv_yoy', 'fc_1y', 'inv', 'hv_5y', 'overvalued'].map(tile).join('')}</div>
+    ${level === 'zip' ? schoolList() : ''}`;
+}
+// ZIP codes: their public schools, best rated first (rating 1–10 from state tests, ranked within the state).
+function schoolList() {
+  if (hist == null) return '';
+  const list = hist.sch || [];
+  if (!list.length) return '<h4 class="snap-h">Schools</h4><p class="note">No public schools are listed with this ZIP code.</p>';
+  const yr = (D.meta.years || {}).schools;
+  const badge = s => s == null ? '<span class="sbadge na" title="No published test results (often a small or new school, or one with no tested grades)">–</span>'
+    : `<span class="sbadge" style="background:${s >= 8 ? '#059669' : s >= 5 ? '#d97706' : '#dc2626'}">${s}</span>`;
+  return `<h4 class="snap-h">Schools in this ZIP <small>(${list.length})</small></h4>
+    <table class="schools"><thead><tr><th>Rating</th><th>School</th><th>Grades</th><th>Students</th></tr></thead><tbody>${
+    list.map(([name, grades, enr, score, charter]) => `<tr><td>${badge(score)}</td><td>${esc(name)}${charter ? ' <small class="tag">charter</small>' : ''}</td><td>${esc(grades)}</td><td>${enr ? nf0.format(enr) : '—'}</td></tr>`).join('')}</tbody></table>
+    <p class="note">Public schools only. Rating 1–10 = how the school's share of students proficient in math and reading${yr ? ` (${yr - 1}–${String(yr).slice(2)} state tests)` : ''} ranks against the other schools in the state. U.S. Department of Education data; this map's own rating, not GreatSchools'.</p>`;
 }
 document.getElementById('dBody').addEventListener('click', e => {
   const m = e.target.closest('[data-metric]'); if (m) { setMetric(m.dataset.metric); return; }
