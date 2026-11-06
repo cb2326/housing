@@ -175,6 +175,7 @@ def zillow(path, level):
 REALTOR_FIELDS = {
     "inv": "active_listing_count", "dom": "median_days_on_market", "newl": "new_listing_count",
     "cut": "price_reduced_share", "lp": "median_listing_price", "pend": "pending_listing_count",
+    "ppsf": "median_listing_price_per_square_foot", "sqft": "median_square_feet",  # for the Price check calculator
 }
 
 
@@ -1104,6 +1105,12 @@ def metrics_for(z, zr, rt, income, rate, forecast=None, sfr=None, condo=None, re
                 m[k] = rnd(v, 0)
                 m[k + "_yoy"] = rnd(change(rt[k], 12), 1)
         m["inv_mom"] = rnd(change(rt["inv"], 1), 1)
+        _, ppsf = latest(rt.get("ppsf") or {})
+        _, sqft = latest(rt.get("sqft") or {})
+        if ppsf:
+            m["ppsf"] = rnd(ppsf, 0)
+        if sqft:
+            m["med_sqft"] = rnd(sqft, 0)
         kk, v = latest(rt["cut"])
         if v is not None:
             m["cut"] = rnd(v * 100, 1)
