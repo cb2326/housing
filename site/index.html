@@ -189,6 +189,15 @@
   .cmp-chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
   .cmp-chip button { border: 0; background: var(--panel-2); border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 11px; }
   .cmp-chart { width: 100%; height: auto; display: block; }
+  .cmp-wrap { position: relative; }
+  .cmp-tip { position: absolute; pointer-events: none; background: #1d1b17; color: #f4eee4; border-radius: 10px; padding: 8px 10px; font-size: 12.5px; display: none; white-space: nowrap; box-shadow: 0 8px 20px rgba(0,0,0,.25); font-variant-numeric: tabular-nums; z-index: 2; }
+  .cmp-tip b { display: block; margin-bottom: 3px; }
+  .cmp-tip div { display: flex; align-items: center; gap: 6px; }
+  .cmp-tip i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .cmp-tip em { font-style: normal; margin-left: auto; padding-left: 14px; font-weight: 600; }
+  .cmp-find { position: relative; flex: 1 1 260px; max-width: 360px; }
+  .cmp-find input { width: 100%; padding: 7px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); }
+  .cmp-find .results { z-index: 5; }
   .cmp-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
   .cmp-table th, .cmp-table td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
   .cmp-table th:first-child, .cmp-table td:first-child { text-align: left; color: var(--muted); }
@@ -339,7 +348,7 @@
       <button class="pill-btn" id="tableBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg><span class="btxt">Table</span></button>
       <button class="pill-btn" id="rankBtn" type="button" title="Ready-made top 25 lists"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21V11M16 21V7M12 21V3M4 21h16"/></svg><span class="btxt">Rankings</span></button>
       <button class="pill-btn" id="timeBtn" type="button" title="Replay home values on the map since 2000"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="btxt">Over time</span></button>
-      <button class="pill-btn cmp-pill" id="cmpBtn" type="button" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18V9M10 18V5M16 18v-7M3 21h18"/></svg><span class="btxt" id="cmpBtnTxt">Compare</span></button>
+      <button class="pill-btn cmp-pill" id="cmpBtn" type="button" title="Compare up to 4 places side by side"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18V9M10 18V5M16 18v-7M3 21h18"/></svg><span class="btxt" id="cmpBtnTxt">Compare</span></button>
       <button class="pill-btn" id="labelBtn" type="button" aria-pressed="true" title="Show names and values on the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg><span class="btxt">Labels</span></button>
       <a class="pill-btn support-btn" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener" title="This map is free. If it helps you, you can support it on Ko-fi."><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span class="btxt">Support</span></a>
     </div>
@@ -353,7 +362,9 @@
       <div class="tv-foot" id="rankFoot"></div>
     </section>
     <section class="table-view" id="cmpView" aria-label="Compare places">
-      <div class="tv-head"><h3>Compare places</h3><select id="cmpPick" aria-label="Data point to compare"></select><button class="x" id="cmpClose" type="button" aria-label="Close compare">✕</button></div>
+      <div class="tv-head"><h3>Compare places</h3>
+        <div class="cmp-find"><input id="cmpSearch" type="search" placeholder="Add a place: type a ZIP, city, county…" autocomplete="off" aria-label="Add a place to compare"><div class="results" id="cmpResults"></div></div>
+        <select id="cmpPick" aria-label="Data point to compare"></select><button class="x" id="cmpClose" type="button" aria-label="Close compare">✕</button></div>
       <div class="tv-scroll" id="cmpBody"></div>
     </section>
     <div class="timebar" id="timeBar" role="group" aria-label="Map over time">
@@ -1446,8 +1457,7 @@ let cmpList = (saved.cmp || []).slice(0, 4);
 const saveCmp = () => { try { localStorage.setItem('hm-ui', JSON.stringify(Object.assign(JSON.parse(localStorage.getItem('hm-ui') || '{}'), { cmp: cmpList }))); } catch (e) {} };
 function syncCmp() {
   const b = document.getElementById('cmpBtn');
-  b.hidden = !cmpList.length;
-  document.getElementById('cmpBtnTxt').textContent = `Compare (${cmpList.length})`;
+  document.getElementById('cmpBtnTxt').textContent = cmpList.length ? `Compare (${cmpList.length})` : 'Compare';
   const d = document.getElementById('dCmp');
   if (openPlace) {
     const inList = cmpList.some(([l, i]) => l === openPlace.level && i === openPlace.id);
@@ -1474,7 +1484,7 @@ async function cmpPlace([level, id]) {
 async function renderCompare() {
   const body = document.getElementById('cmpBody');
   document.getElementById('cmpPick').innerHTML = GROUPS.filter(([g, keys]) => keys.some(hasData)).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].filter(hasData).map(x => `<option value="${x}" ${x === cmpMetric ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('');
-  if (!cmpList.length) { body.innerHTML = '<p class="note" style="padding:16px">Open any place and click “+ Compare” to add it here (up to 4).</p>'; return; }
+  if (!cmpList.length) { body.innerHTML = '<p class="note" style="padding:16px">Type a ZIP code, city, county, metro or state in the box above, or open any place on the map and click “+ Compare” (up to 4 places).</p>'; return; }
   body.innerHTML = '<p class="note" style="padding:16px">Loading…</p>';
   const places = (await Promise.all(cmpList.map(cmpPlace))).filter(Boolean);
   const k = cmpMetric, def = M[k];
@@ -1490,7 +1500,7 @@ async function renderCompare() {
     return { name: placeName(x.level, x.p), color: CMP_COLORS[i], pts: keys.map(kk => [+kk.slice(0, 4), s[kk]]) };
   });
   const all = lines.flatMap(l => l.pts);
-  let chart = '<p class="note">No history for this data point in these places.</p>';
+  let chart = '<p class="note">No history for this data point in these places.</p>', hover = null;
   if (all.length > 1) {
     const W = 900, H = 330, L0 = 64, R0 = 20, T0 = 16, B0 = 28;
     const x0 = Math.min(...all.map(p => p[0])), x1 = Math.max(...all.map(p => p[0])) || x0 + 1;
@@ -1502,17 +1512,71 @@ async function renderCompare() {
     for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) ticks.push(t);
     const short = v => fmt(v, def.f === 'pct2' ? 'pct' : def.f, true);
     const every = Math.ceil((x1 - x0 + 1) / 12);
+    hover = { W, H, L0, R0, T0, B0, x0, x1, X, Y };
     chart = `<svg viewBox="0 0 ${W} ${H}" class="cmp-chart" role="img" aria-label="${esc(def.l)} compared">
       ${ticks.map(t => `<line x1="${L0}" x2="${W - R0}" y1="${Y(t)}" y2="${Y(t)}" stroke="#e5e7eb"/><text x="${L0 - 8}" y="${Y(t) + 4}" text-anchor="end" font-size="11" fill="#6b7280">${short(t)}</text>`).join('')}
       ${Array.from({ length: x1 - x0 + 1 }, (_, i) => x0 + i).filter((yy, i) => i % every === 0 || yy === x1).map(yy => `<text x="${X(yy)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#6b7280">${yy}</text>`).join('')}
       ${lines.map(l => l.pts.length ? `<path d="${l.pts.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('')}" fill="none" stroke="${l.color}" stroke-width="2.6" stroke-linejoin="round"/>${l.pts.map(p => `<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="3.2" fill="${l.color}"/>`).join('')}` : '').join('')}
+      <line class="xh" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="#6b7280" stroke-dasharray="4 4" visibility="hidden"/>
+      <g class="xd"></g>
+      <rect x="${L0}" y="${T0}" width="${W - L0 - R0}" height="${H - T0 - B0}" fill="transparent"/>
     </svg>`;
   }
   const rows = ['hv', 'hv_yoy', 'fc_1y', 'rent', 'dom', 'inv', 'school_score', 'income', 'pop_growth_5y', 'growth_score', 'risk', 'walk'].filter(hasData);
   body.innerHTML = `<div class="cmp-legend">${places.map((x, i) => `<span class="cmp-chip" style="--c:${CMP_COLORS[i]}"><i></i>${esc(placeName(x.level, x.p))}<button type="button" data-cmp-rm="${i}" aria-label="Remove">✕</button></span>`).join('')}</div>
-    <div class="cmp-wrap">${chart}</div>
+    <div class="cmp-wrap">${chart}<div class="cmp-tip"></div></div>
     <table class="cmp-table"><thead><tr><th></th>${places.map((x, i) => `<th style="color:${CMP_COLORS[i]}">${esc(placeName(x.level, x.p))}</th>`).join('')}</tr></thead>
     <tbody>${rows.map(r => `<tr><td>${esc(M[r].l)}</td>${places.map(x => `<td>${fmtV(r, x.p.v[r])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  // Hover: a dashed line at the nearest year and a box with every place's value that year.
+  const svg = body.querySelector('.cmp-chart');
+  if (!svg || !hover) return;
+  const tipEl = body.querySelector('.cmp-tip'), xh = svg.querySelector('.xh'), xd = svg.querySelector('.xd');
+  svg.addEventListener('mousemove', e => {
+    const r = svg.getBoundingClientRect(), sx = (e.clientX - r.left) * hover.W / r.width;
+    const year = Math.max(hover.x0, Math.min(hover.x1, Math.round(hover.x0 + (sx - hover.L0) / (hover.W - hover.L0 - hover.R0) * (hover.x1 - hover.x0))));
+    const at = lines.map(l => ({ l, p: l.pts.find(pt => pt[0] === year) })).filter(o => o.p);
+    if (!at.length) { tipEl.style.display = 'none'; return; }
+    const cx = hover.X(year);
+    xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.setAttribute('visibility', 'visible');
+    xd.innerHTML = at.map(o => `<circle cx="${cx}" cy="${hover.Y(o.p[1])}" r="6" fill="${o.l.color}" stroke="#fff" stroke-width="2"/>`).join('');
+    tipEl.innerHTML = `<b>${year}</b>` + at.sort((a, b) => b.p[1] - a.p[1]).map(o => `<div><i style="background:${o.l.color}"></i>${esc(o.l.name)}<em>${fmtV(k, o.p[1])}</em></div>`).join('');
+    tipEl.style.display = 'block';
+    const px = cx * r.width / hover.W, wrapW = svg.parentElement.clientWidth;
+    tipEl.style.left = (px + 14 + tipEl.offsetWidth > wrapW ? px - 14 - tipEl.offsetWidth : px + 14) + 'px';
+    tipEl.style.top = Math.max(0, (e.clientY - r.top) - tipEl.offsetHeight / 2) + 'px';
+  });
+  svg.addEventListener('mouseleave', () => { tipEl.style.display = 'none'; xh.setAttribute('visibility', 'hidden'); xd.innerHTML = ''; });
+}
+// Type to add a place (ZIP code, city, county, metro or state).
+const cmpSearch = document.getElementById('cmpSearch'), cmpResults = document.getElementById('cmpResults');
+let cmpHits = [], cmpSel = 0;
+cmpSearch.addEventListener('focus', loadZipIndex);
+cmpSearch.addEventListener('input', async () => {
+  const q = cmpSearch.value.trim().toLowerCase();
+  if (q.length < 2) { cmpResults.classList.remove('show'); return; }
+  if (/\d/.test(q)) await loadZipIndex();
+  if (cmpSearch.value.trim().toLowerCase() !== q) return;
+  const words = q.split(/\s+/);
+  cmpHits = index.filter(x => words.every(w => x.key.includes(w)))
+    .sort((a, b) => (b.key.startsWith(q) - a.key.startsWith(q)) || (LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level)) || a.key.length - b.key.length)
+    .slice(0, 8);
+  cmpSel = 0;
+  cmpResults.innerHTML = cmpHits.length ? cmpHits.map((h, i) => `<button type="button" data-ci="${i}" class="${i === 0 ? 'sel' : ''}"><span>${esc(h.label)}</span><small>${h.level}</small></button>`).join('') : '<div class="note" style="padding:10px 14px">No matches</div>';
+  cmpResults.classList.add('show');
+});
+cmpSearch.addEventListener('keydown', e => {
+  if (!cmpResults.classList.contains('show') || !cmpHits.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); cmpSel = (cmpSel + (e.key === 'ArrowDown' ? 1 : cmpHits.length - 1)) % cmpHits.length; cmpResults.querySelectorAll('button').forEach((b, i) => b.classList.toggle('sel', i === cmpSel)); }
+  if (e.key === 'Enter') { e.preventDefault(); addCmp(cmpHits[cmpSel]); }
+  if (e.key === 'Escape') cmpResults.classList.remove('show');
+});
+cmpResults.addEventListener('click', e => { const b = e.target.closest('[data-ci]'); if (b) addCmp(cmpHits[+b.dataset.ci]); });
+document.addEventListener('click', e => { if (!e.target.closest('.cmp-find')) cmpResults.classList.remove('show'); });
+function addCmp(h) {
+  cmpResults.classList.remove('show');
+  cmpSearch.value = '';
+  if (!cmpList.some(([l, i]) => l === h.level && i === h.id)) { if (cmpList.length >= 4) cmpList.shift(); cmpList.push([h.level, h.id]); saveCmp(); syncCmp(); }
+  renderCompare();
 }
 document.getElementById('cmpBody').addEventListener('click', e => {
   const rm = e.target.closest('[data-cmp-rm]');
