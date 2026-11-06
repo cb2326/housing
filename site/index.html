@@ -537,6 +537,37 @@ const M = {
   permits:       { l: 'New homes permitted', f: 'num', src: 'permits', i: 'New homes authorised by building permits during the year (Census). Published for counties, metros and states, not ZIP codes.' },
   permits_pct:   { l: 'New homes permitted (% of homes)', f: 'pct2', src: 'permits', i: 'New homes permitted during the year as a share of existing housing units.' },
   gross_yield:   { l: 'Gross rental yield', f: 'pct2', src: 'zillow', i: 'A year of typical rent as a share of home value, before any costs.' },
+  // added: actual sales, market speed and heat, starter and high-end homes (Zillow)
+  sale_price:    { l: 'Median sale price', f: 'usd', src: 'zillow', i: 'Middle price of homes that actually sold (not asking prices), Zillow.' },
+  sale_price_yoy:{ l: 'Sale price change (1 year)', f: 'pct', d: 1, src: 'zillow', i: 'Change in the median sale price versus a year ago.' },
+  hv_low:        { l: 'Starter home value', f: 'usd', src: 'zillow', i: 'Typical value of the least expensive third of homes (Zillow, bottom tier).' },
+  hv_high:       { l: 'High-end home value', f: 'usd', src: 'zillow', i: 'Typical value of the most expensive third of homes (Zillow, top tier).' },
+  sale_to_list:  { l: 'Sale-to-list price', f: 'pct', src: 'zillow', i: 'Sale price as a share of the last asking price. Over 100% means homes sell above asking.' },
+  pct_above_list:{ l: 'Homes sold above asking', f: 'pct', src: 'zillow', i: 'Share of homes that sold for more than their asking price.' },
+  days_to_pending:{ l: 'Days to go under contract', f: 'days', src: 'zillow', i: 'Median days from listing to an accepted offer (Zillow).' },
+  market_heat:   { l: 'Market heat index', f: 'score', src: 'zillow', i: "Zillow's market temperature: about 50 is balanced, higher favours sellers, lower favours buyers." },
+  // added: jobs and pay (BLS), and more from the Census survey
+  unemployment:  { l: 'Unemployment rate', f: 'pct', src: 'acs', i: 'Share of the labor force without a job and looking for one (Census American Community Survey, 5-year average).' },
+  jobs:          { l: 'Jobs', f: 'num', src: 'bls', i: 'Average number of jobs located in the place during the year (BLS Quarterly Census of Employment and Wages). Not available for ZIP codes.' },
+  job_growth:    { l: 'Job growth (1 year)', f: 'pct2', d: 1, src: 'bls', i: 'Change in the number of jobs over the year.' },
+  avg_pay:       { l: 'Average pay per job', f: 'usd', src: 'bls', i: 'Average yearly pay of the jobs located in the place (BLS).' },
+  pay_growth:    { l: 'Pay growth (1 year)', f: 'pct2', d: 1, src: 'bls', i: 'Change in average yearly pay per job.' },
+  commute:       { l: 'Average commute', f: 'mins', src: 'acs', i: 'Average one-way travel time to work, in minutes, for people who do not work from home.' },
+  rent_burden:   { l: 'Renters spending 30%+ on rent', f: 'pct', src: 'acs', i: 'Share of renter households paying 30% or more of income on rent and utilities (\u201ccost-burdened\u201d).' },
+  owner_burden:  { l: 'Owners spending 30%+ on housing', f: 'pct', src: 'acs', i: 'Share of homeowners paying 30% or more of income on mortgage, taxes, insurance and utilities.' },
+  seasonal_pct:  { l: 'Vacation and second homes', f: 'pct', src: 'acs', i: 'Share of all homes kept for seasonal, recreational or occasional use.' },
+  year_built:    { l: 'Median year built', f: 'year', src: 'acs', i: 'Half of homes were built before this year, half after: a rough guide to the age of the housing.' },
+  rent_census:   { l: 'Median rent (Census)', f: 'usd', src: 'acs', i: 'Median monthly rent including utilities, from the Census survey (all rentals).' },
+  rent_3br:      { l: 'Median rent, 3 bedrooms', f: 'usd', src: 'acs', i: 'Median monthly rent including utilities for 3-bedroom rentals (mostly houses). Census survey; available for ZIP codes.' },
+  rent_4br:      { l: 'Median rent, 4 bedrooms', f: 'usd', src: 'acs', i: 'Median monthly rent including utilities for 4-bedroom rentals.' },
+  // added: flood insurance (FEMA NFIP) and transportation noise
+  flood_zone_pct:{ l: 'Homes in high-risk flood zones', f: 'pct2', src: 'nfip', warm: 1, i: "Share of homes in FEMA's Special Flood Hazard Area (the \u201c100-year\u201d flood zone), where lenders require flood insurance." },
+  flood_ins_pct: { l: 'Homes with flood insurance', f: 'pct2', src: 'nfip', i: 'Share of homes covered by a National Flood Insurance Program policy.' },
+  flood_claims:  { l: 'Flood insurance claims (10 years)', f: 'num', src: 'nfip', warm: 1, i: 'Number of National Flood Insurance Program claims for floods in the last 10 years (by year of the flood).' },
+  flood_paid:    { l: 'Flood claims paid (10 years)', f: 'usd', src: 'nfip', warm: 1, i: 'Dollars paid on those flood insurance claims over the last 10 years.' },
+  flood_claims_rate:{ l: 'Flood claims per 1,000 homes (10 years)', f: 'r2', src: 'nfip', warm: 1, i: 'Flood insurance claims in the last 10 years for every 1,000 homes.' },
+  noise_db:      { l: 'Road, rail and air noise (dB)', f: 'db', src: 'noise', warm: 1, i: 'Average transportation noise where people live (24-hour average, decibels), for residents exposed to 45 dB or more. 55 dB is a busy suburb; 65+ is next to a highway or airport.' },
+  noise_loud:    { l: 'Residents exposed to 60+ dB noise', f: 'pct', src: 'noise', warm: 1, i: 'Share of residents living with road, rail or aircraft noise of 60 dB or more (24-hour average).' },
   // natural hazards (FEMA National Risk Index: national percentile, 0–100) and walkability (EPA)
   risk:          { l: 'Natural hazard risk (overall)', f: 'score', src: 'fema', warm: 1, i: "FEMA's National Risk Index: how a place's expected losses from 18 natural hazards, its social vulnerability and its resilience compare with the rest of the US (0 = lowest risk, 100 = highest). ZIP codes average their census tracts; metros and states average their counties by population. A useful stand-in for insurance costs." },
   flood_risk:    { l: 'Flood risk', f: 'score', src: 'fema', warm: 1, i: 'FEMA National Risk Index score for flooding (the higher of river/inland and coastal flooding), 0–100.' },
@@ -552,14 +583,14 @@ const M = {
 // Sections in the sidebar (a data point may sit in more than one). START_HERE: the quick buttons at the top.
 const START_HERE = [['afford', 'What can I afford?'], ['hv', 'Home value'], ['hv_yoy', 'Price change'], ['school_score', 'Schools'], ['rent', 'Rent'], ['risk', 'Hazard risk'], ['walk', 'Walkability'], ['fc_1y', 'Forecast'], ['growth_score', 'Growth outlook']];
 const GROUPS = [
-  ['Prices and affordability', ['hv', 'hv_yoy', 'hv_mom', 'hv_5y', 'fc_1y', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
-  ['Market activity', ['inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'dom', 'dom_yoy', 'cut', 'lp', 'lp_yoy', 'ppsf', 'med_sqft', 'months_supply', 'inv_pct_houses'], 'activity'],
+  ['Prices and affordability', ['hv', 'hv_yoy', 'hv_mom', 'hv_5y', 'fc_1y', 'sale_price', 'sale_price_yoy', 'hv_low', 'hv_high', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
+  ['Market activity', ['market_heat', 'inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'sale_to_list', 'pct_above_list', 'days_to_pending', 'dom', 'dom_yoy', 'cut', 'lp', 'lp_yoy', 'ppsf', 'med_sqft', 'months_supply', 'inv_pct_houses'], 'activity'],
   ['Schools', ['school_score'], 'school'],
-  ['People and income', ['income', 'income_growth', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
-  ['Climate, risk and walkability', ['risk', 'flood_risk', 'fire_risk', 'hurricane_risk', 'tornado_risk', 'heat_risk', 'quake_risk', 'walk', 'temp'], 'leaf'],
-  ['Who lives here', ['med_age', 'u18_pct', 'a2544_pct', 'a65_pct', 'a75_pct', 'family_hh', 'single_hh', 'homeown', 'mortgaged', 'own_2544_pct', 'own_65_pct', 'own_75_pct', 'rent_2544_pct', 'r_rent2544_own65', 'r_rent2544_own75', 'r_u18_65', 'r_u18_75', 'r_2544_65', 'r_2544_75'], 'building'],
+  ['People and income', ['income', 'income_growth', 'unemployment', 'jobs', 'job_growth', 'avg_pay', 'pay_growth', 'commute', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
+  ['Climate, risk and walkability', ['risk', 'flood_risk', 'flood_zone_pct', 'flood_ins_pct', 'flood_claims', 'flood_claims_rate', 'flood_paid', 'fire_risk', 'hurricane_risk', 'tornado_risk', 'heat_risk', 'quake_risk', 'noise_db', 'noise_loud', 'walk', 'temp'], 'leaf'],
+  ['Who lives here', ['med_age', 'u18_pct', 'a2544_pct', 'a65_pct', 'a75_pct', 'family_hh', 'single_hh', 'homeown', 'mortgaged', 'rent_burden', 'owner_burden', 'seasonal_pct', 'year_built', 'own_2544_pct', 'own_65_pct', 'own_75_pct', 'rent_2544_pct', 'r_rent2544_own65', 'r_rent2544_own75', 'r_u18_65', 'r_u18_75', 'r_2544_65', 'r_2544_75'], 'building'],
   ['Lending', ['apps', 'origs', 'denial', 'avg_rate', 'conv_pct', 'govt_pct', 'fha_pct', 'va_pct', 'usda_pct', 'ltv', 'dti', 'dti43', 'buyer_income', 'loan_amt', 'price_med', 'second_pct', 'investor_pct', 'si_pct'], 'bank'],
-  ['For investors', ['rent', 'rent_sfr', 'rent_yoy', 'rent_pct_income', 'price_rent', 'gross_yield', 'cap_rate', 'rent_overvalued', 'buy_vs_rent', 'vacancy', 'shadow', 'units', 'units_growth', 'permits', 'permits_pct'], 'chart'],
+  ['For investors', ['rent', 'rent_sfr', 'rent_3br', 'rent_4br', 'rent_census', 'rent_yoy', 'rent_pct_income', 'price_rent', 'gross_yield', 'cap_rate', 'rent_overvalued', 'buy_vs_rent', 'vacancy', 'shadow', 'units', 'units_growth', 'permits', 'permits_pct'], 'chart'],
 ];
 // Small line icons for the section headers.
 const ICONS = {
@@ -601,6 +632,9 @@ function fmt(v, f, short) {
     case 'score': return String(Math.round(v));
     case 'rating': return a.toFixed(1) + (short ? '' : ' / 10');
     case 'walk': return a.toFixed(1) + (short ? '' : ' / 20');
+    case 'mins': return a.toFixed(0) + ' min';
+    case 'year': return String(Math.round(v));
+    case 'db': return a.toFixed(1) + ' dB';
     default: return sign + (short && a >= 1e6 ? (a / 1e6).toFixed(1) + 'M' : short && a >= 1e4 ? Math.round(a / 1e3) + 'K' : nf0.format(a));
   }
 }
@@ -747,6 +781,9 @@ function sourceLine(k, meta, yr) {
   if (s === 'units') return `Census housing estimates, ${yr.units || ''}`;
   if (s === 'temp') return `NOAA, ${yr.temp || ''}`;
   if (s === 'votes') return `Presidential election, ${yr.votes || ''}`;
+  if (s === 'bls') return `BLS jobs and wages, ${yr.jobs || ''}`;
+  if (s === 'nfip') return 'FEMA National Flood Insurance Program';
+  if (s === 'noise') return 'US DOT transportation noise map';
   if (s === 'fema') return `FEMA National Risk Index, ${yr.hazards || ''}`;
   if (s === 'epa') return 'EPA National Walkability Index, 2021';
   if (s === 'afford') return affordSource();
@@ -1179,7 +1216,10 @@ function outline(level, id) {
   if (selLayer) { map.removeLayer(selLayer); selLayer = null; }
   if (!level) return;
   const feats = shapesOf(level, id).map(l => l.feature);
-  selLayer = L.geoJSON(feats, { interactive: false, style: { color: '#111827', weight: 3, fill: false, opacity: 0.95 } }).addTo(map);
+  selLayer = L.featureGroup([
+    L.geoJSON(feats, { interactive: false, style: { color: '#ffffff', weight: 9, fill: false, opacity: 0.9 } }),
+    L.geoJSON(feats, { interactive: false, style: { color: '#0b1220', weight: 4.5, fill: false, opacity: 1 } }),
+  ]).addTo(map);
 }
 function closeDrawer() { drawer.classList.remove('open'); document.querySelector('.stage').classList.remove('panel-open'); openPlace = null; outline(); }
 document.getElementById('dClose').addEventListener('click', closeDrawer);
@@ -1226,6 +1266,14 @@ function seriesFor(key, h, p) {
   const per = (s, fn) => s && mapSeries(s, fn);
   switch (key) {
     case 'hv': return hv;
+    case 'sale_price': return h.sp;
+    case 'sale_price_yoy': return h.sp && pctSeries(h.sp, 12);
+    case 'hv_low': return h.hvlo;
+    case 'hv_high': return h.hvhi;
+    case 'sale_to_list': return h.stl && mapSeries(h.stl, x => x * 100);
+    case 'pct_above_list': return h.pal && mapSeries(h.pal, x => x * 100);
+    case 'days_to_pending': return h.dtp;
+    case 'market_heat': return h.heat;
     case 'afford': return per(hv, (x, k) => affordPct(x, p, rateAt(k)));
     case 'hv_yoy': return hv && pctSeries(hv, 12);
     case 'hv_mom': return hv && pctSeries(hv, 1);
@@ -1348,6 +1396,9 @@ const SRC = {
   schools: ['U.S. Department of Education (EDFacts, NCES)', 'https://nces.ed.gov/ccd/'],
   fema: ['FEMA (National Risk Index)', 'https://hazards.fema.gov/nri/'],
   epa: ['EPA (Smart Location Database)', 'https://www.epa.gov/smartgrowth/smart-location-mapping'],
+  bls: ['U.S. Bureau of Labor Statistics (QCEW)', 'https://www.bls.gov/cew/'],
+  nfip: ['FEMA (National Flood Insurance Program)', 'https://www.fema.gov/about/openfema/data-sets'],
+  noise: ['US DOT National Transportation Noise Map (tract figures: Seto & Huang, University of Washington)', 'https://www.bts.gov/geospatial/national-transportation-noise-map'],
   afford: ['Zillow Research, Freddie Mac (mortgage rates) and your budget', 'https://www.zillow.com/research/data/'],
 };
 // Data points worked out from more than one source.
