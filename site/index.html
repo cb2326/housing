@@ -75,6 +75,14 @@
   .pill-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 9px 14px; cursor: pointer; font-weight: 600; box-shadow: var(--shadow); display: inline-flex; gap: 7px; align-items: center; }
   .pill-btn.on { border-color: var(--accent); color: var(--accent); }
   .pill-btn svg { width: 16px; height: 16px; }
+  /* Support (Ko-fi) links: a soft rose so they stand out from the indigo controls without shouting */
+  .support-btn { color: #be123c; border-color: #fecdd3; background: #fff1f2; text-decoration: none; }
+  .support-btn:hover { background: #ffe4e6; }
+  .side-support { display: flex; align-items: center; gap: 10px; margin: 0 14px 10px; padding: 9px 12px; border-radius: 12px; background: #fff1f2; border: 1px solid #fecdd3; color: #9f1239; text-decoration: none; }
+  .side-support:hover { background: #ffe4e6; }
+  .side-support svg { width: 20px; height: 20px; flex: none; color: #e11d48; }
+  .side-support b { display: block; font-size: 13px; }
+  .side-support small { display: block; font-size: 12px; color: #be123c; }
   .menu-btn { display: none; }
 
   .legend { position: absolute; right: 14px; bottom: 22px; z-index: 500; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 8px; box-shadow: var(--shadow); width: 300px; max-width: calc(100% - 28px); }
@@ -202,6 +210,7 @@
     .seg button { padding: 6px 8px; font-size: 13px; }
     .pill-btn { padding: 8px 12px; font-size: 13px; }
     #tableBtn .btxt, #labelBtn .btxt { display: none; }
+    .topbar .support-btn { display: none; } /* on phones it lives in the Data menu */
     #tableBtn, #labelBtn { padding: 8px 10px; }
     .legend { left: 10px; right: 10px; bottom: 30px; width: auto; padding: 7px 10px 6px; }
     .legend h3 { font-size: 13.5px; }
@@ -240,6 +249,7 @@
     <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="dpSearch" type="search" placeholder="Search data points" aria-label="Search data points"></label>
     <div class="groups" id="groups"></div>
+    <a class="side-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span><b>Enjoying this free map?</b><small>Support it on Ko-fi</small></span></a>
     <div class="side-foot">Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, CFPB (HMDA), NOAA, MIT Election Lab, Freddie Mac. Updated twice a month. Personal use; not financial advice.</div>
   </aside>
   <main class="stage">
@@ -256,6 +266,7 @@
       </div>
       <button class="pill-btn" id="tableBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg><span class="btxt">Table</span></button>
       <button class="pill-btn" id="labelBtn" type="button" aria-pressed="true" title="Show names and values on the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg><span class="btxt">Labels</span></button>
+      <a class="pill-btn support-btn" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener" title="This map is free. If it helps you, you can support it on Ko-fi."><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span class="btxt">Support</span></a>
     </div>
     <div class="legend" id="legend"></div>
     <div class="zip-hint" id="zipHint"><b>Zoom in to see ZIP codes</b><span>There are 32,000+ of them, so they appear once you zoom into a state, or search a ZIP code above.</span></div>
