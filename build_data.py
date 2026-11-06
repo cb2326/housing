@@ -752,6 +752,169 @@ def hmda_years(county_to_cbsa):
     return out, max(out, default=None)
 
 
+# ---------- schools: state test results (U.S. Department of Education, EDFacts) + the NCES school list ----------
+# School-level results as published by the Department of Education, from the Education Data Center's public archive
+# of the EDFacts files. Years are the spring of the school year (2022 = 2021-22). 2020 and 2021 are left out: testing
+# was cancelled or patchy during the pandemic.
+EDFACTS = "https://storage.googleapis.com/edc-education-exports/edfacts/"
+SCHOOL_FILES = {
+    2017: ("math-achievement-sch-sy2016-17.csv", "rla-achievement-sch-sy2016-17.csv"),
+    2018: ("math-achievement-sch-sy2017-18.csv", "rla-achievement-sch-sy2017-18.csv"),
+    2019: ("math-achievement-sch-sy2018-19-long.zip", "rla-achievement-sch-sy2018-19-long.zip"),
+    2022: ("EDFacts_2022_School_math.csv", "EDFacts_2022_School_ela.csv"),
+}
+
+
+def pct_mid(s):
+    """'45', '40-44', 'GE50', '<=5%', 'PS' (hidden for privacy) -> a number of percent (the middle of a range)."""
+    s = (s or "").strip().replace("%", "").upper()
+    if not s or s in ("PS", "N/A", "NA", ".", "-"):
+        return None
+    for pre, f in ((">=", lambda x: (x + 100) / 2), ("GE", lambda x: (x + 100) / 2), (">", lambda x: (x + 100) / 2), ("GT", lambda x: (x + 100) / 2),
+                   ("<=", lambda x: x / 2), ("LE", lambda x: x / 2), ("<", lambda x: x / 2), ("LT", lambda x: x / 2)):
+        if s.startswith(pre):
+            x = num(s[len(pre):])
+            return f(x) if x is not None else None
+    if "-" in s:
+        a, b = (num(t) for t in s.split("-", 1))
+        return (a + b) / 2 if a is not None and b is not None else None
+    return num(s)
+
+
+def school_results(year):
+    """{NCES school id: share of students proficient (math and reading together)} for one year."""
+    acc = {}
+    for fname in SCHOOL_FILES[year]:
+        path = fetch_file(EDFACTS + fname, "edf_" + fname)
+        if fname.endswith(".zip"):
+            zf = zipfile.ZipFile(path)
+            fh = io.TextIOWrapper(zf.open(next(n for n in zf.namelist() if n.lower().endswith(".csv"))), encoding="latin-1", newline="")
+        else:
+            fh = open(path, encoding="latin-1", newline="")
+        with fh:
+            r = csv.reader(fh)
+            head = [h.strip() for h in next(r)]
+            c = {h: i for i, h in enumerate(head)}
+            if "NCESSCHID" in c:  # 2022 layout: one row per grade and group; many schools have no "All Grades" row,
+                # so their grades are added up instead (see `whole` below)
+                pick = lambda row: (row[c["NCESSCHID"]].zfill(12), row[c["Denominator"]], row[c["ProficientOrAbove_percent"]],
+                                    row[c["AgeGrade"]] == "All Grades") \
+                    if row[c["Subgroup"]] == "All Students in School" else None
+            elif "CATEGORY" in c:  # 2019 layout: one row per grade and group
+                pick = lambda row: (row[c["NCESSCH"]].zfill(12), row[c["NUMVALID"]], row[c["PCTPROF"]]) \
+                    if row[c["CATEGORY"]] == "ALL" and row[c["GRADE"]] == "00" else None
+            else:  # older layout: one wide row per school
+                ni = next(i for h, i in c.items() if h.startswith("ALL_") and "00NUMVALID" in h)
+                pi = next(i for h, i in c.items() if h.startswith("ALL_") and "00PCTPROF" in h)
+                pick = lambda row: (row[c["NCESSCH"]].zfill(12), row[ni], row[pi])
+            whole, by_grade = {}, {}  # this subject: the school's all-grades figure, and its grades added up
+            for row in r:
+                if len(row) < len(head) - 1:
+                    continue
+                got = pick(row)
+                if not got:
+                    continue
+                sid, n, p = got[0], num(got[1]), pct_mid(got[2])
+                if p is None or not n:
+                    continue
+                if len(got) == 4 and not got[3]:
+                    a = by_grade.setdefault(sid, [0.0, 0.0])
+                    a[0] += p * n
+                    a[1] += n
+                else:
+                    whole[sid] = (p * n, n)
+            for sid, (s, n) in {**by_grade, **whole}.items():
+                if n >= 10:
+                    a = acc.setdefault(sid, [0.0, 0.0])
+                    a[0] += s
+                    a[1] += n
+    return {sid: s / n for sid, (s, n) in acc.items() if n}
+
+
+def school_scores():
+    """{year: {school id: 1-10}}: each school's proficiency ranked against the other schools in its state
+    (states use different tests, so schools are only compared within their state). Saved in data_cache/schools/."""
+    out = {}
+    for year in SCHOOL_FILES:
+        cached = load_dcache(f"schools/scores_{year}.json")
+        if cached is None:
+            try:
+                res = school_results(year)
+            except Exception as e:
+                print(f"  (school results {year} failed: {e})")
+                continue
+            by_state = {}
+            for sid, p in res.items():
+                by_state.setdefault(sid[:2], {})[sid] = p
+            cached = {}
+            for items in by_state.values():
+                for sid, rank in percentile_ranks(items).items():
+                    cached[sid] = min(10, 1 + int(rank * 10))
+            save_dcache(f"schools/scores_{year}.json", cached)
+            print(f"  school scores {year}: {len(cached):,} schools")
+        out[year] = cached
+    return out
+
+
+def school_directory():
+    """Every open regular public school (NCES Common Core of Data, via the Urban Institute's Education Data API):
+    {id: [name, ZIP, county, lowest grade, highest grade, students, charter]}. The latest edition is saved once."""
+    for y in range(THIS_YEAR, THIS_YEAR - 5, -1):
+        cached = load_dcache(f"schools/directory_{y}.json")
+        if cached:
+            return cached, y
+    for y in range(THIS_YEAR, THIS_YEAR - 5, -1):
+        out = {}
+        try:
+            for fips in STATES:
+                url, page = f"https://educationdata.urban.org/api/v1/schools/ccd/directory/{y}/?fips={int(fips)}", 1
+                while url:
+                    d = json.loads(fetch(url, f"ccd_{y}_{fips}_{page}.json", PLAIN, timeout=300))
+                    for s in d.get("results", []):
+                        if s.get("school_type") != 1 or s.get("school_status") not in (1, 3, 4, 5, 8):
+                            continue  # regular schools that are open
+                        enr = s.get("enrollment")
+                        out[s["ncessch"]] = [s.get("school_name") or "", (s.get("zip_location") or "")[:5], s.get("county_code") or "",
+                                             s.get("lowest_grade_offered"), s.get("highest_grade_offered"),
+                                             enr if isinstance(enr, int) and enr > 0 else None, 1 if s.get("charter") == 1 else 0]
+                    url, page = d.get("next"), page + 1
+                if fips == "01" and not out:
+                    raise ValueError("not published yet")
+        except Exception as e:
+            print(f"  (school list {y} not available: {e})")
+            continue
+        if len(out) > 50000:
+            save_dcache(f"schools/directory_{y}.json", out)
+            return out, y
+    return {}, None
+
+
+def grade_label(g):
+    return None if g is None or g < -1 else "PK" if g == -1 else "K" if g == 0 else str(min(g, 12))
+
+
+def school_ratings(directory, scores, county_to_cbsa):
+    """Enrollment-weighted average school score for every ZIP, county and metro, for each year: {level: {id: {year: v}}}."""
+    out = {"zip": {}, "county": {}, "metro": {}}
+    for year, sc in scores.items():
+        sums = {"zip": {}, "county": {}, "metro": {}}
+        for sid, (name, zp, county, lo, hi, enr, charter) in directory.items():
+            s = sc.get(sid)
+            if s is None:
+                continue
+            county = str(county).zfill(5) if county else ""  # the school list drops the leading zero ("1095")
+            w = enr or 100
+            for lvl, key in (("zip", zp), ("county", county), ("metro", county_to_cbsa.get(county))):
+                if key:
+                    a = sums[lvl].setdefault(key, [0.0, 0.0])
+                    a[0] += s * w
+                    a[1] += w
+        for lvl in sums:
+            for key, (t, w) in sums[lvl].items():
+                out[lvl].setdefault(key, {})[str(year)] = round(t / w, 1)
+    return out
+
+
 def archive_forecasts(fc_hist, zmetro):
     """Earlier Zillow metro forecasts (2022 onwards) from the Internet Archive's saved copies of Zillow's file.
     Runs once; the results are kept in data_cache/forecast.json."""
@@ -1214,6 +1377,24 @@ def main():
                 rec = A[lvl].setdefault(pid, {})
                 for k, v in d.items():
                     rec.setdefault(k, {})[str(y)] = tidy(v)
+    print("Schools")
+    sdir, sdir_year = school_directory()
+    sscores = school_scores()
+    srat = school_ratings(sdir, sscores, county_to_cbsa)
+    for lvl in ("county", "metro"):
+        for pid, s in srat[lvl].items():
+            A[lvl].setdefault(pid, {})["school_score"] = s
+    # Each ZIP's schools for the list in the side panel: [name, grades, students, score, charter], best first.
+    latest_scores = sscores.get(max(sscores)) if sscores else {}
+    zip_schools = {}
+    for sid, (name, zp, county, lo, hi, enr, charter) in sdir.items():
+        if zp:
+            lo_l, hi_l = grade_label(lo), grade_label(hi)
+            grades = f"{lo_l}–{hi_l}" if lo_l and hi_l and lo_l != hi_l else lo_l or hi_l or ""
+            zip_schools.setdefault(zp, []).append([name, grades, enr, latest_scores.get(sid), charter])
+    for lst in zip_schools.values():
+        lst.sort(key=lambda s: (-(s[3] or 0), s[0]))
+    print(f"  {len(sdir):,} schools ({sdir_year} list), scores for {sorted(sscores)}")
     for lvl in A:
         growth_scores(A[lvl])
 
@@ -1290,7 +1471,8 @@ def main():
         "built": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "months": {"zillow": zillow_month, "realtor": realtor_month, "income": inc_year, "population": pop_year},
         "years": {"pop": pop_year, "age": age_year, "income": inc_year, "permits": permit_year, "units": unit_year, "temp": temp_year,
-                  "votes": vote_year, "acs": acs_year, "hmda": hmda_year_},
+                  "votes": vote_year, "acs": acs_year, "hmda": hmda_year_, "schools": max(sscores) if sscores else None,
+                  "school_list": sdir_year},
         "mortgage": {"rate": rate, "date": rate_day, "history": trim_series(rate_hist, "2000-01")},
         "counts": {k: len(v) for k, v in places.items()},
     }
@@ -1306,7 +1488,8 @@ def main():
     county_shared = {pid: {k: a[k] for k in ("temp", "vote_r", "vote_d") if a.get(k)} for pid, a in A["county"].items()}
     acs_zip = {y: res.get("zip", {}) for y, res in acs.items() if res.get("zip")}
     del zv, zs, zc, zr, zrs, rt, hist, A, R
-    zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared)
+    zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared,
+                                       srat["zip"], zip_schools)
     meta["counts"]["zip"] = zip_count
     meta["zipBreaks"] = zip_breaks
     write_json(os.path.join(OUT, "meta.json"), meta)
@@ -1587,7 +1770,7 @@ DIVERGING = {"hv_yoy", "hv_mom", "hv_5y", "fc_1y", "overvalued", "from_2022_peak
              "sales_vs_2019", "rent_overvalued"}
 
 
-def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared):
+def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared, zip_school_scores, zip_schools):
     print("ZIP codes: Zillow, Realtor.com, Census shapes")
     # Zillow's own ZIP forecasts, saved each run to build up a history (the chart uses the metro's until there are two).
     zfc_raw, _ = zillow_zip("zhvf_growth/Zip_zhvf_growth_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
@@ -1636,6 +1819,8 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
                 a.setdefault("income_growth", {})[y] = tidy((v / inc_s[str(int(y) - 1)] - 1) * 100)
         for k, s in county_shared.get(county, {}).items():
             a[k] = s
+        if zip_school_scores.get(z):
+            a["school_score"] = zip_school_scores[z]
         own_fc, metro_fc = zfc_hist.get(z, {}), fc_hist.get(county_to_cbsa.get(county), {})
         fc_now = own_fc.get(zillow_month, metro_fc.get(zillow_month))
         la = latest_annual(a)
@@ -1671,6 +1856,8 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
             b["fc"] = compact(fc_s, "2000-01")
         if a:
             b["a"] = a
+        if zip_schools.get(z):
+            b["sch"] = zip_schools[z]
         hist_groups.setdefault(z[:3], {})[z] = {k: x for k, x in b.items() if x}
 
     for st, recs in by_state.items():
