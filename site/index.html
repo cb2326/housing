@@ -6,6 +6,20 @@
 <title>Open Housing Atlas</title>
 <meta name="description" content="Open Housing Atlas: a free map of US housing data. Home values, forecasts, listings, rents, schools, income and population by state, metro, county and ZIP code.">
 <meta name="theme-color" content="#126b60">
+<!-- Link previews (Facebook, X, iMessage, Reddit, LinkedIn…) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Open Housing Atlas">
+<meta property="og:title" content="Open Housing Atlas: the free US housing data map">
+<meta property="og:description" content="Home values, forecasts, schools, rents, hazard risk and more for every state, metro, county and ZIP code. Free, updated twice a month.">
+<meta property="og:url" content="https://cb2326.github.io/housing/">
+<meta property="og:image" content="https://cb2326.github.io/housing/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Open Housing Atlas: the free US housing data map">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Open Housing Atlas: the free US housing data map">
+<meta name="twitter:description" content="Home values, forecasts, schools, rents, hazard risk and more for every US state, metro, county and ZIP code.">
+<meta name="twitter:image" content="https://cb2326.github.io/housing/og.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23126b60'/%3E%3Cpath d='M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z' fill='none' stroke='%23e6f4f1' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M25 15v29M39 20v29' stroke='%238ccdc0' stroke-width='3.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
@@ -152,6 +166,40 @@
   .seg-sm { display: inline-flex; background: var(--panel-2); border-radius: 999px; padding: 3px; }
   .seg-sm button { border: 0; background: none; border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
   .seg-sm button.on { background: var(--text); color: #fff; }
+  /* What can I afford? */
+  .afford { margin: 0 14px 10px; padding: 12px; border: 1px solid #8ccdc0; background: #f3faf8; border-radius: 12px; }
+  .afford h3 { margin: 0 0 8px; font: 600 14px var(--sans); color: #06463f; }
+  .aff-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .aff-form label span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .aff-form input { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+  .aff-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .aff-go { flex: 1; border: 0; background: var(--accent); color: #fff; font-weight: 600; border-radius: 8px; padding: 7px; cursor: pointer; }
+  .aff-x { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 10px; cursor: pointer; }
+  .aff-err { color: #b42318; font-size: 12px; margin: 6px 0 0; min-height: 0; }
+  .aff-err:empty { display: none; }
+  .afford .note { font-size: 11.5px; margin-top: 8px; }
+  /* Compare */
+  .cmp-add { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; color: var(--accent); cursor: pointer; flex: none; margin-top: 2px; }
+  .cmp-add.on { background: var(--accent-soft); border-color: #8ccdc0; }
+  .pill-btn[hidden] { display: none; }
+  .cmp-pill { border-color: #8ccdc0; color: #06463f; background: var(--accent-soft); }
+  #cmpBody { padding: 12px 16px 18px; }
+  .cmp-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .cmp-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 6px 4px 10px; font-size: 13px; font-weight: 600; }
+  .cmp-chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+  .cmp-chip button { border: 0; background: var(--panel-2); border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 11px; }
+  .cmp-chart { width: 100%; height: auto; display: block; }
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  .cmp-table th, .cmp-table td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+  .cmp-table th:first-child, .cmp-table td:first-child { text-align: left; color: var(--muted); }
+  .tv-head select { padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); max-width: 60%; }
+  /* Over time */
+  .timebar { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 560; display: none; align-items: center; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 8px 12px; width: min(560px, calc(100% - 360px)); }
+  .timebar.show { display: flex; }
+  .timebar input { flex: 1; accent-color: var(--accent); }
+  .timebar b { font: 700 20px var(--sans); color: var(--accent); min-width: 52px; text-align: center; }
+  .timebar span { font-size: 11.5px; color: var(--muted); max-width: 140px; }
+  .tplay { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; cursor: pointer; font-size: 13px; flex: none; }
   .ctrl-right { display: flex; align-items: center; gap: 6px; }
   .dl-btn { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
   .dl-btn:hover { background: var(--accent-soft); }
@@ -230,7 +278,9 @@
     .place-search { flex-basis: 100%; max-width: none; order: -1; }
     .seg button { padding: 6px 8px; font-size: 13px; }
     .pill-btn { padding: 8px 12px; font-size: 13px; }
-    #tableBtn .btxt, #labelBtn .btxt { display: none; }
+    #tableBtn .btxt, #labelBtn .btxt, #rankBtn .btxt, #timeBtn .btxt { display: none; }
+    .timebar { left: 10px; right: 10px; transform: none; width: auto; bottom: 150px; }
+    .timebar span { display: none; }
     .topbar .support-btn { display: none; } /* on phones it lives in the Data menu */
     #tableBtn, #labelBtn { padding: 8px 10px; }
     .legend { left: 10px; right: 10px; bottom: 30px; width: auto; padding: 7px 10px 6px; }
@@ -269,6 +319,7 @@
     </div>
     <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="dpSearch" type="search" placeholder="Find a data point" aria-label="Find a data point"></label>
+    <div class="afford" id="affordBox" hidden></div>
     <div class="groups" id="groups"></div>
     <a class="side-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span><b>Support on Ko-fi</b><small>Keep this atlas free for everyone</small></span></a>
     <div class="side-foot">Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, CFPB (HMDA), NOAA, MIT Election Lab, Freddie Mac. Updated twice a month. Personal use; not financial advice.</div>
@@ -286,6 +337,9 @@
         <button data-level="state" type="button">State</button><button data-level="metro" type="button">Metro</button><button data-level="county" type="button" class="on">County</button><button data-level="zip" type="button">Zip</button>
       </div>
       <button class="pill-btn" id="tableBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg><span class="btxt">Table</span></button>
+      <button class="pill-btn" id="rankBtn" type="button" title="Ready-made top 25 lists"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21V11M16 21V7M12 21V3M4 21h16"/></svg><span class="btxt">Rankings</span></button>
+      <button class="pill-btn" id="timeBtn" type="button" title="Replay home values on the map since 2000"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="btxt">Over time</span></button>
+      <button class="pill-btn cmp-pill" id="cmpBtn" type="button" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18V9M10 18V5M16 18v-7M3 21h18"/></svg><span class="btxt" id="cmpBtnTxt">Compare</span></button>
       <button class="pill-btn" id="labelBtn" type="button" aria-pressed="true" title="Show names and values on the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg><span class="btxt">Labels</span></button>
       <a class="pill-btn support-btn" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener" title="This map is free. If it helps you, you can support it on Ko-fi."><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span class="btxt">Support</span></a>
     </div>
@@ -293,13 +347,28 @@
     <div class="zip-hint" id="zipHint"><b>Zoom in to see ZIP codes</b><span>There are 32,000+ of them, so they appear once you zoom into a state, or search a ZIP code above.</span></div>
     <div class="zip-loading" id="zipLoading">Loading ZIP codes…</div>
     <div class="tip" id="tip"></div>
+    <section class="table-view" id="rankView" aria-label="Rankings">
+      <div class="tv-head"><h3 id="rankTitle">Rankings</h3><select id="rankPick" aria-label="Ranking"></select><button class="x" id="rankClose" type="button" aria-label="Close rankings">✕</button></div>
+      <div class="tv-scroll" id="rankScroll"></div>
+      <div class="tv-foot" id="rankFoot"></div>
+    </section>
+    <section class="table-view" id="cmpView" aria-label="Compare places">
+      <div class="tv-head"><h3>Compare places</h3><select id="cmpPick" aria-label="Data point to compare"></select><button class="x" id="cmpClose" type="button" aria-label="Close compare">✕</button></div>
+      <div class="tv-scroll" id="cmpBody"></div>
+    </section>
+    <div class="timebar" id="timeBar" role="group" aria-label="Map over time">
+      <button type="button" id="timePlay" class="tplay" aria-label="Play">▶</button>
+      <input type="range" id="timeRange" min="0" max="0" value="0" aria-label="Year">
+      <b id="timeYear"></b><span id="timeNote"></span>
+      <button class="x" id="timeClose" type="button" aria-label="Close the time slider">✕</button>
+    </div>
     <section class="table-view" id="tableView" aria-label="Table view">
       <div class="tv-head"><h3 id="tvTitle"></h3><input id="tvFilter" type="search" placeholder="Filter places"><button class="x" id="tvClose" type="button" aria-label="Close table">✕</button></div>
       <div class="tv-scroll" id="tvScroll"></div>
       <div class="tv-foot" id="tvFoot"></div>
     </section>
     <aside class="drawer" id="drawer" aria-label="Place details">
-      <header><h2 id="dTitle"></h2><button class="x" id="dClose" type="button" aria-label="Close">✕</button></header>
+      <header><h2 id="dTitle"></h2><button class="cmp-add" id="dCmp" type="button">+ Compare</button><button class="x" id="dClose" type="button" aria-label="Close">✕</button></header>
       <div class="body" id="dBody"></div>
     </aside>
     <div class="loading" id="loading">Loading the atlas…</div>
@@ -433,15 +502,26 @@ const M = {
   permits:       { l: 'New homes permitted', f: 'num', src: 'permits', i: 'New homes authorised by building permits during the year (Census). Published for counties, metros and states, not ZIP codes.' },
   permits_pct:   { l: 'New homes permitted (% of homes)', f: 'pct2', src: 'permits', i: 'New homes permitted during the year as a share of existing housing units.' },
   gross_yield:   { l: 'Gross rental yield', f: 'pct2', src: 'zillow', i: 'A year of typical rent as a share of home value, before any costs.' },
+  // natural hazards (FEMA National Risk Index: national percentile, 0–100) and walkability (EPA)
+  risk:          { l: 'Natural hazard risk (overall)', f: 'score', src: 'fema', warm: 1, i: "FEMA's National Risk Index: how a place's expected losses from 18 natural hazards, its social vulnerability and its resilience compare with the rest of the US (0 = lowest risk, 100 = highest). ZIP codes average their census tracts; metros and states average their counties by population. A useful stand-in for insurance costs." },
+  flood_risk:    { l: 'Flood risk', f: 'score', src: 'fema', warm: 1, i: 'FEMA National Risk Index score for flooding (the higher of river/inland and coastal flooding), 0–100.' },
+  fire_risk:     { l: 'Wildfire risk', f: 'score', src: 'fema', warm: 1, i: 'FEMA National Risk Index score for wildfire, 0–100.' },
+  hurricane_risk:{ l: 'Hurricane risk', f: 'score', src: 'fema', warm: 1, i: 'FEMA National Risk Index score for hurricanes, 0–100.' },
+  tornado_risk:  { l: 'Tornado risk', f: 'score', src: 'fema', warm: 1, i: 'FEMA National Risk Index score for tornadoes, 0–100.' },
+  heat_risk:     { l: 'Heat wave risk', f: 'score', src: 'fema', warm: 1, i: 'FEMA National Risk Index score for heat waves, 0–100.' },
+  quake_risk:    { l: 'Earthquake risk', f: 'score', src: 'fema', warm: 1, i: 'FEMA National Risk Index score for earthquakes, 0–100.' },
+  walk:          { l: 'Walkability (1–20)', f: 'walk', src: 'epa', i: "EPA National Walkability Index: how easy it is to walk to shops, jobs and transit, from street intersections, mixed land use and transit access (1 = car-dependent, 20 = most walkable). Averaged by population from neighborhoods; data from 2021." },
+  afford:        { l: 'Can I afford it? (% of income)', f: 'pct', src: 'afford', i: "Monthly cost of the typical home (mortgage at your rate and down payment, property tax and insurance), plus your other monthly debts, as a share of your monthly income. Under 28% is comfortable; over 36% is a stretch most lenders won't go past." },
   growth_score:  { l: 'Growth outlook (0–100)', f: 'score', src: 'pop', i: "This map's own 0–100 score: how a place ranks against others at the same level on 5-year population growth, net domestic migration and 5-year income growth (averaged). Higher = stronger long-term demand." },
 };
 // Sections in the sidebar (a data point may sit in more than one). START_HERE: the quick buttons at the top.
-const START_HERE = [['hv', 'Home value'], ['hv_yoy', 'Price change'], ['school_score', 'Schools'], ['rent', 'Rent'], ['inv', 'For sale'], ['fc_1y', 'Forecast'], ['growth_score', 'Growth outlook']];
+const START_HERE = [['afford', 'What can I afford?'], ['hv', 'Home value'], ['hv_yoy', 'Price change'], ['school_score', 'Schools'], ['rent', 'Rent'], ['risk', 'Hazard risk'], ['walk', 'Walkability'], ['fc_1y', 'Forecast'], ['growth_score', 'Growth outlook']];
 const GROUPS = [
   ['Prices and affordability', ['hv', 'hv_yoy', 'hv_mom', 'hv_5y', 'fc_1y', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
   ['Market activity', ['inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'dom', 'dom_yoy', 'cut', 'lp', 'lp_yoy', 'ppsf', 'med_sqft', 'months_supply', 'inv_pct_houses'], 'activity'],
   ['Schools', ['school_score'], 'school'],
-  ['People and income', ['income', 'income_growth', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'temp', 'vote_r', 'vote_d'], 'people'],
+  ['People and income', ['income', 'income_growth', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
+  ['Climate, risk and walkability', ['risk', 'flood_risk', 'fire_risk', 'hurricane_risk', 'tornado_risk', 'heat_risk', 'quake_risk', 'walk', 'temp'], 'leaf'],
   ['Who lives here', ['med_age', 'u18_pct', 'a2544_pct', 'a65_pct', 'a75_pct', 'family_hh', 'single_hh', 'homeown', 'mortgaged', 'own_2544_pct', 'own_65_pct', 'own_75_pct', 'rent_2544_pct', 'r_rent2544_own65', 'r_rent2544_own75', 'r_u18_65', 'r_u18_75', 'r_2544_65', 'r_2544_75'], 'building'],
   ['Lending', ['apps', 'origs', 'denial', 'avg_rate', 'conv_pct', 'govt_pct', 'fha_pct', 'va_pct', 'usda_pct', 'ltv', 'dti', 'dti43', 'buyer_income', 'loan_amt', 'price_med', 'second_pct', 'investor_pct', 'si_pct'], 'bank'],
   ['For investors', ['rent', 'rent_sfr', 'rent_yoy', 'rent_pct_income', 'price_rent', 'gross_yield', 'cap_rate', 'rent_overvalued', 'buy_vs_rent', 'vacancy', 'shadow', 'units', 'units_growth', 'permits', 'permits_pct'], 'chart'],
@@ -455,6 +535,7 @@ const ICONS = {
   building: 'M4 21V8l8-5 8 5v13M9 21v-6h6v6M3 21h18',
   bank: 'M3 10h18L12 4zM5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18',
   chart: 'M4 4v16h16M7 15l4-4 3 3 6-7',
+  leaf: 'M5 19c0-8 6-14 15-14 0 9-6 15-14 15-.5 0-1 0-1-1zM5 19l7-7',
 };
 const icon = name => `<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
 
@@ -462,6 +543,8 @@ const icon = name => `<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="cu
 // cream for flat, coral for rising.
 const SEQ = ['#e6f4f1', '#bfe3dc', '#8ccdc0', '#56b0a0', '#2b8f80', '#126b60', '#06463f'];
 const DIV = ['#0b5d5a', '#2a9d8f', '#8fd3c7', '#f4efe6', '#f6b89b', '#e76f51', '#9c2f1c'];
+// Risks: light to dark coral, so more danger reads as "hotter".
+const WARM = ['#fdf3ee', '#fbd9c9', '#f6b89b', '#f0946f', '#e76f51', '#c24d32', '#9c2f1c'];
 
 // ---------- formatting ----------
 const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
@@ -482,6 +565,7 @@ function fmt(v, f, short) {
     case 'yrs': return a.toFixed(1) + (short ? '' : ' yrs');
     case 'score': return String(Math.round(v));
     case 'rating': return a.toFixed(1) + (short ? '' : ' / 10');
+    case 'walk': return a.toFixed(1) + (short ? '' : ' / 20');
     default: return sign + (short && a >= 1e6 ? (a / 1e6).toFixed(1) + 'M' : short && a >= 1e4 ? Math.round(a / 1e3) + 'K' : nf0.format(a));
   }
 }
@@ -493,7 +577,7 @@ const ymLabel = k => !k ? '' : String(k).length === 4 ? String(k) : `${MON[+k.sl
 // ---------- state ----------
 const saved = (() => { try { return JSON.parse(localStorage.getItem('hm-ui')) || {}; } catch (e) { return {}; } })();
 const ui = { scaleMode: saved.scaleMode === 'national' ? 'national' : 'view', metric: M[saved.metric] ? saved.metric : 'hv_yoy', level: ['state', 'metro', 'county', 'zip'].includes(saved.level) ? saved.level : 'county', open: new Set((saved.open || []).filter(n => GROUPS.some(g => g[0] === n))) };
-const saveUi = () => { try { localStorage.setItem('hm-ui', JSON.stringify({ metric: ui.metric, level: ui.level, open: [...ui.open], scaleMode: ui.scaleMode, labels: labelsOn })); } catch (e) {} };
+const saveUi = () => { try { localStorage.setItem('hm-ui', JSON.stringify({ metric: ui.metric, level: ui.level, open: [...ui.open], scaleMode: ui.scaleMode, labels: labelsOn, afford: aff, cmp: cmpList })); } catch (e) {} };
 const D = { meta: null, state: null, metro: null, county: null, zip: {} };
 let topo, layers = {}, map, scale = null;
 
@@ -509,7 +593,7 @@ const hasData = k => !HAS.size || HAS.has(k);
 function renderGroups() {
   const q = document.getElementById('dpSearch').value.trim().toLowerCase();
   // "Start here": quick buttons for the most-used data points (hidden while searching).
-  const start = q ? '' : `<div class="start"><h3>Start here</h3><div class="chips">${START_HERE.filter(([k]) => hasData(k)).map(([k, l]) =>
+  const start = q ? '' : `<div class="start"><h3>Start here</h3><div class="chips">${START_HERE.filter(([k]) => k === 'afford' || hasData(k)).map(([k, l]) =>
     `<button type="button" class="chip ${ui.metric === k ? 'on' : ''}" data-pick="${k}">${esc(l)}</button>`).join('')}</div></div>`;
   // Each section has its own radio group, so a data point listed in two sections (e.g. Typical rent under
   // For investors and in Start here) shows as selected everywhere.
@@ -524,6 +608,7 @@ function renderGroups() {
 }
 document.getElementById('groups').addEventListener('click', e => {
   const pick = e.target.closest('[data-pick]');
+  if (pick && pick.dataset.pick === 'afford') { openAfford(); return; }
   if (pick) { ui.metric = pick.dataset.pick; renderGroups(); restyle(); saveUi(); closeSide(); if (openPlace) renderDrawer(); return; }
   const info = e.target.closest('[data-info]');
   if (info) { e.preventDefault(); showInfo(info); return; }
@@ -582,14 +667,19 @@ function viewValues(key) {
   const view = map.getBounds(), vals = [];
   eachShape(ui.level, l => {
     const p = D[ui.level][dataId(ui.level, l.feature.id)];
-    if (!p || p.v[key] == null) return;
+    const x = p ? valOf(p, key) : null;
+    if (x == null) return;
     const b = l._bb || (l._bb = l.getBounds());
-    if (view.intersects(b)) vals.push(p.v[key]);
+    if (view.intersects(b)) vals.push(x);
   });
   return vals;
 }
 function buildScale() {
-  const key = ui.metric, def = M[key], colors = def.d ? DIV : SEQ;
+  const key = ui.metric, def = M[key], colors = def.d ? DIV : def.warm ? WARM : SEQ;
+  // "What can I afford?": fixed steps, so green and coral always mean the same thing.
+  if (key === 'afford') { scale = { breaks: [15, 20, 25, 30, 36, 45], colors: DIV, key, count: null, mode: 'fixed' }; return; }
+  // Over time: one scale for every year (worked out from all years together), so the colours are comparable.
+  if (time.on && T[ui.level]) { scale = { breaks: timeBreaks(key), colors, key, count: null, mode: 'time' }; return; }
   if (ui.scaleMode === 'view' && map) {
     const vals = viewValues(key);
     if (vals.length >= 8) { scale = { breaks: breaksFrom(vals, def.d), colors, key, count: vals.length, mode: 'view' }; return; }
@@ -600,7 +690,7 @@ function buildScale() {
     scale = { breaks: b || [], colors, key, count: null, mode: 'national' };
     return;
   }
-  const vals = Object.values(D[ui.level]).map(p => p.v[key]);
+  const vals = Object.values(D[ui.level]).map(p => valOf(p, key));
   scale = { breaks: breaksFrom(vals, def.d), colors, key, count: vals.filter(v => v != null).length, mode: 'national' };
 }
 function colorFor(v) {
@@ -622,6 +712,9 @@ function sourceLine(k, meta, yr) {
   if (s === 'units') return `Census housing estimates, ${yr.units || ''}`;
   if (s === 'temp') return `NOAA, ${yr.temp || ''}`;
   if (s === 'votes') return `Presidential election, ${yr.votes || ''}`;
+  if (s === 'fema') return `FEMA National Risk Index, ${yr.hazards || ''}`;
+  if (s === 'epa') return 'EPA National Walkability Index, 2021';
+  if (s === 'afford') return affordSource();
   if (s === 'schools') return `State tests ${yr.schools ? `${yr.schools - 1}–${String(yr.schools).slice(2)}` : ''} (U.S. Dept. of Education)`;
   return `Zillow, ${ymLabel(meta.months.zillow)}${['mtg_pmt', 'mtg_pct_income', 'salary_needed', 'buy_vs_rent'].includes(k) ? ` · rate ${meta.mortgage ? meta.mortgage.rate : ''}%` : ''}`;
 }
@@ -630,7 +723,8 @@ function renderLegend() {
   const meta = D.meta || { months: {} }, yr = meta.years || {};
   const src = sourceLine(ui.metric, meta, yr);
   const noun = { county: 'counties', metro: 'metros', state: 'states', zip: 'ZIP codes' }[ui.level];
-  const count = !scale.breaks.length ? `not available for ${noun}`
+  const count = scale.mode === 'fixed' ? 'teal = comfortable, coral = a stretch' : scale.mode === 'time' ? `${time.years[time.idx]}${time.idx === time.years.length - 1 ? ` (${ymLabel(T[ui.level].last)})` : ' (December)'}`
+    : !scale.breaks.length ? `not available for ${noun}`
     : scale.mode === 'view' ? `${scale.count} ${noun} on screen`
     : ui.level === 'zip' ? 'all ZIP codes nationwide' : `${scale.count} ${noun} nationwide`;
   const sw = `<div class="cmode" role="group" aria-label="Colour comparison"><span>Colors:</span><button type="button" data-mode="national" class="${ui.scaleMode !== 'view' ? 'on' : ''}">Nationwide</button><button type="button" data-mode="view" class="${ui.scaleMode === 'view' ? 'on' : ''}">On screen</button></div>`;
@@ -648,7 +742,7 @@ document.getElementById('legend').addEventListener('click', e => {
 // ---------- map ----------
 function styleFor(level, id) {
   const p = D[level][dataId(level, id)];
-  const c = p ? colorFor(p.v[ui.metric]) : null;
+  const c = p ? colorFor(valOf(p, ui.metric)) : null;
   const strong = level === 'state';
   if (level === 'zip') {
     // Zoomed in, ZIP borders get bolder and the fill lighter, so streets and town names show through.
@@ -665,6 +759,10 @@ function eachShape(level, fn) {
   else if (layers[level]) layers[level].eachLayer(fn);
 }
 function restyle() {
+  if (time.on && !['hv', 'hv_yoy'].includes(ui.metric)) {
+    clearInterval(time.timer); time.timer = null; time.on = false;
+    timeBar.classList.remove('show'); document.getElementById('timeBtn').classList.remove('on');
+  }
   buildScale();
   renderLegend();
   eachShape(ui.level, l => l.setStyle(styleFor(ui.level, l.feature.id)));
@@ -728,7 +826,7 @@ function updateLabels() {
   const placed = [];
   for (const c of cand) {
     if (placed.length >= 400) break;
-    const name = labelName(level, c.p, c.w > 130), val = labelValue(k, c.p.v[k]);
+    const name = labelName(level, c.p, c.w > 130), val = labelValue(k, valOf(c.p, k));
     const tw = Math.max(name.length * 6.4, val.length * 6.8) + 6, th = 28;
     if (tw > c.w * 1.15 || th > c.h * 1.2) continue;
     const box = [c.pt.x - tw / 2, c.pt.y - th / 2, c.pt.x + tw / 2, c.pt.y + th / 2];
@@ -752,6 +850,7 @@ function setLevel(level) {
   if (openPlace && openPlace.level !== level) closeDrawer();
   restyle(); saveUi();
   if (level === 'zip') ensureZips(); else { zipHint.classList.remove('show'); }
+  if (time.on) { if (level === 'zip') stopTime(); else startTime(); }
 }
 
 // ---------- ZIP codes: loaded state by state as you zoom in ----------
@@ -775,7 +874,8 @@ async function loadZipState(st) {
   zipLoading[st] = (async () => {
     try {
       const [recs, shapes] = await Promise.all([fetch(`data/zip/${st}.json`).then(r => r.json()), fetch(`data/zip/shapes/${st}.json`).then(r => r.json())]);
-      for (const [z, rec] of Object.entries(recs)) { rec.s = st; rec.z = z; D.zip[z] = rec; }
+      for (const [z, rec] of Object.entries(recs)) { rec.s = st; rec.z = z; rec._id = z; D.zip[z] = rec; }
+      if (HAS.has('afford')) computeAfford(Object.values(recs));
       const feats = Object.entries(shapes).map(([z, polys]) => ({ type: 'Feature', id: z, properties: {}, geometry: decodeShape(polys) }));
       zipLayers[st] = makeLayer('zip', feats);
       if (ui.level === 'zip') { buildScale(); zipLayers[st].addTo(map); if (layers.stateLines) layers.stateLines.bringToFront(); if (selLayer) selLayer.bringToFront(); updateLabels(); }
@@ -805,7 +905,7 @@ function showTip(e, level, id) {
   const v = p.v, k = ui.metric;
   const extra = ['hv', 'hv_yoy', 'inv_yoy', 'dom'].filter(x => x !== k).slice(0, 3);
   tip.innerHTML = `<b>${esc(placeName(level, p))}</b>
-    <div class="row"><span>${esc(M[k].l)}</span><span>${M[k].d ? signed(v[k], M[k].f) : fmt(v[k], M[k].f)}</span></div>
+    <div class="row"><span>${esc(M[k].l)}${time.on && T[level] ? ` (${time.years[time.idx]})` : ''}</span><span>${M[k].d ? signed(valOf(p, k), M[k].f) : fmt(valOf(p, k), M[k].f)}</span></div>
     ${extra.map(x => `<div class="row"><span>${esc(M[x].l)}</span><span>${M[x].d ? signed(v[x], M[x].f) : fmt(v[x], M[x].f)}</span></div>`).join('')}
     <div class="hint">Click for history and every data point</div>`;
   tip.style.display = 'block';
@@ -849,6 +949,9 @@ async function init() {
   document.getElementById('asof').textContent = `Updated ${D.meta.built.slice(0, 10)}`;
   for (const level of ['state', 'metro', 'county']) for (const p of Object.values(D[level])) for (const k in p.v) HAS.add(k);
   for (const k in D.meta.zipBreaks || {}) HAS.add(k); // data points that only ZIP codes have
+  for (const level of ['state', 'metro', 'county']) for (const [id, p] of Object.entries(D[level])) p._id = id;
+  if (money(aff.income)) { for (const level of ['state', 'metro', 'county']) computeAfford(Object.values(D[level])); HAS.add('afford'); }
+  syncCmp();
   if (!hasData(ui.metric)) ui.metric = 'hv_yoy';
 
   const counties = topojson.feature(topo, topo.objects.counties).features;
@@ -955,15 +1058,23 @@ async function openDetail(level, id) {
   renderDrawer();
   drawer.classList.add('open');
   document.querySelector('.stage').classList.add('panel-open');
+  const h = await loadHist(level, id);
+  if (openPlace && openPlace.id === id) { hist = h; renderDrawer(); }
+}
+// A place's history (charts, school list). Kept once loaded, so Compare and reopening a place are instant.
+const histCache = {};
+async function loadHist(level, id) {
+  const key = level + ':' + id;
+  if (histCache[key]) return histCache[key];
+  let h = {};
   try {
     if (level === 'zip') {
       // ZIP histories come bundled by the first three digits, stored as [first month, [values…]].
       const bundle = await fetch(`data/hist/zip/${id.slice(0, 3)}.json`).then(r => r.ok ? r.json() : {});
-      hist = {};
-      for (const [k, s] of Object.entries(bundle[id] || {})) hist[k] = k === 'a' || k === 'sch' ? s : expand(s);
-    } else hist = await fetch(`data/hist/${level}/${id}.json`).then(r => r.ok ? r.json() : {});
-  } catch (e) { hist = {}; }
-  if (openPlace && openPlace.id === id) renderDrawer();
+      for (const [k, s] of Object.entries(bundle[id] || {})) h[k] = k === 'a' || k === 'sch' ? s : expand(s);
+    } else h = await fetch(`data/hist/${level}/${id}.json`).then(r => r.ok ? r.json() : {});
+  } catch (e) { return {}; }
+  return (histCache[key] = h);
 }
 function expand([start, vals]) {
   const out = {};
@@ -1027,6 +1138,7 @@ function seriesFor(key, h, p) {
   const per = (s, fn) => s && mapSeries(s, fn);
   switch (key) {
     case 'hv': return hv;
+    case 'afford': return per(hv, (x, k) => affordPct(x, p, rateAt(k)));
     case 'hv_yoy': return hv && pctSeries(hv, 12);
     case 'hv_mom': return hv && pctSeries(hv, 1);
     case 'hv_5y': return hv && pctSeries(hv, 60);
@@ -1081,6 +1193,7 @@ function renderDrawer() {
   const county = level === 'zip' && D.county[p.k] ? `${D.county[p.k].n}, ${D.county[p.k].s}` : '';
   const metro = (level === 'county' || level === 'zip') && p.m && D.metro[p.m] ? D.metro[p.m].n : '';
   const kind = level === 'metro' ? 'Metro area' : level === 'county' ? 'County' : level === 'zip' ? 'ZIP code' : 'State';
+  syncCmp();
   document.getElementById('dTitle').innerHTML = `${esc(placeName(level, p))}<small>Place report · ${kind}${[county, metro].filter(Boolean).map(x => ` · ${esc(x)}`).join('')}</small>`;
   const series = hist ? seriesFor(k, hist, p) : null;
   const skeys = series ? Object.keys(series).sort() : [];
@@ -1263,7 +1376,236 @@ document.getElementById('tvScroll').addEventListener('click', e => {
   if (tr) { zoomTo(ui.level, tr.dataset.id); openDetail(ui.level, tr.dataset.id); }
 });
 
+// ---------- values on the map: normally today's, or the chosen year's in "Over time" ----------
+const time = { on: false, idx: 0, years: [], timer: null };
+const T = {}; // yearly snapshots per level: { years, last, hv: {id: [...]}, hv_yoy: {id: [...]} }
+function valOf(p, key) {
+  if (time.on && T[ui.level] && (key === 'hv' || key === 'hv_yoy')) {
+    const row = (T[ui.level][key] || {})[p._id];
+    return row ? row[time.idx] : null;
+  }
+  return p.v[key];
+}
+const breakCache = {};
+function timeBreaks(key) {
+  const ck = ui.level + key;
+  if (!breakCache[ck]) breakCache[ck] = breaksFrom(Object.values(T[ui.level][key] || {}).flat(), M[key].d);
+  return breakCache[ck];
+}
+
+// ---------- "What can I afford?" ----------
+const aff = Object.assign({ income: '', down: '', debts: '', rate: '' }, saved.afford || {});
+function affordSource() {
+  return `Your budget: ${fmt(money(aff.income), 'usd')} a year, ${fmt(money(aff.down), 'usd')} down, ${aff.rate || D.meta.mortgage.rate}% rate`;
+}
+const money = s => +String(s || '').replace(/[^\d.]/g, '') || 0;
+// Monthly cost of a home: mortgage (30-year fixed), property tax (the local rate, else 1.1%) and insurance (~0.5% a year).
+function monthlyCost(price, p, rate) {
+  const loan = Math.max(0, price - money(aff.down)), r = rate / 1200;
+  const pi = r ? loan * r / (1 - Math.pow(1 + r, -360)) : loan / 360;
+  const tax = price * ((p && p.v.prop_tax_rate) || 1.1) / 100 / 12;
+  return pi + tax + price * 0.005 / 12;
+}
+function affordPct(price, p, rate) {
+  const inc = money(aff.income) / 12;
+  return inc && price ? (monthlyCost(price, p, rate) + money(aff.debts)) / inc * 100 : null;
+}
+function computeAfford(places) {
+  const rate = +aff.rate || D.meta.mortgage.rate;
+  for (const p of places) { const x = affordPct(p.v.hv, p, rate); if (x == null) delete p.v.afford; else p.v.afford = Math.round(x * 10) / 10; }
+}
+function openAfford() {
+  const box = document.getElementById('affordBox');
+  const f = (k, label, ph) => `<label><span>${label}</span><input data-aff="${k}" inputmode="decimal" placeholder="${ph}" value="${esc(aff[k])}"></label>`;
+  box.innerHTML = `<h3>What can I afford?</h3>
+    <div class="aff-form">${f('income', 'Yearly household income', '$120,000')}${f('down', 'Down payment', '$60,000')}${f('debts', 'Other monthly debts', '$400')}${f('rate', 'Mortgage rate (%)', String(D.meta.mortgage.rate))}</div>
+    <p class="aff-err" id="affErr"></p>
+    <div class="aff-actions"><button type="button" class="aff-go" data-aff-go>Show on map</button><button type="button" class="aff-x" data-aff-close>Close</button></div>
+    <p class="note">Colors the map by what the typical home there would cost you each month (mortgage, property tax, insurance, plus your debts) as a share of income. Teal = comfortable (under 28%), coral = a stretch (over 36%).</p>`;
+  box.hidden = false;
+  box.querySelector('input').focus();
+}
+document.getElementById('affordBox').addEventListener('input', e => { const k = e.target.dataset.aff; if (k) aff[k] = e.target.value; });
+document.getElementById('affordBox').addEventListener('keydown', e => { if (e.key === 'Enter') document.querySelector('[data-aff-go]').click(); });
+document.getElementById('affordBox').addEventListener('click', e => {
+  if (e.target.closest('[data-aff-close]')) { document.getElementById('affordBox').hidden = true; return; }
+  if (!e.target.closest('[data-aff-go]')) return;
+  if (!money(aff.income)) { document.getElementById('affErr').textContent = 'Enter your yearly household income first.'; return; }
+  document.getElementById('affErr').textContent = '';
+  try { localStorage.setItem('hm-ui', JSON.stringify(Object.assign(JSON.parse(localStorage.getItem('hm-ui') || '{}'), { afford: aff }))); } catch (err) {}
+  saved.afford = aff;
+  for (const level of ['state', 'metro', 'county', 'zip']) computeAfford(Object.values(D[level]));
+  HAS.add('afford');
+  if (time.on) stopTime();
+  ui.metric = 'afford'; renderGroups(); restyle(); closeSide(); if (openPlace) renderDrawer();
+});
+
+// ---------- Compare places (up to 4) ----------
+const CMP_COLORS = ['#126b60', '#e76f51', '#334155', '#c99a06'];
+let cmpList = (saved.cmp || []).slice(0, 4);
+const saveCmp = () => { try { localStorage.setItem('hm-ui', JSON.stringify(Object.assign(JSON.parse(localStorage.getItem('hm-ui') || '{}'), { cmp: cmpList }))); } catch (e) {} };
+function syncCmp() {
+  const b = document.getElementById('cmpBtn');
+  b.hidden = !cmpList.length;
+  document.getElementById('cmpBtnTxt').textContent = `Compare (${cmpList.length})`;
+  const d = document.getElementById('dCmp');
+  if (openPlace) {
+    const inList = cmpList.some(([l, i]) => l === openPlace.level && i === openPlace.id);
+    d.textContent = inList ? '✓ Comparing' : '+ Compare';
+    d.classList.toggle('on', inList);
+  }
+}
+document.getElementById('dCmp').addEventListener('click', () => {
+  if (!openPlace) return;
+  const { level, id } = openPlace, i = cmpList.findIndex(([l, x]) => l === level && x === id);
+  if (i >= 0) cmpList.splice(i, 1);
+  else { if (cmpList.length >= 4) cmpList.shift(); cmpList.push([level, id]); }
+  saveCmp(); syncCmp();
+  if (document.getElementById('cmpView').classList.contains('show')) renderCompare();
+});
+document.getElementById('cmpBtn').addEventListener('click', () => { document.getElementById('cmpView').classList.add('show'); renderCompare(); });
+document.getElementById('cmpClose').addEventListener('click', () => document.getElementById('cmpView').classList.remove('show'));
+let cmpMetric = 'hv';
+document.getElementById('cmpPick').addEventListener('change', e => { cmpMetric = e.target.value; renderCompare(); });
+async function cmpPlace([level, id]) {
+  if (level === 'zip' && !D.zip[id]) { const st = (await loadZipIndex(), index.find(x => x.level === 'zip' && x.id === id) || {}).st; if (st) await loadZipState(st); }
+  return D[level][id] ? { level, id, p: D[level][id], h: await loadHist(level, id) } : null;
+}
+async function renderCompare() {
+  const body = document.getElementById('cmpBody');
+  document.getElementById('cmpPick').innerHTML = GROUPS.filter(([g, keys]) => keys.some(hasData)).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].filter(hasData).map(x => `<option value="${x}" ${x === cmpMetric ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('');
+  if (!cmpList.length) { body.innerHTML = '<p class="note" style="padding:16px">Open any place and click “+ Compare” to add it here (up to 4).</p>'; return; }
+  body.innerHTML = '<p class="note" style="padding:16px">Loading…</p>';
+  const places = (await Promise.all(cmpList.map(cmpPlace))).filter(Boolean);
+  const k = cmpMetric, def = M[k];
+  // One line per place: yearly points (the month closest to the latest) so places with different histories line up.
+  const lines = places.map((x, i) => {
+    const s = seriesFor(k, x.h, x.p) || {};
+    let keys = Object.keys(s).sort();
+    if (keys.length && keys[0].length > 4) {
+      const target = +keys[keys.length - 1].slice(5), by = {};
+      for (const kk of keys) { const y = kk.slice(0, 4), d = Math.abs(+kk.slice(5) - target); if (!by[y] || d < by[y].d) by[y] = { kk, d }; }
+      keys = Object.values(by).map(o => o.kk).sort();
+    }
+    return { name: placeName(x.level, x.p), color: CMP_COLORS[i], pts: keys.map(kk => [+kk.slice(0, 4), s[kk]]) };
+  });
+  const all = lines.flatMap(l => l.pts);
+  let chart = '<p class="note">No history for this data point in these places.</p>';
+  if (all.length > 1) {
+    const W = 900, H = 330, L0 = 64, R0 = 20, T0 = 16, B0 = 28;
+    const x0 = Math.min(...all.map(p => p[0])), x1 = Math.max(...all.map(p => p[0])) || x0 + 1;
+    let lo = Math.min(...all.map(p => p[1])), hi = Math.max(...all.map(p => p[1]));
+    if (def.d) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+    const pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
+    const X = yy => L0 + (W - L0 - R0) * (yy - x0) / ((x1 - x0) || 1), Y = v => T0 + (H - T0 - B0) * (1 - (v - lo) / (hi - lo));
+    const step = niceStep((hi - lo) / 5), ticks = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) ticks.push(t);
+    const short = v => fmt(v, def.f === 'pct2' ? 'pct' : def.f, true);
+    const every = Math.ceil((x1 - x0 + 1) / 12);
+    chart = `<svg viewBox="0 0 ${W} ${H}" class="cmp-chart" role="img" aria-label="${esc(def.l)} compared">
+      ${ticks.map(t => `<line x1="${L0}" x2="${W - R0}" y1="${Y(t)}" y2="${Y(t)}" stroke="#e5e7eb"/><text x="${L0 - 8}" y="${Y(t) + 4}" text-anchor="end" font-size="11" fill="#6b7280">${short(t)}</text>`).join('')}
+      ${Array.from({ length: x1 - x0 + 1 }, (_, i) => x0 + i).filter((yy, i) => i % every === 0 || yy === x1).map(yy => `<text x="${X(yy)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#6b7280">${yy}</text>`).join('')}
+      ${lines.map(l => l.pts.length ? `<path d="${l.pts.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('')}" fill="none" stroke="${l.color}" stroke-width="2.6" stroke-linejoin="round"/>${l.pts.map(p => `<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="3.2" fill="${l.color}"/>`).join('')}` : '').join('')}
+    </svg>`;
+  }
+  const rows = ['hv', 'hv_yoy', 'fc_1y', 'rent', 'dom', 'inv', 'school_score', 'income', 'pop_growth_5y', 'growth_score', 'risk', 'walk'].filter(hasData);
+  body.innerHTML = `<div class="cmp-legend">${places.map((x, i) => `<span class="cmp-chip" style="--c:${CMP_COLORS[i]}"><i></i>${esc(placeName(x.level, x.p))}<button type="button" data-cmp-rm="${i}" aria-label="Remove">✕</button></span>`).join('')}</div>
+    <div class="cmp-wrap">${chart}</div>
+    <table class="cmp-table"><thead><tr><th></th>${places.map((x, i) => `<th style="color:${CMP_COLORS[i]}">${esc(placeName(x.level, x.p))}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr><td>${esc(M[r].l)}</td>${places.map(x => `<td>${fmtV(r, x.p.v[r])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+document.getElementById('cmpBody').addEventListener('click', e => {
+  const rm = e.target.closest('[data-cmp-rm]');
+  if (rm) { cmpList.splice(+rm.dataset.cmpRm, 1); saveCmp(); syncCmp(); renderCompare(); }
+});
+
+// ---------- Rankings: ready-made top 25 lists ----------
+const RANKS = [
+  ['price_drop', 'Biggest price drops (1 year)', 'hv_yoy', 1],
+  ['price_gain', 'Fastest-rising prices (1 year)', 'hv_yoy', -1],
+  ['schools_under_500k', 'Best schools with homes under $500K', 'school_score', -1, v => v.hv > 0 && v.hv < 500000],
+  ['cheapest', 'Lowest home values', 'hv', 1],
+  ['affordable', 'Best price-to-income', 'hv_income', 1],
+  ['fast_selling', 'Fastest-selling markets', 'dom', 1, v => (v.inv || 0) >= 10],
+  ['price_cuts', 'Most price cuts', 'cut', -1, v => (v.inv || 0) >= 10],
+  ['rent_yield', 'Best rental yield', 'gross_yield', -1],
+  ['growing', 'Fastest-growing population (5 years)', 'pop_growth_5y', -1],
+  ['walkable', 'Most walkable', 'walk', -1],
+  ['low_risk', 'Lowest natural-hazard risk', 'risk', 1],
+];
+let rankKey = 'price_drop', zipRanks = null;
+const rankView = document.getElementById('rankView');
+document.getElementById('rankBtn').addEventListener('click', () => { const on = !rankView.classList.contains('show'); rankView.classList.toggle('show', on); document.getElementById('rankBtn').classList.toggle('on', on); if (on) renderRanks(); });
+document.getElementById('rankClose').addEventListener('click', () => { rankView.classList.remove('show'); document.getElementById('rankBtn').classList.remove('on'); });
+document.getElementById('rankPick').addEventListener('change', e => { rankKey = e.target.value; renderRanks(); });
+async function renderRanks() {
+  const level = ui.level, isZip = level === 'zip';
+  if (isZip && !zipRanks) zipRanks = await fetch('data/zip/rankings.json').then(r => r.ok ? r.json() : {}).catch(() => ({}));
+  const lists = RANKS.filter(([key, , m]) => hasData(m) && (!isZip || (zipRanks || {})[key]));
+  if (!lists.some(r => r[0] === rankKey)) rankKey = lists[0][0];
+  document.getElementById('rankPick').innerHTML = lists.map(([key, label]) => `<option value="${key}" ${key === rankKey ? 'selected' : ''}>${esc(label)}</option>`).join('');
+  const [key, label, m, dir, ok] = lists.find(r => r[0] === rankKey);
+  let rows;
+  if (isZip) rows = (zipRanks[key] || []).slice(0, 25).map(([z, city, st, val]) => ({ id: z, st, name: `${z} · ${city ? city + ', ' : ''}${st}`, val, hv: null }));
+  else rows = Object.entries(D[level]).filter(([id, p]) => p.v[m] != null && (!ok || ok(p.v)) && !(level === 'county' && CT_OLD_TO_NEW[id]))
+    .sort((a, b) => (a[1].v[m] - b[1].v[m]) * dir).slice(0, 25).map(([id, p]) => ({ id, name: placeName(level, p), val: p.v[m], hv: p.v.hv }));
+  const noun = { county: 'counties', metro: 'metros', state: 'states', zip: 'ZIP codes' }[level];
+  document.getElementById('rankTitle').textContent = `Rankings · ${noun}`;
+  document.getElementById('rankScroll').innerHTML = `<table><thead><tr><th>#</th><th>Place</th><th>${esc(M[m].l)}</th>${isZip ? '' : '<th>Home value</th>'}</tr></thead><tbody>${
+    rows.map((r, i) => `<tr data-rid="${esc(r.id)}" data-st="${esc(r.st || '')}"><td class="rank">${i + 1}</td><td>${esc(r.name)}</td><td>${fmtV(m, r.val)}</td>${isZip ? '' : `<td>${fmt(r.hv, 'usd')}</td>`}</tr>`).join('')}</tbody></table>`;
+  document.getElementById('rankFoot').textContent = `${label}: top ${rows.length} ${noun} · switch State / Metro / County / Zip above to change the list · click a row to open it` + (key === 'fast_selling' || key === 'price_cuts' ? ' · places with at least 10 listings' : '');
+}
+document.getElementById('rankScroll').addEventListener('click', async e => {
+  const tr = e.target.closest('tr[data-rid]');
+  if (!tr) return;
+  const id = tr.dataset.rid;
+  if (ui.level === 'zip') await loadZipState(tr.dataset.st);
+  zoomTo(ui.level, id); openDetail(ui.level, id);
+});
+
+// ---------- Over time: replay home values on the map since 2000 ----------
+const timeBar = document.getElementById('timeBar'), timeRange = document.getElementById('timeRange');
+async function startTime() {
+  if (ui.level === 'zip') setLevel('county');
+  if (!['hv', 'hv_yoy'].includes(ui.metric)) { ui.metric = 'hv_yoy'; renderGroups(); }
+  if (!T[ui.level]) T[ui.level] = await fetch(`data/time/${ui.level}.json`).then(r => r.ok ? r.json() : null).catch(() => null);
+  if (!T[ui.level]) { alert('The yearly maps are not available yet.'); return; }
+  for (const [id, p] of Object.entries(D[ui.level])) p._id = id;
+  time.on = true; time.years = T[ui.level].years;
+  if (!time.idx || time.idx >= time.years.length) time.idx = time.years.length - 1;
+  timeRange.max = time.years.length - 1; timeRange.value = time.idx;
+  timeBar.classList.add('show'); document.getElementById('timeBtn').classList.add('on');
+  showYear();
+}
+function showYear() {
+  document.getElementById('timeYear').textContent = time.years[time.idx];
+  document.getElementById('timeNote').textContent = `${M[ui.metric].l} · ${ui.level === 'county' ? 'counties' : ui.level === 'metro' ? 'metros' : 'states'}`;
+  restyle();
+  if (openPlace) renderDrawer();
+}
+function stopTime() {
+  clearInterval(time.timer); time.timer = null; time.on = false;
+  timeBar.classList.remove('show'); document.getElementById('timeBtn').classList.remove('on');
+  document.getElementById('timePlay').textContent = '▶';
+  restyle();
+}
+document.getElementById('timeBtn').addEventListener('click', () => time.on ? stopTime() : startTime());
+document.getElementById('timeClose').addEventListener('click', stopTime);
+timeRange.addEventListener('input', () => { time.idx = +timeRange.value; showYear(); });
+document.getElementById('timePlay').addEventListener('click', () => {
+  const btn = document.getElementById('timePlay');
+  if (time.timer) { clearInterval(time.timer); time.timer = null; btn.textContent = '▶'; return; }
+  if (time.idx >= time.years.length - 1) time.idx = 0;
+  btn.textContent = '❚❚';
+  time.timer = setInterval(() => {
+    if (time.idx >= time.years.length - 1) { clearInterval(time.timer); time.timer = null; btn.textContent = '▶'; return; }
+    time.idx++; timeRange.value = time.idx; showYear();
+  }, 900);
+});
+
 init();
 </script>
+<!-- Visitor counts (GoatCounter: no cookies, no personal data; stats at https://openhousingatlas.goatcounter.com) -->
+<script data-goatcounter="https://openhousingatlas.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
