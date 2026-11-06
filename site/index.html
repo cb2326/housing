@@ -152,6 +152,10 @@
   .seg-sm { display: inline-flex; background: var(--panel-2); border-radius: 999px; padding: 3px; }
   .seg-sm button { border: 0; background: none; border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
   .seg-sm button.on { background: var(--text); color: #fff; }
+  .ctrl-right { display: flex; align-items: center; gap: 6px; }
+  .dl-btn { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
+  .dl-btn:hover { background: var(--accent-soft); }
+  .dl-btn svg { width: 14px; height: 14px; }
   .chart-empty { background: var(--panel-2); border-radius: 14px; padding: 26px 18px; text-align: center; margin: 6px 0; }
   .chart-empty b { display: block; font-size: 26px; margin-bottom: 6px; }
   .chart-empty span { color: var(--muted); font-size: 13px; }
@@ -1083,7 +1087,8 @@ function renderDrawer() {
   const tile = x => `<button type="button" class="kpi ${x === k ? 'on' : ''}" data-metric="${x}"><span>${esc(M[x].l)}</span><b>${fmtV(x, v[x])}</b></button>`;
   // Yearly data points (Census, mortgages…) have one value a year, so the Yearly/Monthly switch only shows for monthly data.
   const toggles = `<div class="chart-ctrl">${annual ? '<span class="note" style="margin:0">One value per year</span>' : `<div class="seg-sm">${[['yearly', 'By year'], ['monthly', 'By month']].map(([m, l]) => `<button type="button" class="${chartMode === m ? 'on' : ''}" data-cmode="${m}">${l}</button>`).join('')}</div>`}
-    <div class="seg-sm">${[['5', '5Y'], ['10', '10Y'], ['20', '20Y'], ['all', 'All']].map(([r, l]) => `<button type="button" class="${chartRange === r ? 'on' : ''}" data-range="${r}">${l}</button>`).join('')}</div></div>`;
+    <div class="ctrl-right"><div class="seg-sm">${[['5', '5Y'], ['10', '10Y'], ['20', '20Y'], ['all', 'All']].map(([r, l]) => `<button type="button" class="${chartRange === r ? 'on' : ''}" data-range="${r}">${l}</button>`).join('')}</div>
+    ${skeys.length > 1 ? `<button type="button" class="dl-btn" data-export title="Download this chart as a PNG image" aria-label="Download chart as PNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14"/></svg><span>PNG</span></button>` : ''}</div></div>`;
   const chart = hist == null ? '<p class="note chart-empty">Loading history…</p>'
     : skeys.length > 1 ? `<div class="chart" id="chart">${chartSvg(series, def)}<div class="ctip"></div></div>`
     : `<div class="chart-empty"><b>${fmtV(k, v[k])}</b><span>${v[k] == null ? `No ${esc(def.l)} data for this place.` : 'Only one value so far, so there is no history to chart yet.'}</span></div>`;
@@ -1113,7 +1118,8 @@ function schoolList() {
 document.getElementById('dBody').addEventListener('click', e => {
   const m = e.target.closest('[data-metric]'); if (m) { setMetric(m.dataset.metric); return; }
   const c = e.target.closest('[data-cmode]'); if (c) { chartMode = c.dataset.cmode; renderDrawer(); return; }
-  const r = e.target.closest('[data-range]'); if (r) { chartRange = r.dataset.range; renderDrawer(); }
+  const r = e.target.closest('[data-range]'); if (r) { chartRange = r.dataset.range; renderDrawer(); return; }
+  if (e.target.closest('[data-export]')) exportChart();
 });
 document.getElementById('dBody').addEventListener('change', e => { if (e.target.id === 'mPick') setMetric(e.target.value); });
 
@@ -1164,6 +1170,44 @@ function chartSvg(series, def) {
     <circle class="xd" r="5" fill="var(--warm)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
     <rect x="${L0}" y="${T0}" width="${W - L0 - R0}" height="${H - T0 - B0}" fill="transparent"/>
   </svg><p class="note" style="margin-top:4px">${ymLabel(keys[0])} → ${ymLabel(keys[keys.length - 1])}: ${fmtV(ui.metric, first)} → ${fmtV(ui.metric, lastV)}${!def.d && first > 0 ? ` (${signed((lastV / first - 1) * 100, 'pct')})` : ''}</p>`;
+}
+// Download the chart as a PNG: the place and data point on top, the chart, then the source and this site's name.
+function exportChart() {
+  const svg = document.querySelector('#chart svg');
+  if (!svg || !openPlace) return;
+  const { level, id } = openPlace, p = D[level][id], k = ui.metric;
+  const keys = JSON.parse(svg.dataset.keys);
+  // The chart's colours come from the page's CSS variables, which a stand-alone image can't see: write them in.
+  const cs = getComputedStyle(document.documentElement);
+  let src = new XMLSerializer().serializeToString(svg).replace(/var\((--[\w-]+)\)/g, (_, v) => cs.getPropertyValue(v).trim() || '#111827');
+  if (!/xmlns="http:\/\/www\.w3\.org\/2000\/svg"/.test(src)) src = src.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+  src = src.replace('<svg', '<svg font-family="Segoe UI, Helvetica, Arial, sans-serif"'); // web fonts can't load inside an image
+  const vb = svg.viewBox.baseVal, W = vb.width, H = vb.height, TOP = 70, BOTTOM = 40, S = 2;
+  const font = '"Inter", "Segoe UI", system-ui, sans-serif';
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = W * S; c.height = (H + TOP + BOTTOM) * S;
+    const g = c.getContext('2d');
+    g.scale(S, S);
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H + TOP + BOTTOM);
+    g.fillStyle = '#126b60'; g.font = `700 20px ${font}`; g.fillText(placeName(level, p), 18, 30);
+    g.fillStyle = '#111827'; g.font = `600 14px ${font}`;
+    g.fillText(`${M[k].l} · ${ymLabel(keys[0])} – ${ymLabel(keys[keys.length - 1])}`, 18, 54);
+    g.drawImage(img, 0, TOP, W, H);
+    g.fillStyle = '#6b7280'; g.font = `11px ${font}`;
+    g.fillText(`Source: ${sourceLine(k, D.meta, D.meta.years || {})}`, 18, TOP + H + 18);
+    g.fillStyle = '#126b60'; g.font = `600 11px ${font}`;
+    g.textAlign = 'right'; g.fillText('Open Housing Atlas · cb2326.github.io/housing', W - 18, TOP + H + 18);
+    c.toBlob(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${placeName(level, p)} - ${M[k].l}`.replace(/[^\w\s.-]+/g, '').replace(/\s+/g, ' ').trim() + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }, 'image/png');
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src);
 }
 function niceStep(raw) {
   const p = Math.pow(10, Math.floor(Math.log10(raw || 1))), n = raw / p;
