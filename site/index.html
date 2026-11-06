@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://cb2326.github.io/housing/og.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23126b60'/%3E%3Cpath d='M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z' fill='none' stroke='%23e6f4f1' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M25 15v29M39 20v29' stroke='%238ccdc0' stroke-width='3.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   /* Crisp white: white panels, soft gray lines, indigo accent. */
@@ -32,6 +32,8 @@
     --accent: #126b60; --accent-soft: #e6f4f1; --warm: #f59e0b;
     --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 8px 24px -10px rgba(16, 24, 40, .18);
     --serif: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    /* The atlas's own voice: Fraunces (a soft serif) for the name, headings and place names; Inter for everything else */
+    --display: "Fraunces", Georgia, "Times New Roman", serif;
     --sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
     --na: #e5e7eb;
   }
@@ -126,6 +128,12 @@
   .zip-hint.show { display: block; }
   .zip-hint b { display: block; font-size: 15px; margin-bottom: 4px; }
   .zip-hint span { color: var(--muted); font-size: 13px; }
+  .zip-banner { position: absolute; left: 50%; top: 74px; transform: translateX(-50%); z-index: 520; background: var(--panel); border: 1px solid #8ccdc0; border-radius: 999px; padding: 6px 14px; box-shadow: var(--shadow); display: none; gap: 10px; align-items: baseline; font-size: 13px; white-space: nowrap; }
+  .zip-banner.show { display: flex; }
+  .zip-banner b { color: #06463f; }
+  .zip-banner span { color: var(--muted); font-size: 12px; }
+  .stage.panel-open .zip-banner { left: calc(50% + var(--pw) / 2); }
+  .pick-tip { font-size: 12px; }
   .zip-loading { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); z-index: 520; background: var(--text); color: #fff; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; display: none; }
   .zip-loading.show { display: block; }
   .brand h1, .legend h3, .drawer header h2, .sec h4, .tv-head h3, .kpi b { letter-spacing: -0.01em; }
@@ -209,6 +217,12 @@
   .timebar b { font: 700 20px var(--sans); color: var(--accent); min-width: 52px; text-align: center; }
   .timebar span { font-size: 11.5px; color: var(--muted); max-width: 140px; }
   .tplay { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; cursor: pointer; font-size: 13px; flex: none; }
+  .chart-src { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); }
+  .chart-src a { color: var(--accent); text-decoration: none; }
+  .chart-src a:hover { text-decoration: underline; }
+  .ov-pick { display: flex; align-items: center; gap: 8px; margin: 2px 0 6px; font-size: 12.5px; color: var(--muted); }
+  .ov-pick select { flex: 1; max-width: 340px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); font-size: 12.5px; color: #9c2f1c; }
+  .ov-x { border: 0; background: var(--panel-2); border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 11px; }
   .ctrl-right { display: flex; align-items: center; gap: 6px; }
   .dl-btn { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
   .dl-btn:hover { background: var(--accent-soft); }
@@ -317,6 +331,15 @@
   }
   .scrim { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, .3); z-index: 850; }
   .scrim.show { display: block; }
+  /* ---------- display font ---------- */
+  .brand h1 { font: 700 23px/1.05 var(--display); letter-spacing: -0.01em; font-optical-sizing: auto; }
+  .drawer header h2 { font-family: var(--display); font-weight: 700; letter-spacing: -0.01em; }
+  .drawer header h2 small { font-family: var(--sans); }
+  .mpick select { font-family: var(--display); font-weight: 600; }
+  .snap-h, .start h3, .afford h3, .legend h3, .tv-head h3, .sec h4 { font-family: var(--display); font-weight: 600; letter-spacing: 0; }
+  .snap-h small { font-family: var(--sans); }
+  .group > button { font-family: var(--display); font-weight: 600; font-size: 14.5px; }
+  .zip-hint b, .zip-banner b, .timebar b, .pc-result b { font-family: var(--display); }
 </style>
 </head>
 <body>
@@ -353,7 +376,8 @@
       <a class="pill-btn support-btn" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener" title="This map is free. If it helps you, you can support it on Ko-fi."><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span class="btxt">Support</span></a>
     </div>
     <div class="legend" id="legend"></div>
-    <div class="zip-hint" id="zipHint"><b>Zoom in to see ZIP codes</b><span>There are 32,000+ of them, so they appear once you zoom into a state, or search a ZIP code above.</span></div>
+    <div class="zip-hint" id="zipHint"><b>Pick a county to see its ZIP codes</b><span>Click any county on the map, or search a county or ZIP code above.</span></div>
+    <div class="zip-banner" id="zipBanner"></div>
     <div class="zip-loading" id="zipLoading">Loading ZIP codes…</div>
     <div class="tip" id="tip"></div>
     <section class="table-view" id="rankView" aria-label="Rankings">
@@ -588,7 +612,7 @@ const ymLabel = k => !k ? '' : String(k).length === 4 ? String(k) : `${MON[+k.sl
 // ---------- state ----------
 const saved = (() => { try { return JSON.parse(localStorage.getItem('hm-ui')) || {}; } catch (e) { return {}; } })();
 const ui = { scaleMode: saved.scaleMode === 'national' ? 'national' : 'view', metric: M[saved.metric] ? saved.metric : 'hv_yoy', level: ['state', 'metro', 'county', 'zip'].includes(saved.level) ? saved.level : 'county', open: new Set((saved.open || []).filter(n => GROUPS.some(g => g[0] === n))) };
-const saveUi = () => { try { localStorage.setItem('hm-ui', JSON.stringify({ metric: ui.metric, level: ui.level, open: [...ui.open], scaleMode: ui.scaleMode, labels: labelsOn, afford: aff, cmp: cmpList })); } catch (e) {} };
+const saveUi = () => { try { localStorage.setItem('hm-ui', JSON.stringify({ metric: ui.metric, level: ui.level, open: [...ui.open], scaleMode: ui.scaleMode, labels: labelsOn, afford: aff, cmp: cmpList, zipFocus })); } catch (e) {} };
 const D = { meta: null, state: null, metro: null, county: null, zip: {} };
 let topo, layers = {}, map, scale = null;
 
@@ -766,7 +790,7 @@ function styleFor(level, id) {
 }
 const dark = () => false; // Crisp white is a light theme everywhere
 function eachShape(level, fn) {
-  if (level === 'zip') Object.values(zipLayers).forEach(g => g.eachLayer(fn));
+  if (level === 'zip') { if (zipLayer) zipLayer.eachLayer(fn); }
   else if (layers[level]) layers[level].eachLayer(fn);
 }
 function restyle() {
@@ -817,7 +841,7 @@ const labelValue = (k, v) => v == null ? '—' : (M[k].d && v > 0 ? '+' : '') + 
 function updateLabels() {
   if (!labelLayer) return;
   labelLayer.clearLayers();
-  if (!labelsOn || (ui.level === 'zip' && map.getZoom() < ZIP_MIN_ZOOM)) return;
+  if (!labelsOn || (ui.level === 'zip' && !zipLayer)) return;
   const level = ui.level, k = ui.metric, size = map.getSize(), view = map.getBounds(), cand = [];
   eachShape(level, l => {
     const b = l._bb || (l._bb = l.getBounds());
@@ -860,14 +884,23 @@ function setLevel(level) {
   if (layers.stateLines) layers.stateLines.bringToFront();
   if (openPlace && openPlace.level !== level) closeDrawer();
   restyle(); saveUi();
-  if (level === 'zip') ensureZips(); else { zipHint.classList.remove('show'); }
+  if (level === 'zip') ensureZips();
+  else {
+    zipHint.classList.remove('show'); document.getElementById('zipBanner').classList.remove('show');
+    if (pickLayer) map.removeLayer(pickLayer);
+    if (zipLayer) { map.removeLayer(zipLayer); zipLayer = null; }
+  }
   if (time.on) { if (level === 'zip') stopTime(); else startTime(); }
 }
 
-// ---------- ZIP codes: loaded state by state as you zoom in ----------
-const zipLayers = {}, zipLoading = {}, zipHint = document.getElementById('zipHint');
-const ZIP_MIN_ZOOM = 6.5;
+// ---------- ZIP codes: one county at a time ----------
+// Like picking a county first: the ZIP view shows only the chosen county's ZIP codes (all 32,000 at once would be
+// unreadable). Counties stay outlined underneath, so clicking another county switches to it.
+const zipFeats = {}, zipLoading = {}, zipHint = document.getElementById('zipHint');
+let zipLayer = null, pickLayer = null, zipFocus = saved.zipFocus || null;
 const abbrOf = fips => D.state[fips] && D.state[fips].s;
+// A ZIP belongs to the county holding most of its land; Connecticut's ZIPs still use its old counties.
+const inFocus = z => { const k = D.zip[z] && D.zip[z].k; return !!k && (k === zipFocus || CT_OLD_TO_NEW[k] === zipFocus); };
 // Shapes are stored as delta-encoded integers (1/10,000 of a degree) to keep the files small.
 function decodeShape(polys) {
   return { type: 'MultiPolygon', coordinates: polys.map(rings => rings.map(flat => {
@@ -877,8 +910,9 @@ function decodeShape(polys) {
   })) };
 }
 let zipPending = 0;
+// Loads one state's ZIP data and shapes (each state once).
 async function loadZipState(st) {
-  if (zipLayers[st]) return zipLayers[st];
+  if (zipFeats[st]) return true;
   if (zipLoading[st]) return zipLoading[st];
   zipPending++;
   document.getElementById('zipLoading').classList.add('show');
@@ -887,25 +921,52 @@ async function loadZipState(st) {
       const [recs, shapes] = await Promise.all([fetch(`data/zip/${st}.json`).then(r => r.json()), fetch(`data/zip/shapes/${st}.json`).then(r => r.json())]);
       for (const [z, rec] of Object.entries(recs)) { rec.s = st; rec.z = z; rec._id = z; D.zip[z] = rec; }
       if (HAS.has('afford')) computeAfford(Object.values(recs));
-      const feats = Object.entries(shapes).map(([z, polys]) => ({ type: 'Feature', id: z, properties: {}, geometry: decodeShape(polys) }));
-      zipLayers[st] = makeLayer('zip', feats);
-      if (ui.level === 'zip') { buildScale(); zipLayers[st].addTo(map); if (layers.stateLines) layers.stateLines.bringToFront(); if (selLayer) selLayer.bringToFront(); updateLabels(); }
-      if (tableOpen && ui.level === 'zip') renderTable();
-      return zipLayers[st];
-    } catch (e) { delete zipLoading[st]; return null; }
+      zipFeats[st] = Object.entries(shapes).map(([z, polys]) => ({ type: 'Feature', id: z, properties: {}, geometry: decodeShape(polys) }));
+      return true;
+    } catch (e) { delete zipLoading[st]; return false; }
     finally { if (--zipPending === 0) document.getElementById('zipLoading').classList.remove('show'); }
   })();
   return zipLoading[st];
 }
+// Draw the chosen county's ZIP codes.
+let zipGen = 0;
+async function showZipFocus() {
+  const gen = ++zipGen; // only the latest request draws (choosing quickly twice must not leave two layers)
+  if (zipLayer) { map.removeLayer(zipLayer); zipLayer = null; }
+  if (!zipFocus || ui.level !== 'zip') return;
+  const st = abbrOf(zipFocus.slice(0, 2));
+  if (!st || !(await loadZipState(st)) || ui.level !== 'zip' || gen !== zipGen) return;
+  const feats = zipFeats[st].filter(f => inFocus(f.id));
+  if (zipLayer) map.removeLayer(zipLayer);
+  zipLayer = makeLayer('zip', feats).addTo(map);
+  if (layers.stateLines) layers.stateLines.bringToFront();
+  if (selLayer) selLayer.bringToFront();
+  const c = D.county[zipFocus];
+  document.getElementById('zipBanner').innerHTML = `<b>${feats.length} ZIP codes in ${esc(c ? `${c.n}, ${c.s}` : 'this county')}</b><span>Click another county to switch</span>`;
+  document.getElementById('zipBanner').classList.add('show');
+  zipHint.classList.remove('show');
+  restyle();
+  if (tableOpen) renderTable();
+}
+async function setZipFocus(fips, zoom = true) {
+  zipFocus = fips; saveUi();
+  if (ui.level !== 'zip') setLevel('zip'); else await showZipFocus();
+  if (zoom && pickLayer) {
+    let bounds = null;
+    pickLayer.eachLayer(l => { if (dataId('county', l.feature.id) === fips) bounds = bounds ? bounds.extend(l.getBounds()) : l.getBounds(); });
+    const wide = innerWidth > 820, pw = drawer.classList.contains('open') ? Math.min(820, document.querySelector('.stage').clientWidth * 0.62) : 0;
+    if (bounds) map.flyToBounds(bounds, { paddingTopLeft: [wide ? pw + 40 : 30, wide ? 110 : 140], paddingBottomRight: wide ? [40, 40] : [30, 140] });
+  }
+}
 function ensureZips() {
   if (ui.level !== 'zip') return;
-  // Show only the loaded states that are on screen; load the rest when zoomed in far enough.
-  const view = map.getBounds(), near = map.getZoom() >= ZIP_MIN_ZOOM;
-  const visible = [];
-  layers.state.eachLayer(l => { const st = abbrOf(l.feature.id); if (st && view.intersects(l.getBounds())) visible.push(st); });
-  for (const [st, g] of Object.entries(zipLayers)) { if (visible.includes(st) && near) g.addTo(map); else map.removeLayer(g); }
-  zipHint.classList.toggle('show', !near);
-  if (near) visible.slice(0, 8).forEach(st => loadZipState(st));
+  if (pickLayer && !map.hasLayer(pickLayer)) { pickLayer.addTo(map); pickLayer.bringToBack(); }
+  if (!zipFocus) {
+    zipHint.classList.add('show');
+    document.getElementById('zipBanner').classList.remove('show');
+    return;
+  }
+  if (!zipLayer) showZipFocus();
 }
 document.getElementById('levels').addEventListener('click', e => { const b = e.target.closest('[data-level]'); if (b) setLevel(b.dataset.level); });
 
@@ -981,6 +1042,16 @@ async function init() {
   layers.county = makeLayer('county', counties);
   layers.metro = makeLayer('metro', metros);
   layers.state = makeLayer('state', states.filter(f => D.state[f.id]));
+  pickLayer = L.geoJSON(counties, {
+    style: { color: '#126b60', weight: 0.7, opacity: 0.55, fillColor: '#126b60', fillOpacity: 0.03 },
+    onEachFeature: (f, l) => {
+      l.on('mouseover', () => l.setStyle({ weight: 2, opacity: 0.9, fillOpacity: 0.1 }));
+      l.on('mouseout', () => l.setStyle({ weight: 0.7, opacity: 0.55, fillOpacity: 0.03 }));
+      l.on('click', () => setZipFocus(dataId('county', f.id)));
+      const c = D.county[dataId('county', f.id)];
+      if (c) l.bindTooltip(`${c.n}, ${c.s}: click to see its ZIP codes`, { sticky: true, direction: 'top', className: 'pick-tip' });
+    },
+  });
   layers.stateLines = L.geoJSON(topojson.mesh(topo, topo.objects.states, (a, b) => a !== b), { style: { color: '#111827', weight: 1.8, opacity: 0.85, fill: false }, interactive: false }).addTo(map);
   // After every pan or zoom: load ZIPs that came into view, and recolour (On screen colours and ZIP borders depend on the view).
   let moveTimer;
@@ -1038,8 +1109,14 @@ async function pick(h) {
   resultsEl.classList.remove('show');
   searchEl.value = h.label;
   searchEl.blur();
-  if (ui.level !== h.level) setLevel(h.level);
-  if (h.level === 'zip') await loadZipState(h.st);
+  if (h.level === 'county' && ui.level === 'zip') { setZipFocus(h.id); return; }
+  if (h.level === 'zip') {
+    await loadZipState(h.st);
+    const k = D.zip[h.id] && D.zip[h.id].k;
+    if (k) { zipFocus = dataId('county', k); saveUi(); }
+    if (ui.level !== 'zip') setLevel('zip');
+    await showZipFocus();
+  } else if (ui.level !== h.level) setLevel(h.level);
   zoomTo(h.level, h.id);
   openDetail(h.level, h.id);
 }
@@ -1216,13 +1293,14 @@ function renderDrawer() {
     <div class="ctrl-right"><div class="seg-sm">${[['5', '5Y'], ['10', '10Y'], ['20', '20Y'], ['all', 'All']].map(([r, l]) => `<button type="button" class="${chartRange === r ? 'on' : ''}" data-range="${r}">${l}</button>`).join('')}</div>
     ${skeys.length > 1 ? `<button type="button" class="dl-btn" data-export title="Download this chart as a PNG image" aria-label="Download chart as PNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14"/></svg><span>PNG</span></button>` : ''}</div></div>`;
   const chart = hist == null ? '<p class="note chart-empty">Loading history…</p>'
-    : skeys.length > 1 ? `<div class="chart" id="chart">${chartSvg(series, def)}<div class="ctip"></div></div>`
+    : skeys.length > 1 ? `<div class="chart" id="chart">${chartSvg(series, def, overlayKey && overlayKey !== k ? seriesFor(overlayKey, hist, p) : null, overlayKey && overlayKey !== k ? M[overlayKey] : null)}<div class="ctip"></div></div>`
     : `<div class="chart-empty"><b>${fmtV(k, v[k])}</b><span>${v[k] == null ? `No ${esc(def.l)} data for this place.` : 'Only one value so far, so there is no history to chart yet.'}</span></div>`;
   const asof = skeys.length ? ymLabel(skeys[skeys.length - 1]) : 'now';
   document.getElementById('dBody').innerHTML = `
     <div class="metric-head"><label class="mpick"><select id="mPick" aria-label="Data point">${options}</select></label>
       <div class="mnow"><b>${fmtV(k, v[k])}</b><span>${esc(asof)}</span></div></div>
     ${toggles}
+    ${skeys.length > 1 ? `<label class="ov-pick"><span>Compare with</span><select id="ovPick" aria-label="Compare with another data point"><option value="">— another data point —</option>${GROUPS.filter(([g, keys]) => keys.some(hasData)).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].filter(x => hasData(x) && x !== k).map(x => `<option value="${x}" ${x === overlayKey ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('')}</select>${overlayKey && overlayKey !== k ? '<button type="button" class="ov-x" data-ov-clear aria-label="Remove the second data point">✕</button>' : ''}</label>` : ''}
     ${chart}
     <h4 class="snap-h">At a glance</h4>
     <div class="kpis">${['hv', 'rent', 'school_score', 'dom', 'income', 'growth_score'].map(tile).join('')}</div>
@@ -1245,13 +1323,61 @@ document.getElementById('dBody').addEventListener('click', e => {
   const m = e.target.closest('[data-metric]'); if (m) { setMetric(m.dataset.metric); return; }
   const c = e.target.closest('[data-cmode]'); if (c) { chartMode = c.dataset.cmode; renderDrawer(); return; }
   const r = e.target.closest('[data-range]'); if (r) { chartRange = r.dataset.range; renderDrawer(); return; }
+  if (e.target.closest('[data-ov-clear]')) { overlayKey = ''; renderDrawer(); return; }
   if (e.target.closest('[data-export]')) exportChart();
 });
-document.getElementById('dBody').addEventListener('change', e => { if (e.target.id === 'mPick') setMetric(e.target.value); });
+document.getElementById('dBody').addEventListener('change', e => {
+  if (e.target.id === 'mPick') setMetric(e.target.value);
+  if (e.target.id === 'ovPick') { overlayKey = e.target.value; renderDrawer(); }
+});
+
+// Where each data point comes from: shown under every chart (and on downloaded images), with a link.
+const SRC = {
+  zillow: ['Zillow Research', 'https://www.zillow.com/research/data/'],
+  forecast: ['Zillow Home Value Forecast', 'https://www.zillow.com/research/data/'],
+  realtor: ['Realtor.com Research', 'https://www.realtor.com/research/data/'],
+  income: ['U.S. Census Bureau (SAIPE)', 'https://www.census.gov/programs-surveys/saipe.html'],
+  pop: ['U.S. Census Bureau (Population Estimates)', 'https://www.census.gov/programs-surveys/popest.html'],
+  age: ['U.S. Census Bureau (Population Estimates)', 'https://www.census.gov/programs-surveys/popest.html'],
+  acs: ['U.S. Census Bureau (American Community Survey)', 'https://www.census.gov/programs-surveys/acs'],
+  hmda: ['CFPB (HMDA)', 'https://ffiec.cfpb.gov/data-browser/'],
+  permits: ['U.S. Census Bureau (Building Permits Survey)', 'https://www.census.gov/construction/bps/'],
+  units: ['U.S. Census Bureau (Housing Unit Estimates, Building Permits)', 'https://www.census.gov/programs-surveys/popest.html'],
+  temp: ['NOAA (Climate Divisional Data)', 'https://www.ncei.noaa.gov/'],
+  votes: ['MIT Election Data and Science Lab', 'https://electionlab.mit.edu/'],
+  schools: ['U.S. Department of Education (EDFacts, NCES)', 'https://nces.ed.gov/ccd/'],
+  fema: ['FEMA (National Risk Index)', 'https://hazards.fema.gov/nri/'],
+  epa: ['EPA (Smart Location Database)', 'https://www.epa.gov/smartgrowth/smart-location-mapping'],
+  afford: ['Zillow Research, Freddie Mac (mortgage rates) and your budget', 'https://www.zillow.com/research/data/'],
+};
+// Data points worked out from more than one source.
+const EXTRA_SRC = {
+  mtg_pmt: 'Freddie Mac (mortgage rates)', mtg_pct_income: 'Freddie Mac, U.S. Census Bureau', salary_needed: 'Freddie Mac (mortgage rates)',
+  buy_vs_rent: 'Freddie Mac (mortgage rates)', hv_income: 'U.S. Census Bureau (income)', rent_pct_income: 'U.S. Census Bureau (income)',
+  prop_tax: 'Zillow Research (home values)', inv_pct_houses: 'U.S. Census Bureau (housing units)',
+};
+function sourceParts(k, keys) {
+  const [name, url] = SRC[M[k].src] || SRC.zillow;
+  const range = keys && keys.length ? `${ymLabel(keys[0])}–${ymLabel(keys[keys.length - 1])}` : '';
+  return { name: name + (EXTRA_SRC[k] ? `; ${EXTRA_SRC[k]}` : ''), url, range };
+}
+const sourceText = (k, keys) => { const s = sourceParts(k, keys); return `${s.name}${s.range ? ', ' + s.range : ''}`; };
+const sourceHtml = (k, keys) => { const s = sourceParts(k, keys); return `<a href="${s.url}" target="_blank" rel="noopener">${esc(s.name)}</a>${s.range ? ', ' + esc(s.range) : ''}`; };
+
+// A second data point drawn on the same chart (its own scale on the right), e.g. home value vs purchase applications.
+let overlayKey = '';
+// The second series' value for a point on the main chart: same month; or, when one of them has one value a year,
+// the same year (a monthly series uses its December, or its latest month that year).
+function valueAt(s, k) {
+  if (!s) return null;
+  if (s[k] != null) return s[k];
+  if (k.length === 4) { const ks = Object.keys(s).filter(x => x.startsWith(k + '-')).sort(); return ks.length ? (s[k + '-12'] ?? s[ks[ks.length - 1]]) : null; }
+  return s[k.slice(0, 4)] ?? null;
+}
 
 // History chart for the selected data point. Yearly = the same month each year (labelled), Monthly = every month.
-function chartSvg(series, def) {
-  const f = def.f;
+function chartSvg(series, def, s2, def2) {
+  const f = def.f, f2 = def2 && def2.f;
   let keys = Object.keys(series).sort();
   const last = keys[keys.length - 1];
   if (chartRange !== 'all') { const cut = `${+last.slice(0, 4) - +chartRange}${last.slice(4)}`; keys = keys.filter(k => k >= cut); }
@@ -1264,38 +1390,57 @@ function chartSvg(series, def) {
   }
   if (keys.length < 2) return '<p class="note">Not enough history for this range.</p>';
   const vals = keys.map(k => series[k]);
+  const vals2 = s2 ? keys.map(k => valueAt(s2, k)) : null;
+  const has2 = vals2 && vals2.filter(v => v != null).length >= 1;
   // Phones get a smaller drawing so the numbers stay readable once it is fitted to the screen.
   const narrow = innerWidth <= 820;
-  const W = narrow ? 400 : 760, H = narrow ? 290 : 380, L0 = narrow ? 50 : 62, R0 = narrow ? 12 : 18, T0 = 26, B0 = 28;
-  let lo = Math.min(...vals), hi = Math.max(...vals);
-  if (def.d) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
-  const pad = (hi - lo) * 0.1 || Math.abs(hi) * 0.05 || 1; lo -= pad; hi += pad;
-  if (!def.d && lo > 0 && lo < (hi - lo) * 0.3) lo = 0;
+  const W = narrow ? 400 : 760, H = narrow ? 290 : 380, L0 = narrow ? 50 : 62, R0 = has2 ? (narrow ? 46 : 62) : (narrow ? 12 : 18), T0 = has2 ? 40 : 26, B0 = 28;
+  const range = (vs, d) => {
+    let lo = Math.min(...vs), hi = Math.max(...vs);
+    if (d) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+    const pad = (hi - lo) * 0.1 || Math.abs(hi) * 0.05 || 1; lo -= pad; hi += pad;
+    if (!d && lo > 0 && lo < (hi - lo) * 0.3) lo = 0;
+    return [lo, hi];
+  };
+  const [lo, hi] = range(vals, def.d);
+  const [lo2, hi2] = has2 ? range(vals2.filter(v => v != null), def2.d) : [0, 1];
   const x = i => L0 + (W - L0 - R0) * i / (keys.length - 1), y = v => T0 + (H - T0 - B0) * (1 - (v - lo) / (hi - lo));
-  const step = niceStep((hi - lo) / 5);
-  const ticks = []; for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) ticks.push(Math.abs(t) < step / 1e6 ? 0 : t);
+  const y2 = v => T0 + (H - T0 - B0) * (1 - (v - lo2) / (hi2 - lo2));
+  const tickList = (a, b) => { const step = niceStep((b - a) / 5), t = []; for (let v = Math.ceil(a / step) * step; v <= b + 1e-9; v += step) t.push(Math.abs(v) < step / 1e6 ? 0 : v); return t; };
+  const ticks = tickList(lo, hi), ticks2 = has2 ? tickList(lo2, hi2) : [];
   const years = [...new Set(keys.map(k => k.slice(0, 4)))];
   const every = Math.ceil(years.length / (narrow ? 6 : 10));
   const yearly = chartMode === 'yearly' || keys[0].length === 4;
   const xt = keys.map((k, i) => [k, i]).filter(([k, i]) => yearly ? i % every === 0 || i === keys.length - 1 : k.endsWith('-01') && years.indexOf(k.slice(0, 4)) % every === 0);
   const path = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  // the second line skips gaps
+  const path2 = has2 ? vals2.map((v, i) => v == null ? '' : `${i && vals2[i - 1] != null ? 'L' : 'M'}${x(i).toFixed(1)},${y2(v).toFixed(1)}`).join('') : '';
   const base = def.d ? y(0) : H - B0;
   const area = `${path}L${x(vals.length - 1).toFixed(1)},${base}L${x(0)},${base}Z`;
-  const labels = yearly && keys.length <= (narrow ? 8 : 14);
-  const short = v => f === 'usd' ? fmt(v, 'usd', true) : f.startsWith('pct') ? (v < 0 ? '−' : '') + Math.abs(v).toFixed(Math.abs(hi - lo) < 3 ? 2 : 1) + '%' : f === 'ratio' ? v.toFixed(1) + '×' : fmt(v, f === 'days' ? 'num' : f, true);
+  const labels = !has2 && yearly && keys.length <= (narrow ? 8 : 14);
+  const shortF = (ff, a, b) => v => ff === 'usd' ? fmt(v, 'usd', true) : ff.startsWith('pct') ? (v < 0 ? '−' : '') + Math.abs(v).toFixed(Math.abs(b - a) < 3 ? 2 : 1) + '%' : ff === 'ratio' ? v.toFixed(1) + '×' : fmt(v, ff === 'days' ? 'num' : ff, true);
+  const short = shortF(f, lo, hi), short2 = has2 ? shortF(f2, lo2, hi2) : null;
   const first = vals[0], lastV = vals[vals.length - 1];
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.l)} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}" data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi })}'>
+  const C2 = '#e76f51';
+  const legend = has2 ? `<g font-size="12" font-weight="600"><circle cx="${L0 + 6}" cy="14" r="5" fill="var(--accent)"/><text x="${L0 + 16}" y="18" fill="var(--text)">${esc(def.l)} (left)</text>
+      <circle cx="${W / 2 + 10}" cy="14" r="5" fill="${C2}"/><text x="${W / 2 + 20}" y="18" fill="var(--text)">${esc(def2.l)} (right)</text></g>` : '';
+  const src = `Source: ${sourceHtml(ui.metric, keys)}${has2 ? ` · ${sourceHtml(overlayKey, Object.keys(s2).sort().filter(x => x.slice(0, 4) >= keys[0].slice(0, 4) && x.slice(0, 4) <= last.slice(0, 4)))}` : ''}`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.l)} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}"${has2 ? ` data-vals2='${JSON.stringify(vals2)}' data-f2="${f2}"` : ''} data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi, lo2, hi2 })}'>
     <defs><linearGradient id="cfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    ${legend}
     ${ticks.map(t => `<line x1="${L0}" x2="${W - R0}" y1="${y(t)}" y2="${y(t)}" stroke="${def.d && t === 0 ? '#374151' : 'var(--line)'}" stroke-width="${def.d && t === 0 ? 1.4 : 1}"/><text x="${L0 - 8}" y="${y(t) + 3.5}" text-anchor="end" font-size="11" fill="var(--muted)">${short(t)}</text>`).join('')}
-    ${xt.map(([k, i]) => `<text x="${x(i)}" y="${H - 7}" text-anchor="middle" font-size="11" fill="var(--muted)">${yearly ? k.slice(0, 4) : k.slice(0, 4)}</text>`).join('')}
+    ${ticks2.map(t => `<text x="${W - R0 + 8}" y="${y2(t) + 3.5}" text-anchor="start" font-size="11" fill="${C2}">${short2(t)}</text>`).join('')}
+    ${xt.map(([k, i]) => `<text x="${x(i)}" y="${H - 7}" text-anchor="middle" font-size="11" fill="var(--muted)">${k.slice(0, 4)}</text>`).join('')}
     <path d="${area}" fill="url(#cfill)"/>
     <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
     ${yearly ? vals.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="4.5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`).join('') : `<circle cx="${x(vals.length - 1)}" cy="${y(lastV)}" r="4.5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`}
+    ${has2 ? `<path d="${path2}" fill="none" stroke="${C2}" stroke-width="2.2" stroke-dasharray="6 4" stroke-linejoin="round"/>${yearly ? vals2.map((v, i) => v == null ? '' : `<circle cx="${x(i)}" cy="${y2(v)}" r="4" fill="${C2}" stroke="var(--panel)" stroke-width="2"/>`).join('') : ''}` : ''}
     ${labels ? vals.map((v, i) => `<text x="${x(i)}" y="${y(v) - 10}" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--text)" paint-order="stroke" stroke="var(--panel)" stroke-width="3">${short(v)}</text>`).join('') : ''}
     <line class="xh" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
     <circle class="xd" r="5" fill="var(--warm)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
     <rect x="${L0}" y="${T0}" width="${W - L0 - R0}" height="${H - T0 - B0}" fill="transparent"/>
-  </svg><p class="note" style="margin-top:4px">${ymLabel(keys[0])} → ${ymLabel(keys[keys.length - 1])}: ${fmtV(ui.metric, first)} → ${fmtV(ui.metric, lastV)}${!def.d && first > 0 ? ` (${signed((lastV / first - 1) * 100, 'pct')})` : ''}</p>`;
+  </svg><p class="note" style="margin-top:4px">${ymLabel(keys[0])} → ${ymLabel(keys[keys.length - 1])}: ${fmtV(ui.metric, first)} → ${fmtV(ui.metric, lastV)}${!def.d && first > 0 ? ` (${signed((lastV / first - 1) * 100, 'pct')})` : ''}</p>
+  <p class="chart-src">${src}</p>`;
 }
 // Download the chart as a PNG: the place and data point on top, the chart, then the source and this site's name.
 function exportChart() {
@@ -1319,10 +1464,10 @@ function exportChart() {
     g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H + TOP + BOTTOM);
     g.fillStyle = '#126b60'; g.font = `700 20px ${font}`; g.fillText(placeName(level, p), 18, 30);
     g.fillStyle = '#111827'; g.font = `600 14px ${font}`;
-    g.fillText(`${M[k].l} · ${ymLabel(keys[0])} – ${ymLabel(keys[keys.length - 1])}`, 18, 54);
+    g.fillText(`${M[k].l}${svg.dataset.vals2 && overlayKey ? ` vs ${M[overlayKey].l}` : ''} · ${ymLabel(keys[0])} – ${ymLabel(keys[keys.length - 1])}`, 18, 54);
     g.drawImage(img, 0, TOP, W, H);
     g.fillStyle = '#6b7280'; g.font = `11px ${font}`;
-    g.fillText(`Source: ${sourceLine(k, D.meta, D.meta.years || {})}`, 18, TOP + H + 18);
+    g.fillText(`Source: ${sourceText(k, keys)}${svg.dataset.vals2 && overlayKey ? ` · ${sourceParts(overlayKey).name}` : ''}`, 18, TOP + H + 18);
     g.fillStyle = '#126b60'; g.font = `600 11px ${font}`;
     g.textAlign = 'right'; g.fillText('Open Housing Atlas · cb2326.github.io/housing', W - 18, TOP + H + 18);
     c.toBlob(blob => {
@@ -1349,7 +1494,8 @@ document.getElementById('dBody').addEventListener('mousemove', e => {
   xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.setAttribute('visibility', 'visible');
   xd.setAttribute('cx', cx); xd.setAttribute('cy', cy); xd.setAttribute('visibility', 'visible');
   const t = svg.parentElement.querySelector('.ctip');
-  t.textContent = `${ymLabel(keys[i])}: ${fmt(vals[i], f)}`;
+  const v2s = svg.dataset.vals2 ? JSON.parse(svg.dataset.vals2) : null;
+  t.textContent = `${ymLabel(keys[i])}: ${fmt(vals[i], f)}` + (v2s && v2s[i] != null ? ` · ${fmt(v2s[i], svg.dataset.f2)}` : '');
   t.style.display = 'block'; t.style.left = (cx * r.width / d.W) + 'px'; t.style.top = (cy * r.height / d.H) + 'px';
 });
 document.getElementById('dBody').addEventListener('mouseleave', () => {
@@ -1367,7 +1513,7 @@ function renderTable() {
   const cols = [ui.metric, ...TABLE_COLS.filter(c => c !== ui.metric)];
   const k = sortKey && cols.includes(sortKey) ? sortKey : ui.metric;
   const q = document.getElementById('tvFilter').value.trim().toLowerCase();
-  let list = Object.entries(D[ui.level]).map(([id, p]) => ({ id, p, name: placeName(ui.level, p) })).filter(r => !q || r.name.toLowerCase().includes(q));
+  let list = Object.entries(D[ui.level]).filter(([id]) => ui.level !== 'zip' || inFocus(id)).map(([id, p]) => ({ id, p, name: placeName(ui.level, p) })).filter(r => !q || r.name.toLowerCase().includes(q));
   list.sort((a, b) => {
     const x = a.p.v[k], y = b.p.v[k];
     if (x == null && y == null) return a.name.localeCompare(b.name);
@@ -1375,10 +1521,10 @@ function renderTable() {
     return (x - y) * sortDir;
   });
   const shown = list.slice(0, 400);
-  document.getElementById('tvTitle').textContent = `${M[ui.metric].l} · ${ui.level === 'county' ? 'Counties' : ui.level === 'metro' ? 'Metros' : ui.level === 'zip' ? 'ZIP codes in the states you’ve opened' : 'States'}`;
+  document.getElementById('tvTitle').textContent = `${M[ui.metric].l} · ${ui.level === 'county' ? 'Counties' : ui.level === 'metro' ? 'Metros' : ui.level === 'zip' ? (zipFocus && D.county[zipFocus] ? `ZIP codes in ${D.county[zipFocus].n}, ${D.county[zipFocus].s}` : 'ZIP codes (pick a county first)') : 'States'}`;
   document.getElementById('tvScroll').innerHTML = `<table><thead><tr><th>Place</th>${cols.map(c => `<th data-sort="${c}" class="${c === k ? 'sorted' : ''}">${esc(M[c].l)}${c === k ? (sortDir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('')}</tr></thead><tbody>${
     shown.map(r => `<tr data-id="${r.id}"><td>${esc(r.name)}</td>${cols.map(c => `<td>${M[c].d ? signed(r.p.v[c], M[c].f) : fmt(r.p.v[c], M[c].f)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-  document.getElementById('tvFoot').textContent = (ui.level === 'zip' && !list.length ? 'Zoom into a state on the map (or search a ZIP) to list its ZIP codes · ' : '') + `${list.length} places${list.length > shown.length ? ` · showing the first ${shown.length} (filter to narrow)` : ''} · click a column to sort, a row to open it`;
+  document.getElementById('tvFoot').textContent = (ui.level === 'zip' && !list.length ? 'Pick a county on the map (or search a ZIP) to list its ZIP codes · ' : '') + `${list.length} places${list.length > shown.length ? ` · showing the first ${shown.length} (filter to narrow)` : ''} · click a column to sort, a row to open it`;
 }
 document.getElementById('tvScroll').addEventListener('click', e => {
   const th = e.target.closest('[data-sort]');
@@ -1623,7 +1769,7 @@ document.getElementById('rankScroll').addEventListener('click', async e => {
   const tr = e.target.closest('tr[data-rid]');
   if (!tr) return;
   const id = tr.dataset.rid;
-  if (ui.level === 'zip') await loadZipState(tr.dataset.st);
+  if (ui.level === 'zip') { await loadZipState(tr.dataset.st); const k = D.zip[id] && D.zip[id].k; if (k) { zipFocus = dataId('county', k); saveUi(); await showZipFocus(); } }
   zoomTo(ui.level, id); openDetail(ui.level, id);
 });
 
