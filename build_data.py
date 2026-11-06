@@ -1331,6 +1331,40 @@ def mortgage_rate():
     return monthly, weekly[-1][1], weekly[-1][0]
 
 
+def cpi_inflation():
+    """US consumer price inflation, % change from a year earlier, by month (BLS CPI-U, all items, not seasonally adjusted).
+    BLS's public API first (10 years per request), FRED as a backup; saved, so a failed download keeps the last copy."""
+    cached = load_dcache("cpi.json") or {}
+    index = {}
+    try:
+        for start in range(1999, THIS_YEAR + 1, 10):
+            body = json.dumps({"seriesid": ["CUUR0000SA0"], "startyear": str(start), "endyear": str(min(start + 9, THIS_YEAR))}).encode()
+            req = urllib.request.Request("https://api.bls.gov/publicAPI/v1/timeseries/data/", data=body,
+                                         headers={**PLAIN, "Content-Type": "application/json"})
+            res = json.loads(urllib.request.urlopen(req, timeout=60).read())
+            if res.get("status") != "REQUEST_SUCCEEDED":
+                raise ValueError(res.get("message"))
+            for d in res["Results"]["series"][0]["data"]:
+                if d["period"].startswith("M") and d["period"] != "M13" and num(d["value"]) is not None:
+                    index[f"{d['year']}-{d['period'][1:]}"] = num(d["value"])
+            time.sleep(1)
+    except Exception as e:
+        print(f"  (BLS CPI unavailable: {e}); trying FRED")
+        try:
+            data = fetch("https://fred.stlouisfed.org/graph/fredgraph.csv?id=CPIAUCNS", "fred_cpi.csv", PLAIN, timeout=40, tries=2)
+            index = {r[0][:7]: num(r[1]) for r in list(rows(data))[1:] if len(r) == 2 and num(r[1]) is not None}
+        except Exception as e2:
+            print(f"  (FRED CPI unavailable: {e2})")
+    yoy = {k: round((v / index[months_back(k, 12)] - 1) * 100, 2) for k, v in index.items() if index.get(months_back(k, 12))}
+    if len(yoy) < len(cached) * 0.9:
+        print("  CPI: keeping the saved copy")
+        return cached
+    yoy = dict(sorted(yoy.items()))
+    save_dcache("cpi.json", yoy)
+    print(f"  CPI inflation through {max(yoy) if yoy else None}")
+    return yoy
+
+
 # ---------- metric math ----------
 def latest(series):
     if not series:
@@ -1369,6 +1403,14 @@ def trend_gap(series, min_points=120):
     i_now = len(series) - 1
     fair = math.exp(my + slope * (i_now - mx))
     return (latest(series)[1] / fair - 1) * 100
+
+
+def house_rent(rent, ratio):
+    """Estimated rent for houses: a place's typical rent x its metro's house-to-all-homes rent ratio, month by month."""
+    if not rent or not ratio:
+        return None
+    out = {k: round(v * ratio[k]) for k, v in rent.items() if ratio.get(k)}
+    return out or None
 
 
 def window_extreme(series, start, end, fn):
@@ -1654,6 +1696,8 @@ def main():
     hmda, hmda_year_ = hmda_years(county_to_cbsa)
     print("Mortgage rate")
     rate_hist, rate, rate_day = mortgage_rate()
+    print("Inflation (CPI)")
+    cpi = cpi_inflation()
 
     print("Zillow")
     LV = (("county", "County"), ("metro", "Metro"), ("state", "State"))
@@ -1706,6 +1750,14 @@ def main():
     for cbsa, v in forecast.items():
         fc_hist.setdefault(cbsa, {})[zillow_month] = round(v, 2)
     save_dcache("forecast.json", fc_hist)
+    # Rent for houses: Zillow publishes single-family rents for metros only. Counties and ZIP codes get an estimate:
+    # their own typical rent x their metro's house-to-all-homes rent ratio for the same month.
+    rent_ratio = {}
+    for cbsa, rec in zrs["metro"].items():
+        allr = (zr["metro"].get(cbsa) or {}).get("series") or {}
+        r = {k: v / allr[k] for k, v in (rec.get("series") or {}).items() if v and allr.get(k)}
+        if r:
+            rent_ratio[cbsa] = r
 
     # ----- yearly data points for every place -----
     metro_counties = {}
@@ -1880,8 +1932,9 @@ def main():
         z = srcs(zv, lvl, pid)
         yearly_tax(a, z)
         fc_series = state_fc.get(pid) if lvl == "state" else fc_hist.get(fc_key)
+        rs = srcs(zrs, lvl, pid) or (house_rent(srcs(zr, lvl, pid), rent_ratio.get(fc_key)) if lvl == "county" else None)
         m = metrics_for(z, srcs(zr, lvl, pid), rt[lvl].get(pid), la.get("income"), rate, (fc_series or {}).get(zillow_month),
-                        srcs(zs, lvl, pid), srcs(zc, lvl, pid), srcs(zrs, lvl, pid), la.get("units"), la.get("prop_tax_rate"))
+                        srcs(zs, lvl, pid), srcs(zc, lvl, pid), rs, la.get("units"), la.get("prop_tax_rate"))
         xs = {key: srcs(zx[key], lvl, pid) for key in ZILLOW_EXTRA}
         m.update(extra_metrics(xs))
         v = {**{k: x for k, x in la.items() if k not in ("prop_tax",)}, **m}
@@ -1889,10 +1942,12 @@ def main():
             return
         places[lvl][pid] = {"n": name, "s": st, "v": v, **extra}
         b = {}
-        for key, src in (("hv", zv), ("sfr", zs), ("condo", zc), ("rent", zr), ("rent_sfr", zrs)):
+        for key, src in (("hv", zv), ("sfr", zs), ("condo", zc), ("rent", zr)):
             s = srcs(src, lvl, pid)
             if s:
                 b[key] = trim_series(s, HSTART)
+        if rs:
+            b["rent_sfr"] = trim_series(rs, HSTART)
         rr = rt[lvl].get(pid)
         if rr:
             for k in ("inv", "dom", "cut", "lp", "newl", "pend"):
@@ -1946,6 +2001,7 @@ def main():
                   "votes": vote_year, "acs": acs_year, "hmda": hmda_year_, "schools": max(sscores) if sscores else None,
                   "school_list": sdir_year, "hazards": haz.get("ver"), "walk": 2021, "jobs": max(qcew) if qcew else None},
         "mortgage": {"rate": rate, "date": rate_day, "history": trim_series(rate_hist, "2000-01")},
+        "cpi": {k: v for k, v in cpi.items() if k >= "2000-01"},
         "counts": {k: len(v) for k, v in places.items()},
     }
     for lvl, ps in places.items():
@@ -1962,7 +2018,7 @@ def main():
     del zv, zs, zc, zr, zrs, rt, hist, A, R
     zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared,
                                        srat["zip"], zip_schools, haz.get("zip", {}), haz_year, walk.get("zip", {}),
-                                       flood.get("zip") or {}, noise.get("zip") or {})
+                                       flood.get("zip") or {}, noise.get("zip") or {}, rent_ratio)
     meta["counts"]["zip"] = zip_count
     meta["zipBreaks"] = zip_breaks
     write_json(os.path.join(OUT, "meta.json"), meta)
@@ -2286,7 +2342,7 @@ ZIP_RANKINGS = {
 
 
 def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared, zip_school_scores, zip_schools,
-               zip_haz, haz_year, zip_walk, zip_claims, zip_noise):
+               zip_haz, haz_year, zip_walk, zip_claims, zip_noise, rent_ratio):
     print("ZIP codes: Zillow, Realtor.com, Census shapes")
     # Zillow's own ZIP forecasts, saved each run to build up a history (the chart uses the metro's until there are two).
     zfc_raw, _ = zillow_zip("zhvf_growth/Zip_zhvf_growth_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
@@ -2358,7 +2414,8 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
                 hv = hv_d.get(f"{y}-12") or latest({k: v for k, v in hv_d.items() if k <= f"{y}-12"})[1]
                 if hv:
                     a.setdefault("prop_tax", {})[y] = tidy(hv * r / 100)
-        v = metrics_for(hv_d, rent_d, rt_d, income, rate, fc_now, sfr_d, condo_d, None, la.get("units"), la.get("prop_tax_rate"))
+        rs_d = house_rent(rent_d, rent_ratio.get(county_to_cbsa.get(county)))
+        v = metrics_for(hv_d, rent_d, rt_d, income, rate, fc_now, sfr_d, condo_d, rs_d, la.get("units"), la.get("prop_tax_rate"))
         if not v:
             continue
         v.update({k: x for k, x in la.items() if k not in ("prop_tax",)})
@@ -2374,7 +2431,7 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
         for k, x in v.items():
             all_vals.setdefault(k, []).append(x)
         b = {}
-        for key, d, start in (("hv", hv_d, "2008-01"), ("sfr", sfr_d, "2008-01"), ("condo", condo_d, "2008-01"), ("rent", rent_d, "2015-01")):
+        for key, d, start in (("hv", hv_d, "2008-01"), ("sfr", sfr_d, "2008-01"), ("condo", condo_d, "2008-01"), ("rent", rent_d, "2015-01"), ("rent_sfr", rs_d, "2015-01")):
             if d:
                 b[key] = compact(d, start)
         if rt_d:
