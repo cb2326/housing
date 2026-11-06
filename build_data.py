@@ -1127,17 +1127,21 @@ def flood_insurance():
     base = "https://www.fema.gov/api/open/"
     res = {"built": date.today().isoformat()[:7], "pen": {}, "county": {}, "zip": {}}
     try:
-        d = json.loads(fetch(base + "v1/NfipResidentialPenetrationRates?" + urlencode({"$top": 10000}), "fema_pen.json", PLAIN, timeout=240))
+        d = json.loads(fetch(base + "v1/NfipResidentialPenetrationRates?" + urlencode({"$top": 10000}), "fema_pen.json", PLAIN, timeout=240, tries=6))
         for rec in d.get("NfipResidentialPenetrationRates", []):
             f = (rec.get("fipsCode") or "").zfill(5)
             if f[:2] in STATES:
                 res["pen"][f] = [rec.get("resContractsInForce") or 0, rec.get("resContractsInForceSfha") or 0,
                                  rec.get("totalResStructures") or 0, rec.get("totalResStructuresSfha") or 0]
+    except Exception as e:
+        print(f"  (FEMA flood-zone shares unavailable: {e})")
+    try:
         skip = 0
         while True:
             q = urlencode({"$select": "countyCode,reportedZipCode,yearOfLoss,amountPaidOnBuildingClaim,amountPaidOnContentsClaim",
                            "$filter": "yearOfLoss ge 2000", "$top": 10000, "$skip": skip, "$orderby": "id"})
-            d = json.loads(fetch(base + "v3/NfipClaims?" + q, f"fema_claims_{skip}.json", PLAIN, timeout=300))
+            d = json.loads(fetch(base + "v3/NfipClaims?" + q, f"fema_claims_{skip}.json", PLAIN, timeout=300, tries=8))
+            time.sleep(0.5)  # be gentle with FEMA's servers
             batch = d.get("NfipClaims", [])
             for c in batch:
                 y = c.get("yearOfLoss")
@@ -1154,8 +1158,12 @@ def flood_insurance():
             skip += len(batch)
         print(f"  FEMA flood insurance: {len(res['pen']):,} counties, {skip + len(batch):,} claims")
     except Exception as e:
-        print(f"  (FEMA flood insurance unavailable: {e})")
-        return cached or {}
+        # Claims didn't finish: use the last complete set if there is one, and try again next run (nothing saved).
+        print(f"  (FEMA flood claims unavailable: {e})")
+        res["county"], res["zip"] = (cached or {}).get("county", {}), (cached or {}).get("zip", {})
+        if not res["pen"]:
+            res["pen"] = (cached or {}).get("pen", {})
+        return res
     for lvl in ("county", "zip"):
         for k, ys in res[lvl].items():
             for y in ys:
@@ -1770,17 +1778,18 @@ def main():
                         a.setdefault(g, {})[y] = round((v / s_[str(int(y) - 1)] - 1) * 100, 2)
     # flood insurance: shares of homes in high-risk zones and insured (counts add up to metros and states), and claims
     flood_year = (flood.get("built") or str(THIS_YEAR))[:4]
-    groups_of = {"county": {f: [f] for f in flood.get("pen", {})}, "metro": metro_counties, "state": {}}
-    for f in flood.get("pen", {}):
+    pen = flood.get("pen") or {}
+    groups_of = {"county": {f: [f] for f in pen}, "metro": metro_counties, "state": {}}
+    for f in pen:
         groups_of["state"].setdefault(f[:2], []).append(f)
     for lvl, groups in groups_of.items():
         for pid, members in groups.items():
-            tot = [sum(flood["pen"][c][i] for c in members if c in flood["pen"]) for i in range(4)]
+            tot = [sum(pen[c][i] for c in members if c in pen) for i in range(4)]
             if tot[2]:
                 a = A[lvl].setdefault(pid, {})
                 a["flood_ins_pct"] = {flood_year: round(tot[0] / tot[2] * 100, 2)}
                 a["flood_zone_pct"] = {flood_year: round(tot[3] / tot[2] * 100, 2)}
-    claims_county = flood.get("county", {})
+    claims_county = flood.get("county") or {}
     by_state_all = {}
     for f in A["county"]:
         by_state_all.setdefault(f[:2], []).append(f)
@@ -1953,7 +1962,7 @@ def main():
     del zv, zs, zc, zr, zrs, rt, hist, A, R
     zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared,
                                        srat["zip"], zip_schools, haz.get("zip", {}), haz_year, walk.get("zip", {}),
-                                       flood.get("zip", {}), noise.get("zip", {}))
+                                       flood.get("zip") or {}, noise.get("zip") or {})
     meta["counts"]["zip"] = zip_count
     meta["zipBreaks"] = zip_breaks
     write_json(os.path.join(OUT, "meta.json"), meta)
