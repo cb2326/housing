@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Housing Map</title>
-<meta name="description" content="US housing market map: home values, forecasts, inventory, rents, income and population by state, metro and county.">
-<meta name="theme-color" content="#4f46e5">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234f46e5'/%3E%3Cpath d='M14 34 32 18l18 16v14a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2z' fill='%23f6efe3'/%3E%3Cpath d='M26 50V38h12v12' fill='%23a5b4fc'/%3E%3C/svg%3E">
+<title>Open Housing Atlas</title>
+<meta name="description" content="Open Housing Atlas: a free map of US housing data. Home values, forecasts, listings, rents, schools, income and population by state, metro, county and ZIP code.">
+<meta name="theme-color" content="#126b60">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23126b60'/%3E%3Cpath d='M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z' fill='none' stroke='%23e6f4f1' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M25 15v29M39 20v29' stroke='%238ccdc0' stroke-width='3.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -15,7 +15,7 @@
   :root {
     color-scheme: light;
     --bg: #f5f6f8; --panel: #ffffff; --panel-2: #f3f4f6; --line: #e5e7eb; --text: #111827; --muted: #6b7280;
-    --accent: #4f46e5; --accent-soft: #eef2ff; --warm: #f59e0b;
+    --accent: #126b60; --accent-soft: #e6f4f1; --warm: #f59e0b;
     --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 8px 24px -10px rgba(16, 24, 40, .18);
     --serif: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
     --sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
@@ -51,6 +51,15 @@
   .metric.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .metric .info { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted); font: 600 11px/16px var(--serif); text-align: center; background: var(--panel); }
   .metric .info:hover { color: var(--accent); border-color: var(--accent); }
+  .start { padding: 4px 8px 10px; }
+  .start h3 { margin: 2px 0 7px; font: 600 13px var(--sans); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; cursor: pointer; }
+  .chip:hover { border-color: #8ccdc0; }
+  .chip.on { background: var(--accent-soft); border-color: #8ccdc0; color: #06463f; font-weight: 600; }
+  .group > button span { display: inline-flex; align-items: center; gap: 8px; }
+  .gi { width: 17px; height: 17px; color: var(--accent); flex: none; }
+  .group .dot { width: 7px; height: 7px; border-radius: 50%; background: #e76f51; display: inline-block; }
   .side-foot { padding: 10px 16px 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
   .side-foot a { color: inherit; }
 
@@ -75,14 +84,14 @@
   .pill-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 9px 14px; cursor: pointer; font-weight: 600; box-shadow: var(--shadow); display: inline-flex; gap: 7px; align-items: center; }
   .pill-btn.on { border-color: var(--accent); color: var(--accent); }
   .pill-btn svg { width: 16px; height: 16px; }
-  /* Support (Ko-fi) links: a soft rose so they stand out from the indigo controls without shouting */
-  .support-btn { color: #be123c; border-color: #fecdd3; background: #fff1f2; text-decoration: none; }
-  .support-btn:hover { background: #ffe4e6; }
-  .side-support { display: flex; align-items: center; gap: 10px; margin: 0 14px 10px; padding: 9px 12px; border-radius: 12px; background: #fff1f2; border: 1px solid #fecdd3; color: #9f1239; text-decoration: none; }
-  .side-support:hover { background: #ffe4e6; }
-  .side-support svg { width: 20px; height: 20px; flex: none; color: #e11d48; }
+  /* Support (Ko-fi) links: soft coral, so they stand out from the teal controls without shouting */
+  .support-btn { color: #9c2f1c; border-color: #f6b89b; background: #fbe9e3; text-decoration: none; }
+  .support-btn:hover { background: #f8dccf; }
+  .side-support { display: flex; align-items: center; gap: 10px; margin: 0 14px 10px; padding: 9px 12px; border-radius: 12px; background: #fbe9e3; border: 1px solid #f6b89b; color: #7a2a17; text-decoration: none; }
+  .side-support:hover { background: #f8dccf; }
+  .side-support svg { width: 20px; height: 20px; flex: none; color: #e76f51; }
   .side-support b { display: block; font-size: 13px; }
-  .side-support small { display: block; font-size: 12px; color: #be123c; }
+  .side-support small { display: block; font-size: 12px; color: #9c2f1c; }
   .menu-btn { display: none; }
 
   .legend { position: absolute; right: 14px; bottom: 22px; z-index: 500; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 8px; box-shadow: var(--shadow); width: 300px; max-width: calc(100% - 28px); }
@@ -251,13 +260,13 @@
 <div class="app">
   <aside class="side" id="side" aria-label="Data points">
     <div class="brand">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#4f46e5"/><path d="M14 34 32 18l18 16v14a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2z" fill="#f6efe3"/><path d="M26 50V38h12v12" fill="#a5b4fc"/></svg>
-      <div><h1>Housing Map</h1><small class="byline">by Chris B</small><small id="asof">Loading data…</small></div>
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#126b60"/><path d="M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z" fill="none" stroke="#e6f4f1" stroke-width="3.5" stroke-linejoin="round"/><path d="M25 15v29M39 20v29" stroke="#8ccdc0" stroke-width="3.5"/></svg>
+      <div><h1>Open Housing Atlas</h1><small class="byline">by Chris B · free</small><small id="asof">Loading data…</small></div>
     </div>
     <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="dpSearch" type="search" placeholder="Search data points" aria-label="Search data points"></label>
+      <input id="dpSearch" type="search" placeholder="Find a data point" aria-label="Find a data point"></label>
     <div class="groups" id="groups"></div>
-    <a class="side-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span><b>Enjoying this free map?</b><small>Support it on Ko-fi</small></span></a>
+    <a class="side-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span><b>Support on Ko-fi</b><small>Keep this atlas free for everyone</small></span></a>
     <div class="side-foot">Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, CFPB (HMDA), NOAA, MIT Election Lab, Freddie Mac. Updated twice a month. Personal use; not financial advice.</div>
   </aside>
   <main class="stage">
@@ -266,7 +275,7 @@
       <button class="pill-btn menu-btn" id="menuBtn" type="button" aria-label="Data points"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Data</button>
       <div class="place-search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input id="placeSearch" type="search" placeholder="Search a state, metro, county or ZIP" autocomplete="off" aria-label="Search places">
+        <input id="placeSearch" type="search" placeholder="City, county, metro, state or ZIP" autocomplete="off" aria-label="Search places">
         <div class="results" id="results"></div>
       </div>
       <div class="seg" id="levels" role="tablist" aria-label="Map level">
@@ -289,7 +298,7 @@
       <header><h2 id="dTitle"></h2><button class="x" id="dClose" type="button" aria-label="Close">✕</button></header>
       <div class="body" id="dBody"></div>
     </aside>
-    <div class="loading" id="loading">Loading the map…</div>
+    <div class="loading" id="loading">Loading the atlas…</div>
   </main>
 </div>
 <div class="scrim" id="scrim"></div>
@@ -303,138 +312,150 @@
 // d: diverging scale centred on 0 (else light-to-dark). src: where it comes from (shown under the legend).
 const M = {
   // home prices (Zillow)
-  hv:            { l: 'Home Value', f: 'usd', src: 'zillow', i: 'Typical home value (Zillow Home Value Index, mid-tier homes of all kinds).' },
-  hv_yoy:        { l: 'Home Value Growth (YoY)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical home value over the last 12 months.' },
-  hv_mom:        { l: 'Home Value Growth (MoM)', f: 'pct2', d: 1, src: 'zillow', i: 'Change in typical home value over the last month.' },
-  hv_5y:         { l: 'Home Value Growth (5-Year)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical home value over the last 5 years.' },
-  fc_1y:         { l: 'Home Price Forecast (1-Year)', f: 'pct', d: 1, src: 'forecast', i: "Zillow's forecast for home values 12 months ahead. Zillow publishes it for metros and ZIP codes; counties show their metro's, and states an average of their metros weighted by population. The chart shows Zillow's past forecasts (saved copies go back to 2022)." },
-  overvalued:    { l: 'Overvalued %', f: 'pct', d: 1, src: 'zillow', i: "How far today's home value sits above (+) or below (−) its long-term 2000–2019 trend line, extended to today. A rough gauge, not a prediction." },
-  from_2022_peak:{ l: '% Change from 2022 Peak', f: 'pct', d: 1, src: 'zillow', i: "Today's home value compared with its highest month in 2022." },
-  crash_2007:    { l: '% Crash from 2007–12', f: 'pct', d: 1, src: 'zillow', i: 'Drop from the 2005–08 peak to the 2008–13 low during the last housing crash. The chart shows the slide from the peak.' },
-  hv_income:     { l: 'Home Value / Income Ratio', f: 'ratio', src: 'zillow', i: 'Typical home value divided by median household income. Around 3 to 4 has historically been considered affordable.' },
-  sfr:           { l: 'Single Family Value', f: 'usd', src: 'zillow', i: 'Typical value of single-family houses only (Zillow).' },
-  sfr_yoy:       { l: 'Single Family Value Growth (YoY)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical single-family house value over the last 12 months.' },
-  condo:         { l: 'Condo Value', f: 'usd', src: 'zillow', i: 'Typical value of condos and co-ops (Zillow).' },
-  condo_yoy:     { l: 'Condo Value Growth (YoY)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical condo value over the last 12 months.' },
-  mtg_pmt:       { l: 'Mortgage Payment', f: 'usd', src: 'zillow', i: 'Monthly principal and interest on the typical home: 20% down, 30-year fixed at the national rate of the time. Taxes and insurance not included.' },
-  mtg_pct_income:{ l: 'Mtg Payment as % of Income', f: 'pct', src: 'zillow', i: 'The mortgage payment above as a share of median household income.' },
-  salary_needed: { l: 'Salary to Afford a House', f: 'usd', src: 'zillow', i: 'Yearly income at which the mortgage payment above is 30% of gross pay.' },
-  prop_tax:      { l: 'Property Tax Annual', f: 'usd', src: 'acs', i: 'Yearly property tax on the typical home: the local tax rate below times the typical home value.' },
-  prop_tax_rate: { l: 'Property Tax Rate', f: 'pct2', src: 'acs', i: 'Median property tax paid by homeowners divided by the median home value they report (Census American Community Survey).' },
-  buy_vs_rent:   { l: 'Buy v Rent Differential', f: 'usd', d: 1, src: 'zillow', i: 'Mortgage payment minus typical rent, per month. Positive means owning costs more than renting.' },
+  hv:            { l: 'Home value', f: 'usd', src: 'zillow', i: 'Typical home value (Zillow Home Value Index, mid-tier homes of all kinds).' },
+  hv_yoy:        { l: 'Price change (1 year)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical home value over the last 12 months.' },
+  hv_mom:        { l: 'Price change (1 month)', f: 'pct2', d: 1, src: 'zillow', i: 'Change in typical home value over the last month.' },
+  hv_5y:         { l: 'Price change (5 years)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical home value over the last 5 years.' },
+  fc_1y:         { l: 'Price forecast (next 12 months)', f: 'pct', d: 1, src: 'forecast', i: "Zillow's forecast for home values 12 months ahead. Zillow publishes it for metros and ZIP codes; counties show their metro's, and states an average of their metros weighted by population. The chart shows Zillow's past forecasts (saved copies go back to 2022)." },
+  overvalued:    { l: 'Above or below long-term trend', f: 'pct', d: 1, src: 'zillow', i: "How far today's home value sits above (+) or below (−) its long-term 2000–2019 trend line, extended to today. A rough gauge, not a prediction." },
+  from_2022_peak:{ l: 'Change since the 2022 peak', f: 'pct', d: 1, src: 'zillow', i: "Today's home value compared with its highest month in 2022." },
+  crash_2007:    { l: 'Drop in the 2007–12 crash', f: 'pct', d: 1, src: 'zillow', i: 'Drop from the 2005–08 peak to the 2008–13 low during the last housing crash. The chart shows the slide from the peak.' },
+  hv_income:     { l: 'Price-to-income ratio', f: 'ratio', src: 'zillow', i: 'Typical home value divided by median household income. Around 3 to 4 has historically been considered affordable.' },
+  sfr:           { l: 'Single-family home value', f: 'usd', src: 'zillow', i: 'Typical value of single-family houses only (Zillow).' },
+  sfr_yoy:       { l: 'Single-family price change (1 year)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical single-family house value over the last 12 months.' },
+  condo:         { l: 'Condo value', f: 'usd', src: 'zillow', i: 'Typical value of condos and co-ops (Zillow).' },
+  condo_yoy:     { l: 'Condo price change (1 year)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical condo value over the last 12 months.' },
+  mtg_pmt:       { l: 'Monthly mortgage payment', f: 'usd', src: 'zillow', i: 'Monthly principal and interest on the typical home: 20% down, 30-year fixed at the national rate of the time. Taxes and insurance not included.' },
+  mtg_pct_income:{ l: 'Mortgage as % of income', f: 'pct', src: 'zillow', i: 'The mortgage payment above as a share of median household income.' },
+  salary_needed: { l: 'Income needed to buy', f: 'usd', src: 'zillow', i: 'Yearly income at which the mortgage payment above is 30% of gross pay.' },
+  prop_tax:      { l: 'Property tax per year', f: 'usd', src: 'acs', i: 'Yearly property tax on the typical home: the local tax rate below times the typical home value.' },
+  prop_tax_rate: { l: 'Property tax rate', f: 'pct2', src: 'acs', i: 'Median property tax paid by homeowners divided by the median home value they report (Census American Community Survey).' },
+  buy_vs_rent:   { l: 'Owning vs renting: monthly gap', f: 'usd', d: 1, src: 'zillow', i: 'Mortgage payment minus typical rent, per month. Positive means owning costs more than renting.' },
   // market trends (Realtor.com)
-  inv:           { l: 'For Sale Inventory', f: 'num', src: 'realtor', i: 'Active listings for sale (Realtor.com).' },
-  inv_yoy:       { l: 'Sale Inventory Growth (YoY)', f: 'pct', d: 1, src: 'realtor', i: 'Change in active listings versus the same month last year.' },
-  inv_mom:       { l: 'Sale Inventory Growth (MoM)', f: 'pct', d: 1, src: 'realtor', i: 'Change in active listings versus last month.' },
-  inv_vs_2019:   { l: 'Inventory Surplus/Deficit', f: 'pct', d: 1, src: 'realtor', i: 'Active listings compared with the same month in 2017–2019. Negative means a shortage versus normal.' },
-  sales:         { l: 'Home Sales', f: 'num', src: 'realtor', i: 'Homes under contract (pending sales) this month, from Realtor.com: the most up-to-date count of sales for every place.' },
-  sales_yoy:     { l: 'Home Sales Growth (YoY)', f: 'pct', d: 1, src: 'realtor', i: 'Change in pending home sales versus the same month last year.' },
-  sales_vs_2019: { l: 'Home Sales Surplus/Deficit', f: 'pct', d: 1, src: 'realtor', i: 'Pending home sales compared with the same month in 2017–2019.' },
-  cut:           { l: 'Price Cut %', f: 'pct', src: 'realtor', i: 'Share of active listings with a price reduction this month.' },
-  dom:           { l: 'Days on Market', f: 'days', src: 'realtor', i: 'Median days homes stay listed (Realtor.com).' },
-  dom_yoy:       { l: 'Days on Market Growth (YoY)', f: 'pct', d: 1, src: 'realtor', i: 'Change in median days on market versus a year ago.' },
-  inv_pct_houses:{ l: 'Inventory as % of Houses', f: 'pct2', src: 'realtor', i: 'Active listings as a share of all housing units (Census estimates).' },
-  lp:            { l: 'Median Listing Price', f: 'usd', src: 'realtor', i: 'Median asking price of active listings.' },
-  lp_yoy:        { l: 'Median Listing Price (YoY)', f: 'pct', d: 1, src: 'realtor', i: 'Change in median asking price versus a year ago.' },
-  newl:          { l: 'New Listing Count', f: 'num', src: 'realtor', i: 'Homes newly listed for sale this month.' },
-  newl_yoy:      { l: 'New Listing Count (YoY)', f: 'pct', d: 1, src: 'realtor', i: 'Change in new listings versus the same month last year.' },
-  months_supply: { l: 'Listings per Pending Sale', f: 'ratio', src: 'realtor', i: 'Active listings divided by pending sales: a rough months-of-supply gauge. Higher favours buyers.' },
+  inv:           { l: 'Homes for sale', f: 'num', src: 'realtor', i: 'Active listings for sale (Realtor.com).' },
+  inv_yoy:       { l: 'Listings change (1 year)', f: 'pct', d: 1, src: 'realtor', i: 'Change in active listings versus the same month last year.' },
+  inv_mom:       { l: 'Listings change (1 month)', f: 'pct', d: 1, src: 'realtor', i: 'Change in active listings versus last month.' },
+  inv_vs_2019:   { l: 'Listings vs 2017–19 normal', f: 'pct', d: 1, src: 'realtor', i: 'Active listings compared with the same month in 2017–2019. Negative means a shortage versus normal.' },
+  sales:         { l: 'Homes going under contract', f: 'num', src: 'realtor', i: 'Homes under contract (pending sales) this month, from Realtor.com: the most up-to-date count of sales for every place.' },
+  sales_yoy:     { l: 'Sales change (1 year)', f: 'pct', d: 1, src: 'realtor', i: 'Change in pending home sales versus the same month last year.' },
+  sales_vs_2019: { l: 'Sales vs 2017–19 normal', f: 'pct', d: 1, src: 'realtor', i: 'Pending home sales compared with the same month in 2017–2019.' },
+  cut:           { l: 'Listings with a price cut', f: 'pct', src: 'realtor', i: 'Share of active listings with a price reduction this month.' },
+  dom:           { l: 'Days to sell', f: 'days', src: 'realtor', i: 'Median days homes stay listed (Realtor.com).' },
+  dom_yoy:       { l: 'Days to sell change (1 year)', f: 'pct', d: 1, src: 'realtor', i: 'Change in median days on market versus a year ago.' },
+  inv_pct_houses:{ l: 'Listings as % of all homes', f: 'pct2', src: 'realtor', i: 'Active listings as a share of all housing units (Census estimates).' },
+  lp:            { l: 'Asking price (median)', f: 'usd', src: 'realtor', i: 'Median asking price of active listings.' },
+  lp_yoy:        { l: 'Asking price change (1 year)', f: 'pct', d: 1, src: 'realtor', i: 'Change in median asking price versus a year ago.' },
+  newl:          { l: 'New listings', f: 'num', src: 'realtor', i: 'Homes newly listed for sale this month.' },
+  newl_yoy:      { l: 'New listings change (1 year)', f: 'pct', d: 1, src: 'realtor', i: 'Change in new listings versus the same month last year.' },
+  months_supply: { l: 'Listings per pending sale', f: 'ratio', src: 'realtor', i: 'Active listings divided by pending sales: a rough months-of-supply gauge. Higher favours buyers.' },
   // socioeconomic
-  income:        { l: 'Median Household Income', f: 'usd', src: 'income', i: 'Census Small Area Income & Poverty Estimates (ZIP codes: American Community Survey). Metros are a population-weighted blend of their counties.' },
-  income_growth: { l: 'Income Growth', f: 'pct', d: 1, src: 'income', i: 'Change in median household income over the latest year.' },
-  poverty:       { l: 'Poverty Rate', f: 'pct', src: 'income', i: 'Share of people below the poverty line (Census SAIPE).' },
-  college:       { l: 'College Degree Rate', f: 'pct', src: 'acs', i: "Share of adults 25 and over with a bachelor's degree or higher." },
-  school_score:  { l: 'School Rating (1–10)', f: 'rating', src: 'schools', i: "This map's own school rating, from state test results (share of students proficient in math and reading). Each public school is ranked 1–10 against the other schools in its state, since every state uses different tests; a ZIP, county or metro shows the average of its schools, weighted by students. Private schools don't take state tests and aren't included. Click a ZIP code to see its schools." },
-  remote:        { l: 'Remote Work %', f: 'pct', src: 'acs', i: 'Share of workers who mainly work from home.' },
-  homeown:       { l: 'Homeownership Rate', f: 'pct', src: 'acs', i: 'Share of occupied homes lived in by their owners.' },
-  mortgaged:     { l: 'Mortgaged Home %', f: 'pct', src: 'acs', i: 'Share of owner-occupied homes that have a mortgage.' },
-  family_hh:     { l: 'Family Households %', f: 'pct', src: 'acs', i: 'Share of households that are families (related people living together).' },
-  single_hh:     { l: 'Single Households %', f: 'pct', src: 'acs', i: 'Share of households made up of one person living alone.' },
-  u18_pct:       { l: 'Population Under 18 %', f: 'pct', src: 'age', i: 'Share of residents under 18 (Census population estimates).' },
-  a2544_pct:     { l: 'Population 25-44 %', f: 'pct', src: 'age', i: 'Share of residents aged 25 to 44: the prime first-time-buyer ages.' },
-  a65_pct:       { l: 'Population 65+ %', f: 'pct', src: 'age', i: 'Share of residents 65 and over.' },
-  a75_pct:       { l: 'Population 75+ %', f: 'pct', src: 'age', i: 'Share of residents 75 and over.' },
-  density:       { l: 'Population Density (/sq mi)', f: 'dens', src: 'pop', i: 'Residents per square mile of land.' },
-  temp:          { l: 'Weather (Avg Temperature)', f: 'deg', src: 'temp', i: 'Average temperature over the year, °F (NOAA). Metros average their counties by area; ZIP codes show their county’s.' },
-  units:         { l: 'Housing Units', f: 'num', src: 'units', i: 'Homes of every kind, occupied or not: Census estimates to 2020, then added to with each year’s building permits.' },
-  units_growth:  { l: 'Housing Unit Growth Rate', f: 'pct2', d: 1, src: 'units', i: 'Change in housing units over the latest year.' },
-  vote_r:        { l: 'Vote Republican %', f: 'pct', src: 'votes', i: 'Republican share of the presidential vote, by county (ZIP codes show their county’s).' },
-  vote_d:        { l: 'Vote Democrat %', f: 'pct', src: 'votes', i: 'Democratic share of the presidential vote, by county (ZIP codes show their county’s).' },
+  income:        { l: 'Household income (median)', f: 'usd', src: 'income', i: 'Census Small Area Income & Poverty Estimates (ZIP codes: American Community Survey). Metros are a population-weighted blend of their counties.' },
+  income_growth: { l: 'Income change (1 year)', f: 'pct', d: 1, src: 'income', i: 'Change in median household income over the latest year.' },
+  poverty:       { l: 'Poverty rate', f: 'pct', src: 'income', i: 'Share of people below the poverty line (Census SAIPE).' },
+  college:       { l: 'College graduates', f: 'pct', src: 'acs', i: "Share of adults 25 and over with a bachelor's degree or higher." },
+  school_score:  { l: 'School rating (1–10)', f: 'rating', src: 'schools', i: "This map's own school rating, from state test results (share of students proficient in math and reading). Each public school is ranked 1–10 against the other schools in its state, since every state uses different tests; a ZIP, county or metro shows the average of its schools, weighted by students. Private schools don't take state tests and aren't included. Click a ZIP code to see its schools." },
+  remote:        { l: 'Working from home', f: 'pct', src: 'acs', i: 'Share of workers who mainly work from home.' },
+  homeown:       { l: 'Homeownership rate', f: 'pct', src: 'acs', i: 'Share of occupied homes lived in by their owners.' },
+  mortgaged:     { l: 'Owners with a mortgage', f: 'pct', src: 'acs', i: 'Share of owner-occupied homes that have a mortgage.' },
+  family_hh:     { l: 'Family households', f: 'pct', src: 'acs', i: 'Share of households that are families (related people living together).' },
+  single_hh:     { l: 'People living alone', f: 'pct', src: 'acs', i: 'Share of households made up of one person living alone.' },
+  u18_pct:       { l: 'Children (under 18)', f: 'pct', src: 'age', i: 'Share of residents under 18 (Census population estimates).' },
+  a2544_pct:     { l: 'Adults 25–44', f: 'pct', src: 'age', i: 'Share of residents aged 25 to 44: the prime first-time-buyer ages.' },
+  a65_pct:       { l: 'Seniors 65+', f: 'pct', src: 'age', i: 'Share of residents 65 and over.' },
+  a75_pct:       { l: 'Seniors 75+', f: 'pct', src: 'age', i: 'Share of residents 75 and over.' },
+  density:       { l: 'People per square mile', f: 'dens', src: 'pop', i: 'Residents per square mile of land.' },
+  temp:          { l: 'Average temperature', f: 'deg', src: 'temp', i: 'Average temperature over the year, °F (NOAA). Metros average their counties by area; ZIP codes show their county’s.' },
+  units:         { l: 'Housing units', f: 'num', src: 'units', i: 'Homes of every kind, occupied or not: Census estimates to 2020, then added to with each year’s building permits.' },
+  units_growth:  { l: 'Housing unit growth', f: 'pct2', d: 1, src: 'units', i: 'Change in housing units over the latest year.' },
+  vote_r:        { l: 'Republican vote share', f: 'pct', src: 'votes', i: 'Republican share of the presidential vote, by county (ZIP codes show their county’s).' },
+  vote_d:        { l: 'Democratic vote share', f: 'pct', src: 'votes', i: 'Democratic share of the presidential vote, by county (ZIP codes show their county’s).' },
   // population and demographics
   pop:           { l: 'Population', f: 'num', src: 'pop', i: 'Census population estimate (July of each year).' },
-  pop_growth:    { l: 'Population Growth', f: 'pct2', d: 1, src: 'pop', i: 'Population change over the latest year.' },
-  pop_growth_5y: { l: 'Population Growth (5-Year)', f: 'pct', d: 1, src: 'pop', i: 'Population change over the last 5 years.' },
-  med_age:       { l: 'Median Age', f: 'yrs', src: 'age', i: 'Half of residents are older, half younger. Metros and states: an average of their counties weighted by population.' },
+  pop_growth:    { l: 'Population change (1 year)', f: 'pct2', d: 1, src: 'pop', i: 'Population change over the latest year.' },
+  pop_growth_5y: { l: 'Population change (5 years)', f: 'pct', d: 1, src: 'pop', i: 'Population change over the last 5 years.' },
+  med_age:       { l: 'Median age', f: 'yrs', src: 'age', i: 'Half of residents are older, half younger. Metros and states: an average of their counties weighted by population.' },
   births:        { l: 'Births', f: 'num', src: 'pop', i: 'Babies born in the year.' },
-  births_pct:    { l: 'Birth %', f: 'pct2', src: 'pop', i: 'Births as a share of population.' },
+  births_pct:    { l: 'Birth rate', f: 'pct2', src: 'pop', i: 'Births as a share of population.' },
   deaths:        { l: 'Deaths', f: 'num', src: 'pop', i: 'Deaths in the year.' },
-  deaths_pct:    { l: 'Death %', f: 'pct2', src: 'pop', i: 'Deaths as a share of population.' },
-  birth_death:   { l: 'Birth / Death Ratio', f: 'r2', src: 'pop', i: 'Births per death. Below 1 means more deaths than births.' },
-  natural:       { l: 'Natural Population Increase', f: 'num', d: 1, src: 'pop', i: 'Births minus deaths.' },
-  natural_pct:   { l: 'Natural Population Increase %', f: 'pct2', d: 1, src: 'pop', i: 'Births minus deaths, as a share of population.' },
-  dom_mig:       { l: 'Domestic Migration', f: 'num', d: 1, src: 'pop', i: 'People moving in from other US places minus people moving out to them.' },
-  dom_mig_pct:   { l: 'Domestic Migration %', f: 'pct2', d: 1, src: 'pop', i: 'Net domestic migration as a share of population.' },
-  intl_mig:      { l: 'International Migration', f: 'num', d: 1, src: 'pop', i: 'Net migration from abroad.' },
-  intl_mig_pct:  { l: 'International Migration %', f: 'pct2', d: 1, src: 'pop', i: 'Net international migration as a share of population.' },
-  r_u18_65:      { l: 'Pop Ratio Under 18 to 65+', f: 'r2', src: 'age', i: 'Residents under 18 for every resident 65 and over.' },
-  r_u18_75:      { l: 'Pop Ratio Under 18 to 75+', f: 'r2', src: 'age', i: 'Residents under 18 for every resident 75 and over.' },
-  r_2544_65:     { l: 'Pop Ratio 25-44 to 65+', f: 'r2', src: 'age', i: 'Residents aged 25–44 (future buyers) for every resident 65 and over (future sellers).' },
-  r_2544_75:     { l: 'Pop Ratio 25-44 to 75+', f: 'r2', src: 'age', i: 'Residents aged 25–44 for every resident 75 and over.' },
-  own_2544_pct:  { l: 'Homeowners 25-44 %', f: 'pct', src: 'acs', i: 'Share of owner households headed by someone aged 25–44.' },
-  own_65_pct:    { l: 'Homeowners 65+ %', f: 'pct', src: 'acs', i: 'Share of owner households headed by someone 65 or older.' },
-  own_75_pct:    { l: 'Homeowners 75+ %', f: 'pct', src: 'acs', i: 'Share of owner households headed by someone 75 or older.' },
-  rent_2544_pct: { l: 'Renters 25-44 %', f: 'pct', src: 'acs', i: 'Share of renter households headed by someone aged 25–44.' },
-  r_rent2544_own65: { l: 'Renters 25-44 / Owners 65+', f: 'r2', src: 'acs', i: 'Renter households aged 25–44 (likely future buyers) for every owner household 65+ (likely future sellers).' },
-  r_rent2544_own75: { l: 'Renters 25-44 / Owners 75+', f: 'r2', src: 'acs', i: 'Renter households aged 25–44 for every owner household 75+.' },
+  deaths_pct:    { l: 'Death rate', f: 'pct2', src: 'pop', i: 'Deaths as a share of population.' },
+  birth_death:   { l: 'Births per death', f: 'r2', src: 'pop', i: 'Births per death. Below 1 means more deaths than births.' },
+  natural:       { l: 'Births minus deaths', f: 'num', d: 1, src: 'pop', i: 'Births minus deaths.' },
+  natural_pct:   { l: 'Births minus deaths (% of people)', f: 'pct2', d: 1, src: 'pop', i: 'Births minus deaths, as a share of population.' },
+  dom_mig:       { l: 'Moving in from other states and counties', f: 'num', d: 1, src: 'pop', i: 'People moving in from other US places minus people moving out to them.' },
+  dom_mig_pct:   { l: 'Domestic moves (% of people)', f: 'pct2', d: 1, src: 'pop', i: 'Net domestic migration as a share of population.' },
+  intl_mig:      { l: 'Moving in from abroad', f: 'num', d: 1, src: 'pop', i: 'Net migration from abroad.' },
+  intl_mig_pct:  { l: 'Moves from abroad (% of people)', f: 'pct2', d: 1, src: 'pop', i: 'Net international migration as a share of population.' },
+  r_u18_65:      { l: 'Children per senior (65+)', f: 'r2', src: 'age', i: 'Residents under 18 for every resident 65 and over.' },
+  r_u18_75:      { l: 'Children per senior (75+)', f: 'r2', src: 'age', i: 'Residents under 18 for every resident 75 and over.' },
+  r_2544_65:     { l: 'Young adults per senior (65+)', f: 'r2', src: 'age', i: 'Residents aged 25–44 (future buyers) for every resident 65 and over (future sellers).' },
+  r_2544_75:     { l: 'Young adults per senior (75+)', f: 'r2', src: 'age', i: 'Residents aged 25–44 for every resident 75 and over.' },
+  own_2544_pct:  { l: 'Owners aged 25–44', f: 'pct', src: 'acs', i: 'Share of owner households headed by someone aged 25–44.' },
+  own_65_pct:    { l: 'Owners aged 65+', f: 'pct', src: 'acs', i: 'Share of owner households headed by someone 65 or older.' },
+  own_75_pct:    { l: 'Owners aged 75+', f: 'pct', src: 'acs', i: 'Share of owner households headed by someone 75 or older.' },
+  rent_2544_pct: { l: 'Renters aged 25–44', f: 'pct', src: 'acs', i: 'Share of renter households headed by someone aged 25–44.' },
+  r_rent2544_own65: { l: 'Young renters per older owner (65+)', f: 'r2', src: 'acs', i: 'Renter households aged 25–44 (likely future buyers) for every owner household 65+ (likely future sellers).' },
+  r_rent2544_own75: { l: 'Young renters per older owner (75+)', f: 'r2', src: 'acs', i: 'Renter households aged 25–44 for every owner household 75+.' },
   // mortgage quality (HMDA: home-purchase loans, first liens)
-  apps:          { l: 'Purchase Applications', f: 'num', src: 'hmda', i: 'Mortgage applications to buy a home during the year (HMDA).' },
-  origs:         { l: 'Purchase Originations', f: 'num', src: 'hmda', i: 'Home-purchase mortgages actually made during the year.' },
-  denial:        { l: 'Purchase Denial Rate', f: 'pct', src: 'hmda', i: 'Share of decided purchase applications that lenders turned down.' },
-  avg_rate:      { l: 'Average Interest Rate', f: 'pct2', src: 'hmda', i: 'Average interest rate on home-purchase mortgages made during the year.' },
-  conv_pct:      { l: 'Conventional Mortgage %', f: 'pct', src: 'hmda', i: 'Share of purchase mortgages that are conventional (not government-backed).' },
-  govt_pct:      { l: 'Govt-Backed Mortgage %', f: 'pct', src: 'hmda', i: 'Share backed by FHA, VA or USDA.' },
-  fha_pct:       { l: 'FHA Mortgage %', f: 'pct', src: 'hmda', i: 'Share insured by the FHA (popular with first-time buyers; low down payments).' },
-  va_pct:        { l: 'VA Mortgage %', f: 'pct', src: 'hmda', i: 'Share guaranteed by Veterans Affairs.' },
-  usda_pct:      { l: 'USDA Mortgage %', f: 'pct', src: 'hmda', i: 'Share backed by the USDA rural housing programs.' },
-  ltv:           { l: 'Purchase LTV', f: 'pct', src: 'hmda', i: 'Median loan-to-value: the loan as a share of the home price. 80% means a 20% down payment.' },
-  dti:           { l: 'Purchase DTI', f: 'pct', src: 'hmda', i: "Median debt-to-income: the buyer's monthly debts, including the new mortgage, as a share of income." },
-  dti43:         { l: 'Purchase DTI Above 43%', f: 'pct', src: 'hmda', i: 'Share of buyers whose debts take more than 43% of income: a traditional stretch limit.' },
-  buyer_income:  { l: 'Median Buyer Income', f: 'usd', src: 'hmda', i: 'Median yearly income of people who got a purchase mortgage.' },
-  loan_amt:      { l: 'Median Purchase Mortgage', f: 'usd', src: 'hmda', i: 'Median loan amount (rounded to $5,000).' },
-  price_med:     { l: 'Median Purchase Price', f: 'usd', src: 'hmda', i: 'Median value of the homes bought with a mortgage (rounded to $5,000).' },
-  second_pct:    { l: '2nd Home Purchase %', f: 'pct', src: 'hmda', i: 'Share of purchase mortgages for second homes.' },
-  investor_pct:  { l: 'Investor Purchase %', f: 'pct', src: 'hmda', i: 'Share of purchase mortgages for investment (rental) properties. Cash buyers are not counted.' },
-  si_pct:        { l: '2nd Home + Investor Purchase %', f: 'pct', src: 'hmda', i: 'Second homes plus investment properties, as a share of purchase mortgages.' },
+  apps:          { l: 'Purchase loan applications', f: 'num', src: 'hmda', i: 'Mortgage applications to buy a home during the year (HMDA).' },
+  origs:         { l: 'Purchase loans made', f: 'num', src: 'hmda', i: 'Home-purchase mortgages actually made during the year.' },
+  denial:        { l: 'Loan denial rate', f: 'pct', src: 'hmda', i: 'Share of decided purchase applications that lenders turned down.' },
+  avg_rate:      { l: 'Average mortgage rate', f: 'pct2', src: 'hmda', i: 'Average interest rate on home-purchase mortgages made during the year.' },
+  conv_pct:      { l: 'Conventional loans', f: 'pct', src: 'hmda', i: 'Share of purchase mortgages that are conventional (not government-backed).' },
+  govt_pct:      { l: 'Government-backed loans', f: 'pct', src: 'hmda', i: 'Share backed by FHA, VA or USDA.' },
+  fha_pct:       { l: 'FHA loans', f: 'pct', src: 'hmda', i: 'Share insured by the FHA (popular with first-time buyers; low down payments).' },
+  va_pct:        { l: 'VA loans', f: 'pct', src: 'hmda', i: 'Share guaranteed by Veterans Affairs.' },
+  usda_pct:      { l: 'USDA loans', f: 'pct', src: 'hmda', i: 'Share backed by the USDA rural housing programs.' },
+  ltv:           { l: 'Loan-to-value (median)', f: 'pct', src: 'hmda', i: 'Median loan-to-value: the loan as a share of the home price. 80% means a 20% down payment.' },
+  dti:           { l: 'Debt-to-income (median)', f: 'pct', src: 'hmda', i: "Median debt-to-income: the buyer's monthly debts, including the new mortgage, as a share of income." },
+  dti43:         { l: 'Buyers with debt over 43% of income', f: 'pct', src: 'hmda', i: 'Share of buyers whose debts take more than 43% of income: a traditional stretch limit.' },
+  buyer_income:  { l: 'Buyer income (median)', f: 'usd', src: 'hmda', i: 'Median yearly income of people who got a purchase mortgage.' },
+  loan_amt:      { l: 'Loan amount (median)', f: 'usd', src: 'hmda', i: 'Median loan amount (rounded to $5,000).' },
+  price_med:     { l: 'Purchase price (median)', f: 'usd', src: 'hmda', i: 'Median value of the homes bought with a mortgage (rounded to $5,000).' },
+  second_pct:    { l: 'Second-home purchases', f: 'pct', src: 'hmda', i: 'Share of purchase mortgages for second homes.' },
+  investor_pct:  { l: 'Investor purchases', f: 'pct', src: 'hmda', i: 'Share of purchase mortgages for investment (rental) properties. Cash buyers are not counted.' },
+  si_pct:        { l: 'Second-home and investor purchases', f: 'pct', src: 'hmda', i: 'Second homes plus investment properties, as a share of purchase mortgages.' },
   // investor metrics
-  rent:          { l: 'Rental Rate', f: 'usd', src: 'zillow', i: 'Typical asking rent, all rentals (Zillow Observed Rent Index).' },
-  rent_sfr:      { l: 'Rent For Houses', f: 'usd', src: 'zillow', i: 'Typical asking rent for single-family houses. Zillow publishes this for metro areas only.' },
-  rent_yoy:      { l: 'Rent Growth (YoY)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical rent over the last 12 months.' },
-  cap_rate:      { l: 'Cap Rate', f: 'pct2', src: 'zillow', i: 'A year of typical rent, minus 35% for taxes, insurance, upkeep and vacancy, divided by the typical home value. A rough estimate.' },
-  vacancy:       { l: 'Vacancy Rate', f: 'pct', src: 'acs', i: 'Rental vacancy: homes for rent that are empty, as a share of all rental homes.' },
-  price_rent:    { l: 'Home Value to Rent Ratio', f: 'ratio', src: 'zillow', i: 'Home value divided by a year of rent. Higher means buying is expensive relative to renting.' },
-  rent_overvalued:{ l: 'Overvalued % – Rental Market', f: 'pct', d: 1, src: 'zillow', i: "How far today's rent sits above (+) or below (−) its 2015–2019 trend line, extended to today. Rough. Zillow publishes rents for metros, counties and ZIP codes (not states)." },
-  rent_pct_income:{ l: 'Rent as % of Income', f: 'pct', src: 'zillow', i: 'A year of typical rent as a share of median household income.' },
-  shadow:        { l: 'Shadow Inventory %', f: 'pct2', src: 'acs', i: 'Homes sitting empty that are not for sale or rent (not seasonal homes either), as a share of all homes: possible future supply.' },
-  permits:       { l: 'Building Permits', f: 'num', src: 'permits', i: 'New homes authorised by building permits during the year (Census). Published for counties, metros and states, not ZIP codes.' },
-  permits_pct:   { l: 'Building Permits %', f: 'pct2', src: 'permits', i: 'New homes permitted during the year as a share of existing housing units.' },
-  gross_yield:   { l: 'Gross Rental Yield', f: 'pct2', src: 'zillow', i: 'A year of typical rent as a share of home value, before any costs.' },
-  growth_score:  { l: 'Long-Term Growth Score', f: 'score', src: 'pop', i: "This map's own 0–100 score: how a place ranks against others at the same level on 5-year population growth, net domestic migration and 5-year income growth (averaged). Higher = stronger long-term demand." },
+  rent:          { l: 'Typical rent', f: 'usd', src: 'zillow', i: 'Typical asking rent, all rentals (Zillow Observed Rent Index).' },
+  rent_sfr:      { l: 'Typical rent for houses', f: 'usd', src: 'zillow', i: 'Typical asking rent for single-family houses. Zillow publishes this for metro areas only.' },
+  rent_yoy:      { l: 'Rent change (1 year)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical rent over the last 12 months.' },
+  cap_rate:      { l: 'Cap rate (estimate)', f: 'pct2', src: 'zillow', i: 'A year of typical rent, minus 35% for taxes, insurance, upkeep and vacancy, divided by the typical home value. A rough estimate.' },
+  vacancy:       { l: 'Rental vacancy', f: 'pct', src: 'acs', i: 'Rental vacancy: homes for rent that are empty, as a share of all rental homes.' },
+  price_rent:    { l: 'Price-to-rent ratio', f: 'ratio', src: 'zillow', i: 'Home value divided by a year of rent. Higher means buying is expensive relative to renting.' },
+  rent_overvalued:{ l: 'Rent above or below trend', f: 'pct', d: 1, src: 'zillow', i: "How far today's rent sits above (+) or below (−) its 2015–2019 trend line, extended to today. Rough. Zillow publishes rents for metros, counties and ZIP codes (not states)." },
+  rent_pct_income:{ l: 'Rent as % of income', f: 'pct', src: 'zillow', i: 'A year of typical rent as a share of median household income.' },
+  shadow:        { l: 'Empty homes held off the market', f: 'pct2', src: 'acs', i: 'Homes sitting empty that are not for sale or rent (not seasonal homes either), as a share of all homes: possible future supply.' },
+  permits:       { l: 'New homes permitted', f: 'num', src: 'permits', i: 'New homes authorised by building permits during the year (Census). Published for counties, metros and states, not ZIP codes.' },
+  permits_pct:   { l: 'New homes permitted (% of homes)', f: 'pct2', src: 'permits', i: 'New homes permitted during the year as a share of existing housing units.' },
+  gross_yield:   { l: 'Gross rental yield', f: 'pct2', src: 'zillow', i: 'A year of typical rent as a share of home value, before any costs.' },
+  growth_score:  { l: 'Growth outlook (0–100)', f: 'score', src: 'pop', i: "This map's own 0–100 score: how a place ranks against others at the same level on 5-year population growth, net domestic migration and 5-year income growth (averaged). Higher = stronger long-term demand." },
 };
+// Sections in the sidebar (a data point may sit in more than one). START_HERE: the quick buttons at the top.
+const START_HERE = [['hv', 'Home value'], ['hv_yoy', 'Price change'], ['school_score', 'Schools'], ['rent', 'Rent'], ['inv', 'For sale'], ['fc_1y', 'Forecast'], ['growth_score', 'Growth outlook']];
 const GROUPS = [
-  ['Popular Data', ['hv', 'hv_yoy', 'inv', 'fc_1y', 'hv_5y', 'hv_mom', 'overvalued', 'dom', 'sales', 'cap_rate', 'growth_score']],
-  ['Home Price & Affordability', ['hv', 'hv_yoy', 'hv_5y', 'overvalued', 'hv_income', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'from_2022_peak', 'crash_2007', 'hv_mom', 'fc_1y']],
-  ['Market Trends', ['inv', 'inv_yoy', 'inv_vs_2019', 'sales', 'sales_yoy', 'sales_vs_2019', 'cut', 'dom', 'dom_yoy', 'inv_pct_houses', 'lp', 'lp_yoy', 'newl', 'newl_yoy', 'inv_mom', 'months_supply']],
-  ['Socioeconomic Data', ['income', 'income_growth', 'poverty', 'school_score', 'college', 'remote', 'homeown', 'mortgaged', 'family_hh', 'single_hh', 'u18_pct', 'a2544_pct', 'a65_pct', 'a75_pct', 'density', 'temp', 'units', 'units_growth', 'vote_r', 'vote_d']],
-  ['Population and Demographics', ['pop', 'pop_growth', 'pop_growth_5y', 'med_age', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'r_u18_65', 'r_u18_75', 'r_2544_65', 'r_2544_75', 'own_2544_pct', 'own_65_pct', 'own_75_pct', 'rent_2544_pct', 'r_rent2544_own65', 'r_rent2544_own75']],
-  ['Mortgage Quality', ['apps', 'origs', 'denial', 'avg_rate', 'conv_pct', 'govt_pct', 'fha_pct', 'va_pct', 'usda_pct', 'ltv', 'dti', 'dti43', 'buyer_income', 'loan_amt', 'price_med', 'second_pct', 'investor_pct', 'si_pct']],
-  ['Investor Metrics', ['rent', 'rent_sfr', 'rent_yoy', 'cap_rate', 'vacancy', 'price_rent', 'rent_overvalued', 'rent_pct_income', 'shadow', 'permits', 'permits_pct', 'gross_yield', 'buy_vs_rent']],
+  ['Prices and affordability', ['hv', 'hv_yoy', 'hv_mom', 'hv_5y', 'fc_1y', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
+  ['Market activity', ['inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'dom', 'dom_yoy', 'cut', 'lp', 'lp_yoy', 'months_supply', 'inv_pct_houses'], 'activity'],
+  ['Schools', ['school_score'], 'school'],
+  ['People and income', ['income', 'income_growth', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'temp', 'vote_r', 'vote_d'], 'people'],
+  ['Who lives here', ['med_age', 'u18_pct', 'a2544_pct', 'a65_pct', 'a75_pct', 'family_hh', 'single_hh', 'homeown', 'mortgaged', 'own_2544_pct', 'own_65_pct', 'own_75_pct', 'rent_2544_pct', 'r_rent2544_own65', 'r_rent2544_own75', 'r_u18_65', 'r_u18_75', 'r_2544_65', 'r_2544_75'], 'building'],
+  ['Lending', ['apps', 'origs', 'denial', 'avg_rate', 'conv_pct', 'govt_pct', 'fha_pct', 'va_pct', 'usda_pct', 'ltv', 'dti', 'dti43', 'buyer_income', 'loan_amt', 'price_med', 'second_pct', 'investor_pct', 'si_pct'], 'bank'],
+  ['For investors', ['rent', 'rent_sfr', 'rent_yoy', 'rent_pct_income', 'price_rent', 'gross_yield', 'cap_rate', 'rent_overvalued', 'buy_vs_rent', 'vacancy', 'shadow', 'units', 'units_growth', 'permits', 'permits_pct'], 'chart'],
 ];
+// Small line icons for the section headers.
+const ICONS = {
+  home: 'M3 11 12 4l9 7M5 10v10h14V10M10 20v-5h4v5',
+  activity: 'M3 12h4l3 7 4-14 3 7h4',
+  school: 'M2 9l10-5 10 5-10 5zM6 11v5c3 2.5 9 2.5 12 0v-5',
+  people: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6',
+  building: 'M4 21V8l8-5 8 5v13M9 21v-6h6v6M3 21h18',
+  bank: 'M3 10h18L12 4zM5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18',
+  chart: 'M4 4v16h16M7 15l4-4 3 3 6-7',
+};
+const icon = name => `<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
 
-// Colour ramps: one hue light-to-dark for amounts,
-// cool-to-warm through a neutral grey for changes that can go either way.
-// One vivid scale for everything: deep blue (low / falling) through white to red (high / rising).
-const RAMP = ['#1d3fd8', '#6b7ff2', '#b9b9f4', '#f4f2f5', '#f9c3ad', '#f27a5c', '#dc2626'];
-const SEQ = RAMP, DIV = RAMP;
+// Amounts (home value, rent, income…): one teal, light to dark. Changes (growth, migration…): teal for falling,
+// cream for flat, coral for rising.
+const SEQ = ['#e6f4f1', '#bfe3dc', '#8ccdc0', '#56b0a0', '#2b8f80', '#126b60', '#06463f'];
+const DIV = ['#0b5d5a', '#2a9d8f', '#8fd3c7', '#f4efe6', '#f6b89b', '#e76f51', '#9c2f1c'];
 
 // ---------- formatting ----------
 const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
@@ -465,9 +486,8 @@ const ymLabel = k => !k ? '' : String(k).length === 4 ? String(k) : `${MON[+k.sl
 
 // ---------- state ----------
 const saved = (() => { try { return JSON.parse(localStorage.getItem('hm-ui')) || {}; } catch (e) { return {}; } })();
-const ui = { scaleMode: saved.scaleMode === 'national' ? 'national' : 'view', metric: M[saved.metric] ? saved.metric : 'hv_yoy', level: ['state', 'metro', 'county', 'zip'].includes(saved.level) ? saved.level : 'county', open: new Set(saved.open || ['Popular Data']) };
+const ui = { scaleMode: saved.scaleMode === 'national' ? 'national' : 'view', metric: M[saved.metric] ? saved.metric : 'hv_yoy', level: ['state', 'metro', 'county', 'zip'].includes(saved.level) ? saved.level : 'county', open: new Set((saved.open || []).filter(n => GROUPS.some(g => g[0] === n))) };
 const saveUi = () => { try { localStorage.setItem('hm-ui', JSON.stringify({ metric: ui.metric, level: ui.level, open: [...ui.open], scaleMode: ui.scaleMode, labels: labelsOn })); } catch (e) {} };
-if (ui.open.has('Popular')) { ui.open.delete('Popular'); ui.open.add('Popular Data'); }
 const D = { meta: null, state: null, metro: null, county: null, zip: {} };
 let topo, layers = {}, map, scale = null;
 
@@ -482,17 +502,23 @@ const HAS = new Set();
 const hasData = k => !HAS.size || HAS.has(k);
 function renderGroups() {
   const q = document.getElementById('dpSearch').value.trim().toLowerCase();
-  // Each section has its own radio group, so a data point listed in two sections (e.g. Home Value under
-  // Popular Data and under Home Price & Affordability) shows as selected in both.
-  document.getElementById('groups').innerHTML = GROUPS.map(([name, keys], gi) => {
+  // "Start here": quick buttons for the most-used data points (hidden while searching).
+  const start = q ? '' : `<div class="start"><h3>Start here</h3><div class="chips">${START_HERE.filter(([k]) => hasData(k)).map(([k, l]) =>
+    `<button type="button" class="chip ${ui.metric === k ? 'on' : ''}" data-pick="${k}">${esc(l)}</button>`).join('')}</div></div>`;
+  // Each section has its own radio group, so a data point listed in two sections (e.g. Typical rent under
+  // For investors and in Start here) shows as selected everywhere.
+  document.getElementById('groups').innerHTML = start + (GROUPS.map(([name, keys, ic], gi) => {
     const list = keys.filter(k => hasData(k) && (!q || M[k].l.toLowerCase().includes(q)));
     if (!list.length) return '';
     const open = q || ui.open.has(name);
-    return `<div class="group ${open ? 'open' : ''}"><button type="button" data-group="${esc(name)}">${esc(name)}</button><ul>${list.map(k =>
+    const here = list.includes(ui.metric) ? ' <i class="dot" aria-label="selected here"></i>' : '';
+    return `<div class="group ${open ? 'open' : ''}"><button type="button" data-group="${esc(name)}"><span>${icon(ic)}${esc(name)}${here}</span></button><ul>${list.map(k =>
       `<li><label class="metric ${ui.metric === k ? 'on' : ''}"><input type="radio" name="metric-${gi}" value="${k}" ${ui.metric === k ? 'checked' : ''}><span>${esc(M[k].l)}</span><button class="info" type="button" data-info="${k}" aria-label="About ${esc(M[k].l)}">i</button></label></li>`).join('')}</ul></div>`;
-  }).join('') || '<p class="note" style="padding:8px">No data points match.</p>';
+  }).join('') || '<p class="note" style="padding:8px">No data points match.</p>');
 }
 document.getElementById('groups').addEventListener('click', e => {
+  const pick = e.target.closest('[data-pick]');
+  if (pick) { ui.metric = pick.dataset.pick; renderGroups(); restyle(); saveUi(); closeSide(); if (openPlace) renderDrawer(); return; }
   const info = e.target.closest('[data-info]');
   if (info) { e.preventDefault(); showInfo(info); return; }
   const g = e.target.closest('[data-group]');
@@ -1049,14 +1075,14 @@ function renderDrawer() {
   const county = level === 'zip' && D.county[p.k] ? `${D.county[p.k].n}, ${D.county[p.k].s}` : '';
   const metro = (level === 'county' || level === 'zip') && p.m && D.metro[p.m] ? D.metro[p.m].n : '';
   const kind = level === 'metro' ? 'Metro area' : level === 'county' ? 'County' : level === 'zip' ? 'ZIP code' : 'State';
-  document.getElementById('dTitle').innerHTML = `${esc(placeName(level, p))}<small>${kind}${[county, metro].filter(Boolean).map(x => ` · ${esc(x)}`).join('')}</small>`;
+  document.getElementById('dTitle').innerHTML = `${esc(placeName(level, p))}<small>Place report · ${kind}${[county, metro].filter(Boolean).map(x => ` · ${esc(x)}`).join('')}</small>`;
   const series = hist ? seriesFor(k, hist, p) : null;
   const skeys = series ? Object.keys(series).sort() : [];
   const annual = skeys.length && skeys[0].length === 4;
-  const options = GROUPS.slice(1).filter(([g, keys]) => keys.some(hasData)).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].filter(hasData).map(x => `<option value="${x}" ${x === k ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('');
+  const options = GROUPS.filter(([g, keys]) => keys.some(hasData)).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].filter(hasData).map(x => `<option value="${x}" ${x === k ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('');
   const tile = x => `<button type="button" class="kpi ${x === k ? 'on' : ''}" data-metric="${x}"><span>${esc(M[x].l)}</span><b>${fmtV(x, v[x])}</b></button>`;
   // Yearly data points (Census, mortgages…) have one value a year, so the Yearly/Monthly switch only shows for monthly data.
-  const toggles = `<div class="chart-ctrl">${annual ? '<span class="note" style="margin:0">One value per year</span>' : `<div class="seg-sm">${[['yearly', 'Yearly'], ['monthly', 'Monthly']].map(([m, l]) => `<button type="button" class="${chartMode === m ? 'on' : ''}" data-cmode="${m}">${l}</button>`).join('')}</div>`}
+  const toggles = `<div class="chart-ctrl">${annual ? '<span class="note" style="margin:0">One value per year</span>' : `<div class="seg-sm">${[['yearly', 'By year'], ['monthly', 'By month']].map(([m, l]) => `<button type="button" class="${chartMode === m ? 'on' : ''}" data-cmode="${m}">${l}</button>`).join('')}</div>`}
     <div class="seg-sm">${[['5', '5Y'], ['10', '10Y'], ['20', '20Y'], ['all', 'All']].map(([r, l]) => `<button type="button" class="${chartRange === r ? 'on' : ''}" data-range="${r}">${l}</button>`).join('')}</div></div>`;
   const chart = hist == null ? '<p class="note chart-empty">Loading history…</p>'
     : skeys.length > 1 ? `<div class="chart" id="chart">${chartSvg(series, def)}<div class="ctip"></div></div>`
@@ -1067,8 +1093,8 @@ function renderDrawer() {
       <div class="mnow"><b>${fmtV(k, v[k])}</b><span>${esc(asof)}</span></div></div>
     ${toggles}
     ${chart}
-    <h4 class="snap-h">Market snapshot</h4>
-    <div class="kpis">${['hv', 'hv_yoy', 'fc_1y', 'inv', 'hv_5y', 'overvalued'].map(tile).join('')}</div>
+    <h4 class="snap-h">At a glance</h4>
+    <div class="kpis">${['hv', 'rent', 'school_score', 'dom', 'income', 'growth_score'].map(tile).join('')}</div>
     ${level === 'zip' ? schoolList() : ''}`;
 }
 // ZIP codes: their public schools, best rated first (rating 1–10 from state tests, ranked within the state).
