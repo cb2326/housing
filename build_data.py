@@ -496,6 +496,37 @@ ACS_VARS = {
     "r_tot": "B25007_012E", "r_2534": "B25007_014E", "r_3544": "B25007_015E",
     "income": "B19013_001E", "pop": "B01003_001E",
 }
+# Version 2 added these (unemployment, housing-cost burden, second homes, age of homes, commute, rent by bedrooms).
+ACS_V = 2
+ACS_MORE = {
+    "lf": "B23025_003E", "unemp": "B23025_005E",
+    "rb_tot": "B25070_001E", "rb_30": "B25070_007E", "rb_35": "B25070_008E", "rb_40": "B25070_009E", "rb_50": "B25070_010E", "rb_nc": "B25070_011E",
+    "obm_tot": "B25091_002E", "obm_30": "B25091_008E", "obm_35": "B25091_009E", "obm_40": "B25091_010E", "obm_50": "B25091_011E", "obm_nc": "B25091_012E",
+    "obn_tot": "B25091_013E", "obn_30": "B25091_019E", "obn_35": "B25091_020E", "obn_40": "B25091_021E", "obn_50": "B25091_022E", "obn_nc": "B25091_023E",
+    "units2": "B25001_001E", "seasonal": "B25004_006E", "yrbuilt": "B25035_001E",
+    "tt_agg": "B08013_001E", "w_tot": "B08301_001E", "w_home": "B08301_021E",
+    "rent_med": "B25064_001E", "rent3": "B25031_005E", "rent4": "B25031_006E",
+}
+
+
+def acs_derive_more(v):
+    g = v.get
+    s = lambda *ks: sum(g(k) or 0 for k in ks) if all(g(k) is not None for k in ks) else None
+    def pct(a, b):
+        return a / b * 100 if a is not None and b else None
+    m = {
+        "unemployment": pct(g("unemp"), g("lf")),
+        "rent_burden": pct(s("rb_30", "rb_35", "rb_40", "rb_50"), (g("rb_tot") or 0) - (g("rb_nc") or 0)),
+        "owner_burden": pct(s("obm_30", "obm_35", "obm_40", "obm_50", "obn_30", "obn_35", "obn_40", "obn_50"),
+                            (g("obm_tot") or 0) - (g("obm_nc") or 0) + (g("obn_tot") or 0) - (g("obn_nc") or 0)),
+        "seasonal_pct": pct(g("seasonal"), g("units2")),
+        "year_built": g("yrbuilt") if g("yrbuilt") and 1900 < g("yrbuilt") < 2100 else None,
+        "commute": g("tt_agg") / (g("w_tot") - (g("w_home") or 0)) if g("tt_agg") and g("w_tot") and g("w_tot") > (g("w_home") or 0) else None,
+        "rent_census": g("rent_med"), "rent_3br": g("rent3"), "rent_4br": g("rent4"),
+    }
+    return {k: round(x, 2) for k, x in m.items() if x is not None and math.isfinite(x)}
+
+
 ACS_EXTRA = {"tax": "B25103_001E", "value": "B25077_001E", "edu": "B15003_001E", "ba": "B15003_022E", "ma": "B15003_023E", "prof": "B15003_024E", "phd": "B15003_025E"}
 # Age groups for ZIP codes (counties and states get these from the yearly population estimates instead).
 _AGE_CELLS = [3, 4, 5, 6, 11, 12, 13, 14, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 35, 36, 37, 38, 44, 45, 46, 47, 48, 49]
@@ -573,6 +604,22 @@ def acs_years():
     out, latest = {}, None
     for y in range(2010, THIS_YEAR):
         cached = load_dcache(f"acs/{y}.json")
+        if cached is not None and cached.get("v", 1) < ACS_V and CENSUS_KEY:
+            # saved before version 2: fetch only the newer questions and add them
+            for geo, recs in cached.items():
+                if geo == "v":
+                    continue
+                try:
+                    more = acs_call(y, geo, ACS_MORE)
+                except Exception as e:
+                    print(f"  (ACS {y} {geo} extra questions not available: {e})")
+                    continue
+                for pid, vals in more.items():
+                    d = acs_derive_more(vals)
+                    if d and pid in recs:
+                        recs[pid].update(d)
+            cached["v"] = ACS_V
+            save_dcache(f"acs/{y}.json", cached)
         if cached is None:
             if not CENSUS_KEY:
                 continue
@@ -589,15 +636,20 @@ def acs_years():
                     extra = acs_call(y, geo, ACS_EXTRA if y >= 2012 else {k: v for k, v in ACS_EXTRA.items() if k in ("tax", "value")})
                 except Exception:
                     extra = {}
+                try:
+                    more = acs_call(y, geo, ACS_MORE)
+                except Exception:
+                    more = {}
                 if geo == "zip":
                     try:
                         for pid, vals in acs_call(y, geo, ACS_AGE).items():
                             extra.setdefault(pid, {}).update(vals)
                     except Exception as e:
                         print(f"  (ACS {y} ZIP ages not available: {e})")
-                res[geo] = {pid: d for pid, vals in base.items() if (d := acs_derive({**vals, **extra.get(pid, {})}))}
+                res[geo] = {pid: d for pid, vals in base.items() if (d := {**acs_derive({**vals, **extra.get(pid, {})}), **acs_derive_more(more.get(pid, {}))})}
             if not res.get("county"):
                 continue  # not published yet
+            res["v"] = ACS_V
             save_dcache(f"acs/{y}.json", res)
             cached = res
         out[y] = cached
@@ -1035,6 +1087,183 @@ def walkability():
     return res
 
 
+# ---------- jobs and pay (BLS Quarterly Census of Employment and Wages, yearly averages) ----------
+def qcew_years():
+    """{year: {area: [jobs, average yearly pay]}} for every county ("06037"), state ("06000") and metro ("C3108").
+    Finished years are kept in data_cache/qcew.json."""
+    cache = load_dcache("qcew.json") or {}
+    for y in range(2010, THIS_YEAR):
+        if str(y) in cache:
+            continue
+        data = try_fetch(f"https://data.bls.gov/cew/data/api/{y}/a/industry/10.csv", f"qcew_{y}.csv", PLAIN)
+        if not data:
+            continue
+        r = rows(data)
+        head = next(r)
+        c = {h: i for i, h in enumerate(head)}
+        out = {}
+        for row in r:
+            if len(row) < len(head) or row[c["own_code"]] != "0" or row[c["agglvl_code"]] not in ("70", "50", "40"):
+                continue
+            emp, pay = num(row[c["annual_avg_emplvl"]]), num(row[c["avg_annual_pay"]])
+            if emp:
+                out[row[c["area_fips"]]] = [emp, pay]
+        if len(out) > 1000:
+            cache[str(y)] = out
+    save_dcache("qcew.json", cache)
+    return {int(y): v for y, v in cache.items()}
+
+
+# ---------- flood insurance (FEMA's National Flood Insurance Program, via OpenFEMA) ----------
+def flood_insurance():
+    """County shares of homes in high-risk flood zones and with flood insurance, plus every flood claim since 2000
+    (count and dollars paid) by county and ZIP code and year. Claims are refreshed every 6 months (data_cache/flood.json)."""
+    cached = load_dcache("flood.json")
+    if cached and cached.get("built"):
+        age = (date.today().year - int(cached["built"][:4])) * 12 + date.today().month - int(cached["built"][5:7])
+        if age < 6:
+            return cached
+    from urllib.parse import urlencode
+    base = "https://www.fema.gov/api/open/"
+    res = {"built": date.today().isoformat()[:7], "pen": {}, "county": {}, "zip": {}}
+    try:
+        d = json.loads(fetch(base + "v1/NfipResidentialPenetrationRates?" + urlencode({"$top": 10000}), "fema_pen.json", PLAIN, timeout=240))
+        for rec in d.get("NfipResidentialPenetrationRates", []):
+            f = (rec.get("fipsCode") or "").zfill(5)
+            if f[:2] in STATES:
+                res["pen"][f] = [rec.get("resContractsInForce") or 0, rec.get("resContractsInForceSfha") or 0,
+                                 rec.get("totalResStructures") or 0, rec.get("totalResStructuresSfha") or 0]
+        skip = 0
+        while True:
+            q = urlencode({"$select": "countyCode,reportedZipCode,yearOfLoss,amountPaidOnBuildingClaim,amountPaidOnContentsClaim",
+                           "$filter": "yearOfLoss ge 2000", "$top": 10000, "$skip": skip, "$orderby": "id"})
+            d = json.loads(fetch(base + "v3/NfipClaims?" + q, f"fema_claims_{skip}.json", PLAIN, timeout=300))
+            batch = d.get("NfipClaims", [])
+            for c in batch:
+                y = c.get("yearOfLoss")
+                if not y:
+                    continue
+                paid = (c.get("amountPaidOnBuildingClaim") or 0) + (c.get("amountPaidOnContentsClaim") or 0)
+                for lvl, key in (("county", (c.get("countyCode") or "")[:5]), ("zip", (c.get("reportedZipCode") or "")[:5])):
+                    if len(key) == 5 and key.isdigit():
+                        a = res[lvl].setdefault(key, {}).setdefault(str(int(y)), [0, 0])
+                        a[0] += 1
+                        a[1] += paid
+            if len(batch) < 10000:
+                break
+            skip += len(batch)
+        print(f"  FEMA flood insurance: {len(res['pen']):,} counties, {skip + len(batch):,} claims")
+    except Exception as e:
+        print(f"  (FEMA flood insurance unavailable: {e})")
+        return cached or {}
+    for lvl in ("county", "zip"):
+        for k, ys in res[lvl].items():
+            for y in ys:
+                ys[y][1] = round(ys[y][1])
+    save_dcache("flood.json", res)
+    return res
+
+
+def flood_metrics(claims_by_year, homes, last_year):
+    """Yearly 10-year totals of flood claims and dollars paid (and claims per 1,000 homes)."""
+    out = {}
+    if not claims_by_year:
+        return out
+    for y in range(2009, last_year + 1):
+        window = [claims_by_year.get(str(x)) for x in range(y - 9, y + 1)]
+        n = sum(w[0] for w in window if w)
+        paid = sum(w[1] for w in window if w)
+        out.setdefault("flood_claims", {})[str(y)] = n
+        out.setdefault("flood_paid", {})[str(y)] = paid
+        if homes:
+            out.setdefault("flood_claims_rate", {})[str(y)] = round(n / homes * 1000, 2)
+    return out
+
+
+# ---------- transportation noise (BTS National Transportation Noise Map, by census tract) ----------
+def read_dbf(data, wanted):
+    """Yield {field: text} for each record of a .dbf table (the attribute table of a shapefile)."""
+    import struct
+    nrec, hlen, rlen = struct.unpack("<IHH", data[4:12])
+    fields, pos, off = [], 32, 1
+    while data[pos] != 0x0D:
+        name = data[pos:pos + 11].split(b"\x00")[0].decode("latin-1")
+        flen = data[pos + 16]
+        fields.append((name, off, flen))
+        off += flen
+        pos += 32
+    keep = [(n, o, l) for n, o, l in fields if n in wanted]
+    for i in range(nrec):
+        start = hlen + i * rlen
+        if data[start:start + 1] == b"*":
+            continue  # deleted record
+        yield {n: data[start + o:start + o + l].decode("latin-1").strip() for n, o, l in keep}
+
+
+def noise_levels():
+    """Population-weighted road, rail and aircraft noise (dB) and the share of residents exposed to 60 dB or more,
+    by county and ZIP code. Tract figures from Seto and Huang (2023), University of Washington, built on the US DOT
+    National Transportation Noise Map. Kept in data_cache/noise.json."""
+    cached = load_dcache("noise.json")
+    if cached:
+        return cached
+    bands = [("ns4050n", 47.5), ("ns5060n", 55), ("ns6070n", 65), ("ns7080n", 75), ("ns8090n", 85), ("ns90n", 90)]
+    tracts = {}
+    for name in ("conus_shp.zip", "AK_HI_shp.zip"):
+        try:
+            path = fetch_file("https://www.edmundseto.com/NTNE_map/" + name, "noise_" + name)
+        except Exception as e:
+            print(f"  (noise data unavailable: {e})")
+            continue
+        with zipfile.ZipFile(path) as z:
+            for n in z.namelist():
+                if not n.lower().endswith(".dbf"):
+                    continue
+                for rec in read_dbf(z.read(n), {"GEOID", "estimat"} | {b for b, _ in bands}):
+                    pop = num(rec.get("estimat")) or 0
+                    ns = [(num(rec.get(b)) or 0, mid) for b, mid in bands]
+                    exposed = sum(x for x, _ in ns)
+                    if not rec.get("GEOID") or not pop:
+                        continue
+                    db = sum(x * mid for x, mid in ns) / exposed if exposed else None
+                    loud = sum(x for (x, mid) in ns if mid >= 65) / pop * 100
+                    tracts[rec["GEOID"].zfill(11)] = (pop, db, min(loud, 100))
+    if not tracts:
+        return {}
+    county = {}
+    for t, (pop, db, loud) in tracts.items():
+        a = county.setdefault(t[:5], [0.0, 0.0, 0.0, 0.0])
+        if db is not None:
+            a[0] += db * pop
+            a[1] += pop
+        a[2] += loud * pop
+        a[3] += pop
+    rel = fetch("https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_tract_rel_10.txt", "zcta_tract10.txt")
+    lines = rel.decode("utf-8-sig", "replace").splitlines()
+    head = lines[0].split(",")
+    zi, gi, pi = head.index("ZCTA5"), head.index("GEOID"), head.index("POPPT")
+    zips = {}
+    for line in lines[1:]:
+        t = line.split(",")
+        if len(t) <= pi or t[gi] not in tracts:
+            continue
+        w = num(t[pi]) or 0
+        if not w:
+            continue
+        pop, db, loud = tracts[t[gi]]
+        a = zips.setdefault(t[zi], [0.0, 0.0, 0.0, 0.0])
+        if db is not None:
+            a[0] += db * w
+            a[1] += w
+        a[2] += loud * w
+        a[3] += w
+    pack = lambda d: {k: {"noise_db": round(a[0] / a[1], 1) if a[1] else None, "noise_loud": round(a[2] / a[3], 1)} for k, a in d.items() if a[3]}
+    res = {"county": pack(county), "zip": pack(zips)}
+    save_dcache("noise.json", res)
+    print(f"  noise: {len(tracts):,} tracts, {len(res['county']):,} counties, {len(res['zip']):,} ZIPs")
+    return res
+
+
 def archive_forecasts(fc_hist, zmetro):
     """Earlier Zillow metro forecasts (2022 onwards) from the Internet Archive's saved copies of Zillow's file.
     Runs once; the results are kept in data_cache/forecast.json."""
@@ -1426,6 +1655,7 @@ def main():
     zr = {lvl: zillow(f"zori/{name}_zori_uc_sfrcondomfr_sm_month.csv", lvl) for lvl, name in LV[:2]}
     zrs = {"metro": zillow("zori/Metro_zori_uc_sfr_sm_month.csv", "metro")}
     fc_raw = zillow("zhvf_growth/Metro_zhvf_growth_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv", "metro")
+    zx = {key: {lvl: zillow(path.format(name), lvl) for lvl, name in LV} for key, path in ZILLOW_EXTRA.items()}
     print("Realtor.com")
     rt = {lvl: realtor(lvl) for lvl in ("county", "metro", "state")}
 
@@ -1452,7 +1682,7 @@ def main():
             if cbsa and cbsa not in out:
                 out[cbsa] = rec
         return out
-    for d in (zv, zs, zc, zr, zrs):
+    for d in (zv, zs, zc, zr, zrs, *zx.values()):
         d["metro"] = zmetro(d["metro"])
     forecast = {}
     for cbsa, rec in zmetro(fc_raw).items():
@@ -1492,7 +1722,7 @@ def main():
         A["metro"][cbsa] = derive(add_up(R, cs))
     for y, res in acs.items():
         for lvl in ("state", "county", "metro"):
-            for pid, d in res.get(lvl, {}).items():
+            for pid, d in (res.get(lvl) or {}).items():
                 rec = A[lvl].setdefault(pid, {})
                 for k, v in d.items():
                     if not k.startswith("acs_"):
@@ -1521,6 +1751,63 @@ def main():
     for lst in zip_schools.values():
         lst.sort(key=lambda s: (-(s[3] or 0), s[0]))
     print(f"  {len(sdir):,} schools ({sdir_year} list), scores for {sorted(sscores)}")
+
+    print("Jobs and pay, flood insurance, noise")
+    qcew, flood, noise = qcew_years(), flood_insurance(), noise_levels()
+    for y, areas in qcew.items():
+        for area, (emp, pay) in areas.items():
+            lvl, pid = ("metro", area[1:] + "0") if area.startswith("C") else ("state", area[:2]) if area.endswith("000") else ("county", area)
+            a = A[lvl].setdefault(pid, {})
+            a.setdefault("jobs", {})[str(y)] = emp
+            if pay:
+                a.setdefault("avg_pay", {})[str(y)] = pay
+    for lvl in A:
+        for a in A[lvl].values():
+            for k, g in (("jobs", "job_growth"), ("avg_pay", "pay_growth")):
+                s_ = a.get(k) or {}
+                for y, v in s_.items():
+                    if s_.get(str(int(y) - 1)):
+                        a.setdefault(g, {})[y] = round((v / s_[str(int(y) - 1)] - 1) * 100, 2)
+    # flood insurance: shares of homes in high-risk zones and insured (counts add up to metros and states), and claims
+    flood_year = (flood.get("built") or str(THIS_YEAR))[:4]
+    groups_of = {"county": {f: [f] for f in flood.get("pen", {})}, "metro": metro_counties, "state": {}}
+    for f in flood.get("pen", {}):
+        groups_of["state"].setdefault(f[:2], []).append(f)
+    for lvl, groups in groups_of.items():
+        for pid, members in groups.items():
+            tot = [sum(flood["pen"][c][i] for c in members if c in flood["pen"]) for i in range(4)]
+            if tot[2]:
+                a = A[lvl].setdefault(pid, {})
+                a["flood_ins_pct"] = {flood_year: round(tot[0] / tot[2] * 100, 2)}
+                a["flood_zone_pct"] = {flood_year: round(tot[3] / tot[2] * 100, 2)}
+    claims_county = flood.get("county", {})
+    by_state_all = {}
+    for f in A["county"]:
+        by_state_all.setdefault(f[:2], []).append(f)
+    for lvl, groups in (("county", {f: [f] for f in A["county"]}), ("metro", metro_counties), ("state", by_state_all)):
+        for pid, members in groups.items():
+            years = {}
+            for c in members:
+                for y, (n, paid) in (claims_county.get(c) or {}).items():
+                    acc = years.setdefault(y, [0, 0])
+                    acc[0] += n
+                    acc[1] += paid
+            if years:
+                homes = latest_annual(A[lvl].get(pid, {})).get("units")
+                A[lvl].setdefault(pid, {}).update(flood_metrics(years, homes, THIS_YEAR - 1))
+    # noise: counties from the tract figures; metros and states weighted by population
+    for fips, d in (noise.get("county") or {}).items():
+        a = A["county"].setdefault(fips, {})
+        for k, v in d.items():
+            if v is not None:
+                a[k] = {"2020": v}
+    for lvl, groups in (("metro", metro_counties), ("state", by_state_all)):
+        for pid, members in groups.items():
+            for k in ("noise_db", "noise_loud"):
+                acc = [((noise.get("county") or {}).get(c, {}).get(k), latest_annual(A["county"].get(c, {})).get("pop") or 0) for c in members]
+                acc = [(v, w) for v, w in acc if v is not None and w]
+                if acc:
+                    A[lvl].setdefault(pid, {})[k] = {"2020": round(sum(v * w for v, w in acc) / sum(w for _, w in acc), 1)}
 
     print("Natural hazards and walkability")
     haz, walk = hazards(), walkability()
@@ -1586,6 +1873,8 @@ def main():
         fc_series = state_fc.get(pid) if lvl == "state" else fc_hist.get(fc_key)
         m = metrics_for(z, srcs(zr, lvl, pid), rt[lvl].get(pid), la.get("income"), rate, (fc_series or {}).get(zillow_month),
                         srcs(zs, lvl, pid), srcs(zc, lvl, pid), srcs(zrs, lvl, pid), la.get("units"), la.get("prop_tax_rate"))
+        xs = {key: srcs(zx[key], lvl, pid) for key in ZILLOW_EXTRA}
+        m.update(extra_metrics(xs))
         v = {**{k: x for k, x in la.items() if k not in ("prop_tax",)}, **m}
         if not v:
             return
@@ -1602,6 +1891,9 @@ def main():
                     b[k] = trim_series(rr[k], HSTART)
         if fc_series:
             b["fc"] = dict(sorted(fc_series.items()))
+        for key, sx in xs.items():
+            if sx:
+                b[key] = trim_series(sx, HSTART)
         if a:
             b["a"] = a
         hist[lvl][pid] = b
@@ -1643,7 +1935,7 @@ def main():
         "months": {"zillow": zillow_month, "realtor": realtor_month, "income": inc_year, "population": pop_year},
         "years": {"pop": pop_year, "age": age_year, "income": inc_year, "permits": permit_year, "units": unit_year, "temp": temp_year,
                   "votes": vote_year, "acs": acs_year, "hmda": hmda_year_, "schools": max(sscores) if sscores else None,
-                  "school_list": sdir_year, "hazards": haz.get("ver"), "walk": 2021},
+                  "school_list": sdir_year, "hazards": haz.get("ver"), "walk": 2021, "jobs": max(qcew) if qcew else None},
         "mortgage": {"rate": rate, "date": rate_day, "history": trim_series(rate_hist, "2000-01")},
         "counts": {k: len(v) for k, v in places.items()},
     }
@@ -1660,7 +1952,8 @@ def main():
     acs_zip = {y: res.get("zip", {}) for y, res in acs.items() if res.get("zip")}
     del zv, zs, zc, zr, zrs, rt, hist, A, R
     zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared,
-                                       srat["zip"], zip_schools, haz.get("zip", {}), haz_year, walk.get("zip", {}))
+                                       srat["zip"], zip_schools, haz.get("zip", {}), haz_year, walk.get("zip", {}),
+                                       flood.get("zip", {}), noise.get("zip", {}))
     meta["counts"]["zip"] = zip_count
     meta["zipBreaks"] = zip_breaks
     write_json(os.path.join(OUT, "meta.json"), meta)
@@ -1941,6 +2234,33 @@ DIVERGING = {"hv_yoy", "hv_mom", "hv_5y", "fc_1y", "overvalued", "from_2022_peak
              "sales_vs_2019", "rent_overvalued"}
 
 
+# More Zillow market data: actual sale prices, how close homes sell to asking, how fast, market heat, and the values of
+# starter (bottom third) and high-end (top third) homes.
+ZILLOW_EXTRA = {
+    "sp": "median_sale_price/{}_median_sale_price_uc_sfrcondo_sm_month.csv",
+    "stl": "mean_sale_to_list/{}_mean_sale_to_list_uc_sfrcondo_sm_month.csv",
+    "pal": "pct_sold_above_list/{}_pct_sold_above_list_uc_sfrcondo_sm_month.csv",
+    "dtp": "med_doz_pending/{}_med_doz_pending_uc_sfrcondo_sm_month.csv",
+    "heat": "market_temp_index/{}_market_temp_index_uc_sfrcondo_month.csv",
+    "hvlo": "zhvi/{}_zhvi_uc_sfrcondo_tier_0.0_0.33_sm_sa_month.csv",
+    "hvhi": "zhvi/{}_zhvi_uc_sfrcondo_tier_0.67_1.0_sm_sa_month.csv",
+}
+
+
+def extra_metrics(xs):
+    m = {}
+    k, v = latest(xs.get("sp") or {})
+    if v:
+        m["sale_price"] = rnd(v, 0)
+        m["sale_price_yoy"] = rnd(change(xs["sp"], 12), 1)
+    for key, out, mult, digits in (("stl", "sale_to_list", 100, 1), ("pal", "pct_above_list", 100, 1), ("dtp", "days_to_pending", 1, 0),
+                                   ("heat", "market_heat", 1, 0), ("hvlo", "hv_low", 1, 0), ("hvhi", "hv_high", 1, 0)):
+        k, v = latest(xs.get(key) or {})
+        if v is not None:
+            m[out] = rnd(v * mult, digits)
+    return {k: v for k, v in m.items() if v is not None}
+
+
 # Ready-made ZIP code rankings (counties, metros and states are ranked in the browser, which has all of them loaded):
 # list -> (data point, 1 = lowest first / -1 = highest first, which ZIPs qualify).
 ZIP_RANKINGS = {
@@ -1957,7 +2277,7 @@ ZIP_RANKINGS = {
 
 
 def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared, zip_school_scores, zip_schools,
-               zip_haz, haz_year, zip_walk):
+               zip_haz, haz_year, zip_walk, zip_claims, zip_noise):
     print("ZIP codes: Zillow, Realtor.com, Census shapes")
     # Zillow's own ZIP forecasts, saved each run to build up a history (the chart uses the metro's until there are two).
     zfc_raw, _ = zillow_zip("zhvf_growth/Zip_zhvf_growth_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
@@ -1969,6 +2289,7 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
     save_dcache("forecast_zip.json", zfc_hist)
     del zfc_raw
     zhv, zinfo = zillow_zip("zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
+    zxz = {key: zillow_zip(path.format("Zip"))[0] for key, path in ZILLOW_EXTRA.items()}
     zsfr, _ = zillow_zip("zhvi/Zip_zhvi_uc_sfr_tier_0.33_0.67_sm_sa_month.csv")
     zcondo, _ = zillow_zip("zhvi/Zip_zhvi_uc_condo_tier_0.33_0.67_sm_sa_month.csv")
     zrent, _ = zillow_zip("zori/Zip_zori_uc_sfrcondomfr_sm_month.csv")
@@ -2012,6 +2333,13 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
             a[k] = {haz_year: v}
         if z in zip_walk:
             a["walk"] = {"2021": zip_walk[z]}
+        for k, v in (zip_noise.get(z) or {}).items():
+            if v is not None:
+                a[k] = {"2020": v}
+        if zip_claims.get(z):
+            zu = latest_annual(a).get("units")
+            a.update(flood_metrics(zip_claims[z], zu, THIS_YEAR - 1))
+        zx_d = {key: to_dict(zxz[key].get(z)) for key in ZILLOW_EXTRA}
         own_fc, metro_fc = zfc_hist.get(z, {}), fc_hist.get(county_to_cbsa.get(county), {})
         fc_now = own_fc.get(zillow_month, metro_fc.get(zillow_month))
         la = latest_annual(a)
@@ -2025,6 +2353,7 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
         if not v:
             continue
         v.update({k: x for k, x in la.items() if k not in ("prop_tax",)})
+        v.update(extra_metrics(zx_d))
         city = (zinfo.get(z) or ("", ""))[0] or (rnames.get(z, "").rsplit(",", 1)[0].title())
         rec = {"c": city, "k": county}
         if county_to_cbsa.get(county):
@@ -2046,6 +2375,9 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
         fc_s = own_fc if len(own_fc) >= 2 else {**metro_fc, **own_fc}  # metro's past forecasts, ZIP's own for now
         if fc_s:
             b["fc"] = compact(fc_s, "2000-01")
+        for key, d in zx_d.items():
+            if d:
+                b[key] = compact(d, "2008-01")
         if a:
             b["a"] = a
         if zip_schools.get(z):
