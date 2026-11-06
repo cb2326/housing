@@ -916,6 +916,125 @@ def school_ratings(directory, scores, county_to_cbsa):
     return out
 
 
+# ---------- natural hazards (FEMA National Risk Index) and walkability (EPA) ----------
+# FEMA publishes the National Risk Index on its official ArcGIS account (FEMA_NationalRiskIndex), which programs can
+# query. Scores are national percentiles, 0-100 (higher = more risk). Counties come straight from FEMA; ZIP codes are an
+# area-weighted average of the census tracts they overlap; metros and states are population-weighted county averages.
+NRI_QUERY = "https://services.arcgis.com/XG15cJAlne2vxtgt/arcgis/rest/services/{}/FeatureServer/0/query"
+NRI_FIELDS = {"risk": ("RISK_SCORE",), "flood_risk": ("IFLD_RISKS", "CFLD_RISKS"), "fire_risk": ("WFIR_RISKS",), "hurricane_risk": ("HRCN_RISKS",),
+              "tornado_risk": ("TRND_RISKS",), "heat_risk": ("HWAV_RISKS",), "quake_risk": ("ERQK_RISKS",)}
+
+
+def nri_layer(service, id_field):
+    from urllib.parse import urlencode
+    fields = [id_field, "POPULATION", "NRI_VER"] + sorted({f for fs in NRI_FIELDS.values() for f in fs})
+    out, offset, ver = {}, 0, None
+    while True:
+        url = NRI_QUERY.format(service) + "?" + urlencode({"where": "1=1", "outFields": ",".join(fields), "returnGeometry": "false",
+                                                             "orderByFields": id_field, "resultOffset": offset, "resultRecordCount": 2000, "f": "json"})
+        d = json.loads(fetch(url, f"nri_{service}_{offset}.json", PLAIN, timeout=240))
+        feats = d.get("features", [])
+        for f in feats:
+            a = f["attributes"]
+            ver = ver or a.get("NRI_VER")
+            rec = {"pop": a.get("POPULATION") or 0}
+            for key, flds in NRI_FIELDS.items():
+                vals = [a.get(x) for x in flds if isinstance(a.get(x), (int, float))]
+                if vals:
+                    rec[key] = round(max(vals), 1)  # flood = the worse of inland and coastal flooding
+            out[str(a[id_field])] = rec
+        if len(feats) < 2000 and not d.get("exceededTransferLimit"):
+            break
+        offset += len(feats)
+    return out, ver
+
+
+def hazards():
+    """{"county": {fips: {...}}, "zip": {zip: {...}}, "ver": "December 2025"}, kept in data_cache/ until FEMA updates it."""
+    cached = load_dcache("hazards.json")
+    try:
+        probe = json.loads(urllib.request.urlopen(urllib.request.Request(
+            NRI_QUERY.format("National_Risk_Index_Counties") + "?where=1%3D1&outFields=NRI_VER&resultRecordCount=1&returnGeometry=false&f=json",
+            headers=PLAIN), timeout=60).read())
+        ver = probe["features"][0]["attributes"]["NRI_VER"]
+    except Exception as e:
+        print(f"  (FEMA risk index unavailable: {e})")
+        return cached or {}
+    if cached and cached.get("ver") == ver:
+        return cached
+    counties, ver = nri_layer("National_Risk_Index_Counties", "STCOFIPS")
+    tracts, _ = nri_layer("National_Risk_Index_Census_Tracts", "TRACTFIPS")
+    # ZIP codes: average of their tracts, weighted by how much land each tract shares with the ZIP
+    rel = fetch("https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_tract20_natl.txt", "zcta_tract20.txt")
+    lines = rel.decode("utf-8-sig", "replace").splitlines()
+    head = lines[0].split("|")
+    zi, ti, ai = head.index("GEOID_ZCTA5_20"), head.index("GEOID_TRACT_20"), head.index("AREALAND_PART")
+    acc = {}
+    for line in lines[1:]:
+        t = line.split("|")
+        if len(t) <= ai or not t[zi] or t[ti] not in tracts:
+            continue
+        w = num(t[ai]) or 0
+        if not w:
+            continue
+        z = acc.setdefault(t[zi], {})
+        for k, v in tracts[t[ti]].items():
+            if k != "pop":
+                s = z.setdefault(k, [0.0, 0.0])
+                s[0] += v * w
+                s[1] += w
+    zips = {z: {k: round(s / w, 1) for k, (s, w) in d.items() if w} for z, d in acc.items()}
+    res = {"ver": ver, "county": counties, "zip": zips}
+    save_dcache("hazards.json", res)
+    print(f"  FEMA risk index ({ver}): {len(counties):,} counties, {len(zips):,} ZIPs")
+    return res
+
+
+def walkability():
+    """EPA National Walkability Index (1 = least walkable, 20 = most), averaged by population from neighbourhood block
+    groups up to counties and (through census tracts) to ZIP codes. Kept in data_cache/ (the EPA file is from 2021)."""
+    cached = load_dcache("walk.json")
+    if cached:
+        return cached
+    path = fetch_file("https://edg.epa.gov/EPADataCommons/public/OA/EPA_SmartLocationDatabase_V3_Jan_2021_Final.csv", "epa_sld.csv")
+    county, tract = {}, {}
+    with open(path, encoding="utf-8", errors="replace", newline="") as f:
+        r = csv.reader(f)
+        head = next(r)
+        c = {h: i for i, h in enumerate(head)}
+        for row in r:
+            if len(row) < len(head) - 2:
+                continue
+            w, pop = num(row[c["NatWalkInd"]]), num(row[c["TotPop"]]) or 0
+            if w is None:
+                continue
+            st, co, tr = row[c["STATEFP"]].zfill(2), row[c["COUNTYFP"]].zfill(3), row[c["TRACTCE"]].zfill(6)
+            for d, key in ((county, st + co), (tract, st + co + tr)):
+                a = d.setdefault(key, [0.0, 0.0])
+                a[0] += w * pop
+                a[1] += pop
+    county = {k: round(s / p, 1) for k, (s, p) in county.items() if p}
+    tract = {k: s / p for k, (s, p) in tract.items() if p}
+    rel = fetch("https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_tract_rel_10.txt", "zcta_tract10.txt")
+    lines = rel.decode("utf-8-sig", "replace").splitlines()
+    head = lines[0].split(",")
+    zi, gi, pi = head.index("ZCTA5"), head.index("GEOID"), head.index("POPPT")
+    acc = {}
+    for line in lines[1:]:
+        t = line.split(",")
+        if len(t) <= pi or t[gi] not in tract:
+            continue
+        w = num(t[pi]) or 0
+        if w:
+            a = acc.setdefault(t[zi], [0.0, 0.0])
+            a[0] += tract[t[gi]] * w
+            a[1] += w
+    res = {"county": county, "zip": {z: round(s / w, 1) for z, (s, w) in acc.items() if w}}
+    save_dcache("walk.json", res)
+    print(f"  walkability: {len(county):,} counties, {len(res['zip']):,} ZIPs")
+    return res
+
+
 def archive_forecasts(fc_hist, zmetro):
     """Earlier Zillow metro forecasts (2022 onwards) from the Internet Archive's saved copies of Zillow's file.
     Runs once; the results are kept in data_cache/forecast.json."""
@@ -1402,6 +1521,31 @@ def main():
     for lst in zip_schools.values():
         lst.sort(key=lambda s: (-(s[3] or 0), s[0]))
     print(f"  {len(sdir):,} schools ({sdir_year} list), scores for {sorted(sscores)}")
+
+    print("Natural hazards and walkability")
+    haz, walk = hazards(), walkability()
+    haz_year = (re.findall(r"\d{4}", haz.get("ver") or "") or [str(THIS_YEAR)])[0]
+    county_pop = {c: latest_annual(a).get("pop") or 0 for c, a in A["county"].items()}
+    for fips, rec in haz.get("county", {}).items():
+        a = A["county"].setdefault(fips, {})
+        for k, v in rec.items():
+            if k != "pop":
+                a[k] = {haz_year: v}
+        county_pop.setdefault(fips, rec.get("pop") or 0)
+    for fips, w in walk.get("county", {}).items():
+        A["county"].setdefault(fips, {})["walk"] = {"2021": w}
+    # Metros and states: population-weighted averages of their counties.
+    haz_keys = list(NRI_FIELDS) + ["walk"]
+    by_state = {}
+    for fips in A["county"]:
+        by_state.setdefault(fips[:2], []).append(fips)
+    for lvl, groups in (("metro", metro_counties), ("state", by_state)):
+        for pid, members in groups.items():
+            for k in haz_keys:
+                acc = [(next(iter(A["county"][c][k].values())), county_pop.get(c) or 1) for c in members if c in A["county"] and A["county"][c].get(k)]
+                if acc:
+                    yr = next(iter(A["county"][[c for c in members if c in A["county"] and A["county"][c].get(k)][0]][k]))
+                    A[lvl].setdefault(pid, {})[k] = {yr: round(sum(v * w for v, w in acc) / sum(w for _, w in acc), 1)}
     for lvl in A:
         growth_scores(A[lvl])
 
@@ -1473,13 +1617,33 @@ def main():
         cbsa = county_to_cbsa.get(fips)
         build("county", fips, county_name(fips, zv, rt, pop_names), STATES[fips[:2]][0], {"m": cbsa} if cbsa else {}, cbsa)
 
+    # Yearly snapshots for the map's time slider: each December's home value and its 1-year change (latest month for
+    # this year), for every state, metro and county.
+    last_year = int(zillow_month[:4])
+    years = list(range(2000, last_year + 1))
+    for lvl in ("state", "metro", "county"):
+        ts_hv, ts_yoy = {}, {}
+        for pid in places[lvl]:
+            s = srcs(zv, lvl, pid)
+            if not s:
+                continue
+            hv_row, yoy_row = [], []
+            for y in years:
+                k = zillow_month if y == last_year else f"{y}-12"
+                v, old = s.get(k), s.get(months_back(k, 12))
+                hv_row.append(round(v) if v else None)
+                yoy_row.append(round((v / old - 1) * 100, 1) if v and old else None)
+            if any(hv_row):
+                ts_hv[pid], ts_yoy[pid] = hv_row, yoy_row
+        write_json(os.path.join(OUT, "time", f"{lvl}.json"), {"years": years, "last": zillow_month, "hv": ts_hv, "hv_yoy": ts_yoy})
+
     realtor_month = max((max(r["inv"]) for r in rt["state"].values() if r["inv"]), default=None)
     meta = {
         "built": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "months": {"zillow": zillow_month, "realtor": realtor_month, "income": inc_year, "population": pop_year},
         "years": {"pop": pop_year, "age": age_year, "income": inc_year, "permits": permit_year, "units": unit_year, "temp": temp_year,
                   "votes": vote_year, "acs": acs_year, "hmda": hmda_year_, "schools": max(sscores) if sscores else None,
-                  "school_list": sdir_year},
+                  "school_list": sdir_year, "hazards": haz.get("ver"), "walk": 2021},
         "mortgage": {"rate": rate, "date": rate_day, "history": trim_series(rate_hist, "2000-01")},
         "counts": {k: len(v) for k, v in places.items()},
     }
@@ -1496,7 +1660,7 @@ def main():
     acs_zip = {y: res.get("zip", {}) for y, res in acs.items() if res.get("zip")}
     del zv, zs, zc, zr, zrs, rt, hist, A, R
     zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared,
-                                       srat["zip"], zip_schools)
+                                       srat["zip"], zip_schools, haz.get("zip", {}), haz_year, walk.get("zip", {}))
     meta["counts"]["zip"] = zip_count
     meta["zipBreaks"] = zip_breaks
     write_json(os.path.join(OUT, "meta.json"), meta)
@@ -1777,7 +1941,23 @@ DIVERGING = {"hv_yoy", "hv_mom", "hv_5y", "fc_1y", "overvalued", "from_2022_peak
              "sales_vs_2019", "rent_overvalued"}
 
 
-def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared, zip_school_scores, zip_schools):
+# Ready-made ZIP code rankings (counties, metros and states are ranked in the browser, which has all of them loaded):
+# list -> (data point, 1 = lowest first / -1 = highest first, which ZIPs qualify).
+ZIP_RANKINGS = {
+    "price_drop": ("hv_yoy", 1, lambda v: True),
+    "price_gain": ("hv_yoy", -1, lambda v: True),
+    "schools_under_500k": ("school_score", -1, lambda v: 0 < (v.get("hv") or 0) < 500000),
+    "cheapest": ("hv", 1, lambda v: True),
+    "fast_selling": ("dom", 1, lambda v: (v.get("inv") or 0) >= 10),
+    "price_cuts": ("cut", -1, lambda v: (v.get("inv") or 0) >= 10),
+    "rent_yield": ("gross_yield", -1, lambda v: True),
+    "walkable": ("walk", -1, lambda v: True),
+    "low_risk": ("risk", 1, lambda v: True),
+}
+
+
+def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared, zip_school_scores, zip_schools,
+               zip_haz, haz_year, zip_walk):
     print("ZIP codes: Zillow, Realtor.com, Census shapes")
     # Zillow's own ZIP forecasts, saved each run to build up a history (the chart uses the metro's until there are two).
     zfc_raw, _ = zillow_zip("zhvf_growth/Zip_zhvf_growth_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
@@ -1798,7 +1978,7 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
     print(f"  {len(zhv)} Zillow ZIPs, {len(rtz)} Realtor.com ZIPs, {len(shapes)} shapes, ACS years {sorted(acs_zip)}")
     acs_years_ = sorted(acs_zip)
 
-    by_state, index, hist_groups, all_vals = {}, {}, {}, {}
+    by_state, index, hist_groups, all_vals, ranked = {}, {}, {}, {}, []
     for z in sorted(set(zhv) | set(rtz)):
         county = zc.get(z)
         if not county or county[:2] not in STATES or z not in shapes:
@@ -1828,6 +2008,10 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
             a[k] = s
         if zip_school_scores.get(z):
             a["school_score"] = zip_school_scores[z]
+        for k, v in (zip_haz.get(z) or {}).items():
+            a[k] = {haz_year: v}
+        if z in zip_walk:
+            a["walk"] = {"2021": zip_walk[z]}
         own_fc, metro_fc = zfc_hist.get(z, {}), fc_hist.get(county_to_cbsa.get(county), {})
         fc_now = own_fc.get(zillow_month, metro_fc.get(zillow_month))
         la = latest_annual(a)
@@ -1847,6 +2031,7 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
             rec["m"] = county_to_cbsa[county]
         rec["v"] = v
         by_state.setdefault(st, {})[z] = rec
+        ranked.append((z, city, st, v))
         index[z] = [city, st]
         for k, x in v.items():
             all_vals.setdefault(k, []).append(x)
@@ -1873,6 +2058,12 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
     for prefix, group in hist_groups.items():
         write_json(os.path.join(OUT, "hist", "zip", f"{prefix}.json"), group)
     write_json(os.path.join(OUT, "zip", "index.json"), index)
+    rankings = {}
+    for name, (key, direction, ok) in ZIP_RANKINGS.items():
+        rows = [(v[key], z, city, st) for z, city, st, v in ranked if v.get(key) is not None and ok(v)]
+        rows.sort(key=lambda r: r[0] * direction)
+        rankings[name] = [[z, city, st, val] for val, z, city, st in rows[:50]]
+    write_json(os.path.join(OUT, "zip", "rankings.json"), rankings)
     breaks = {k: scale_breaks(vals, k in DIVERGING) for k, vals in all_vals.items()}
     return len(index), breaks
 
