@@ -2480,24 +2480,52 @@ def main():
 
 # ---------- search-friendly pages (one per state, metro and county) ----------
 SITE_URL = "https://openhousingatlas.com"
+# Each section's first 3 rows are the most important ones and always show; the rest sit under "Show more".
 PAGE_SECTIONS = [
-    ("Prices and affordability", [("hv", "Typical home value", "usd"), ("hv_yoy", "Change in 1 year", "spct"), ("hv_5y", "Change in 5 years", "spct"),
-                                  ("fair_value", "Fair home value", "usd"), ("overvalued", "Overvalued %", "spct"),
+    ("Prices and affordability", [("hv", "Typical home value", "usd"), ("hv_yoy", "Change in 1 year", "spct"), ("overvalued", "Overvalued %", "spct"),
+                                  ("fair_value", "Fair home value", "usd"), ("hv_5y", "Change in 5 years", "spct"),
                                   ("fc_1y", "Zillow forecast, next 12 months", "spct"), ("hv_income", "Home value to income", "x"),
                                   ("mtg_pmt", "Monthly mortgage payment (20% down)", "usd"), ("salary_needed", "Income needed to afford it", "usd"),
                                   ("prop_tax_rate", "Property tax rate", "pct2")]),
-    ("Rent and investing", [("rent", "Typical rent", "usd"), ("rent_sfr", "Typical rent for houses", "usd"), ("fmr_2br", "HUD Fair Market Rent, 2 bedrooms", "usd"),
-                            ("price_rent", "Price-to-rent ratio", "x"), ("gross_yield", "Gross rental yield", "pct2"), ("cap_rate", "Cap rate (estimate)", "pct2")]),
-    ("Market activity", [("inv", "Homes for sale", "num"), ("inv_yoy", "Listings vs a year ago", "spct"), ("dom", "Days on market", "num"),
-                         ("cut", "Listings with a price cut", "pct"), ("pending_ratio", "Pending sales per 100 listings", "num"), ("ppsf", "Asking price per sq ft", "usd")]),
-    ("People and jobs", [("pop", "Population", "num"), ("pop_growth", "Population change (1 year)", "spct"), ("income", "Median household income", "usd"),
-                         ("income_real", "Income adjusted for cost of living", "usd"), ("unemployment", "Unemployment rate", "pct"),
+    ("Rent and investing", [("rent", "Typical rent", "usd"), ("rent_sfr", "Typical rent for houses", "usd"), ("price_rent", "Price-to-rent ratio", "x"),
+                            ("fmr_2br", "HUD Fair Market Rent, 2 bedrooms", "usd"), ("gross_yield", "Gross rental yield", "pct2"), ("cap_rate", "Cap rate (estimate)", "pct2")]),
+    ("Market activity", [("inv_yoy", "Listings vs a year ago", "spct"), ("dom", "Days on market", "num"), ("cut", "Listings with a price cut", "pct"),
+                         ("inv", "Homes for sale", "num"), ("pending_ratio", "Pending sales per 100 listings", "num"), ("ppsf", "Asking price per sq ft", "usd")]),
+    ("People and jobs", [("income", "Median household income", "usd"), ("pop_growth", "Population change (1 year)", "spct"), ("unemployment", "Unemployment rate", "pct"),
+                         ("pop", "Population", "num"), ("income_real", "Income adjusted for cost of living", "usd"),
                          ("mig_net", "Net moves in (IRS)", "snum"), ("rpp_all", "Cost of living (US = 100)", "n1")]),
     ("Schools, risk and environment", [("school_score", "School rating (1 to 10)", "n1"), ("risk", "FEMA hazard risk score (0 to 100)", "n1"),
-                                       ("flood_risk", "Flood risk score", "n1"), ("fire_risk", "Wildfire risk score", "n1"),
-                                       ("aqi_bad_days", "Unhealthy air days a year", "num"), ("walk", "Walkability (1 to 20)", "n1"),
+                                       ("aqi_bad_days", "Unhealthy air days a year", "num"), ("flood_risk", "Flood risk score", "n1"),
+                                       ("fire_risk", "Wildfire risk score", "n1"), ("walk", "Walkability (1 to 20)", "n1"),
                                        ("noise_db", "Road, rail and air noise", "db")]),
 ]
+
+
+def _market(v):
+    """Buyer's, seller's or balanced market, from listings per pending sale, the change in listings, the price trend,
+    price cuts and days on market. Returns (label, tone, reason) or None."""
+    ms, inv_yoy, dom, yoy, cut = v.get("months_supply"), v.get("inv_yoy"), v.get("dom"), v.get("hv_yoy"), v.get("cut")
+    if not ms and not dom:
+        return None
+    buyer = sum([bool(ms and ms > 4), bool(inv_yoy and inv_yoy > 10), bool(yoy is not None and yoy < 0), bool(cut and cut > 20)])
+    seller = sum([bool(ms and ms < 2.5), bool(inv_yoy is not None and inv_yoy < 0), bool(yoy and yoy > 4), bool(dom and dom < 30)])
+    if buyer - seller >= 2:
+        label, tone = "Buyer's market", "dn"
+    elif seller - buyer >= 2:
+        label, tone = "Seller's market", "up"
+    elif buyer > seller:
+        label, tone = "Balanced, leaning buyers", "dn"
+    elif seller > buyer:
+        label, tone = "Balanced, leaning sellers", "up"
+    else:
+        label, tone = "Balanced market", ""
+    bits = []
+    if inv_yoy is not None:
+        bits.append(f"{'more' if inv_yoy > 0 else 'fewer'} homes for sale than last year")
+    if cut is not None:
+        bits.append(f"{cut:.0f}% have cut their price")
+    reason = (", ".join(bits)[:1].upper() + ", ".join(bits)[1:]) if bits else ""
+    return label, tone, reason
 MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
 
@@ -2573,12 +2601,11 @@ def _summary(name, v, rate):
         s.append(f"That is {word} what local incomes have historically supported: fair value is about {_fmt(v.get('fair_value'), 'usd')}, "
                  f"so the area is {abs(ov):.1f}% {'overvalued' if ov > 0 else 'undervalued'}.")
         faq.append((f"Is {name} overvalued?", s[-1].replace("That is", f"Home prices in {name} are")))
-    ms, inv_yoy, dom = v.get("months_supply"), v.get("inv_yoy"), v.get("dom")
-    buyer = sum([bool(ms and ms > 4), bool(inv_yoy and inv_yoy > 10), bool(yoy is not None and yoy < 0), bool(v.get("cut") and v["cut"] > 20)])
-    seller = sum([bool(ms and ms < 2.5), bool(inv_yoy is not None and inv_yoy < 0), bool(yoy and yoy > 4), bool(dom and dom < 30)])
-    if ms or dom:
-        kind = "a buyer's market" if buyer - seller >= 2 else "a seller's market" if seller - buyer >= 2 else \
-            "a balanced market, leaning toward buyers" if buyer > seller else "a balanced market, leaning toward sellers" if seller > buyer else "a balanced market"
+    inv_yoy, dom = v.get("inv_yoy"), v.get("dom")
+    mk = _market(v)
+    if mk:
+        kind = {"Buyer's market": "a buyer's market", "Seller's market": "a seller's market", "Balanced, leaning buyers": "a balanced market, leaning toward buyers",
+                "Balanced, leaning sellers": "a balanced market, leaning toward sellers"}.get(mk[0], "a balanced market")
         bits = [f"homes take about {dom:.0f} days to sell" if dom else "",
                 f"listings are {'up' if inv_yoy > 0 else 'down'} {abs(inv_yoy):.0f}% from a year ago" if inv_yoy is not None else "",
                 f"{v['cut']:.0f}% of listings have had a price cut" if v.get("cut") is not None else ""]
@@ -2615,7 +2642,8 @@ main{max-width:960px;margin:0 auto;padding:20px}.crumbs{font-size:13px;color:#6b
 h1{font:600 32px/1.2 Fraunces,Georgia,serif;margin:6px 0 4px;color:#06463f}h2{font:600 21px Fraunces,Georgia,serif;margin:28px 0 10px;color:#06463f}
 .sub{color:#6b6457;font-size:14px;margin:0 0 18px}.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 .kpi{background:#fff;border:1px solid #e7e2d8;border-radius:12px;padding:12px 14px}.kpi span{display:block;font-size:13px;color:#6b6457}.kpi b{font-size:22px}
-.kpi small{display:block;font-size:13px}.up{color:#9c2f1c}.dn{color:#0b5d5a}.lede{background:#fff;border:1px solid #e7e2d8;border-radius:12px;padding:16px 18px;margin-top:16px}
+.kpi small{display:block;font-size:13px;color:#4b463d;line-height:1.4;margin-top:3px}.kpi small em{font-style:normal;font-weight:600}.up{color:#9c2f1c}.dn{color:#0b5d5a}
+.kpi b{display:block;line-height:1.25}.kpi .word{font-size:18px}.more{margin-top:6px}.more summary{cursor:pointer;color:#126b60;font-weight:600;font-size:14px;padding:4px 2px}.more table{margin-top:6px}.lede{background:#fff;border:1px solid #e7e2d8;border-radius:12px;padding:16px 18px;margin-top:16px}
 .chart{background:#fff;border:1px solid #e7e2d8;border-radius:12px;padding:12px 14px}.chart svg{width:100%;height:auto;font-size:11px;fill:#6b6457}
 .legend{font-size:12.5px;color:#6b6457}table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e7e2d8;border-radius:12px;overflow:hidden}
 td{padding:8px 14px;border-bottom:1px solid #efeae0;font-size:15px}td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
@@ -2723,21 +2751,46 @@ def write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa)
                 zl = sorted(zips_of.get(pid, []))
                 if zl:
                     link_groups.append((f"ZIP codes in {p['n']} (open on the map)", [(z, f"/#zip/{z}") for z in zl]))
-            kpi = lambda k, label, kind, note="": (f'<div class="kpi"><span>{label}</span><b>{_fmt(v[k], kind)}</b>{note}</div>' if v.get(k) is not None else "")
+            # five headline tiles, each with a plain-English line, for readers new to housing data
+            tile = lambda label, big, note="", tone="": f'<div class="kpi"><span>{label}</span><b class="{tone}">{big}</b><small>{note}</small></div>'
+            tiles = []
             yo = v.get("hv_yoy")
-            ov = v.get("overvalued")
-            kpis = "".join([
-                kpi("hv", "Typical home value", "usd", f'<small class="{"up" if (yo or 0) > 0 else "dn"}">{_fmt(yo, "spct")} in a year</small>' if yo is not None else ""),
-                kpi("fair_value", "Fair home value", "usd", f'<small class="{"up" if (ov or 0) > 0 else "dn"}">{abs(ov):.1f}% {"overvalued" if ov > 0 else "undervalued"}</small>' if ov is not None else ""),
-                kpi("rent", "Typical rent", "usd"),
-                kpi("dom", "Days on market", "num"),
-                kpi("fc_1y", "Forecast, next 12 months", "spct"),
-            ])
+            if v.get("hv"):
+                trend = "" if yo is None else ("prices are rising fast" if yo > 3 else "prices are rising" if yo > 0.5 else
+                                               "prices are flat" if yo >= -0.5 else "prices are falling" if yo >= -3 else "prices are falling fast")
+                tiles.append(tile("Typical home value", _fmt(v["hv"], "usd"),
+                                  f'<em class="{"up" if (yo or 0) > 0 else "dn"}">{_fmt(yo, "spct")} YoY</em> · {trend}' if yo is not None else ""))
+            mk = _market(v)
+            if mk:
+                tiles.append(tile("Market right now", f'<span class="word">{mk[0]}</span>', mk[2], mk[1]))
+            sal, inc = v.get("salary_needed"), v.get("income")
+            if sal:
+                note = ""
+                if inc:
+                    x = sal / inc
+                    verdict = "affordable for a typical household" if x <= 1 else "a stretch for a typical household" if x <= 1.5 else "hard to afford"
+                    note = f"About {x:.1f}× the local median income ({_fmt(inc, 'usd')}): {verdict}"
+                tiles.append(tile("Income needed to buy, per year", _fmt(sal, "usd"), note, "up" if inc and sal > 1.5 * inc else ""))
+            if v.get("dom") is not None:
+                dy = v.get("dom_yoy")
+                note = "" if dy is None else ("About the same pace as a year ago" if abs(dy) < 5 else
+                                              "Slower than a year ago: buyers have time to negotiate" if dy > 0 else
+                                              "Faster than a year ago: sellers have the edge")
+                tiles.append(tile("Days on market", f"{v['dom']:.0f} days", note))
+            fc = v.get("fc_1y")
+            if fc is not None:
+                note = ("Zillow expects prices to rise strongly" if fc > 4 else "Zillow expects prices to rise slightly" if fc > 0.5 else
+                        "Zillow expects prices to stay about flat" if fc >= -0.5 else "Zillow expects prices to dip slightly" if fc >= -4 else
+                        "Zillow expects prices to fall")
+                tiles.append(tile("Next 12 months", _fmt(fc, "spct"), note, "up" if fc > 0.5 else "dn" if fc < -0.5 else ""))
+            kpis = "".join(tiles)
             tables = ""
             for title_s, rows in PAGE_SECTIONS:
-                trs = "".join(f"<tr><td>{lab}</td><td>{_fmt(v[k], kind)}</td></tr>" for k, lab, kind in rows if v.get(k) is not None)
+                trs = [f"<tr><td>{lab}</td><td>{_fmt(v[k], kind)}</td></tr>" for k, lab, kind in rows if v.get(k) is not None]
                 if trs:
-                    tables += f"<h2>{title_s}</h2><table>{trs}</table>"
+                    more = (f'<details class="more"><summary>Show {len(trs) - 3} more</summary><table>{"".join(trs[3:])}</table></details>'
+                            if len(trs) > 3 else "")
+                    tables += f"<h2>{title_s}</h2><table>{''.join(trs[:3])}</table>{more}"
             links = "".join(f"<h2>{esc(t)}</h2><div class=\"links\">" + "".join(f'<a href="{h}">{esc(n)}</a>' for n, h in items) + "</div>"
                             for t, items in link_groups if items)
             faq_html = "".join(f"<dt>{esc(q)}</dt><dd>{esc(ans)}</dd>" for q, ans in faq)
