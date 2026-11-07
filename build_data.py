@@ -1540,6 +1540,44 @@ def trend_gap(series, min_points=120):
     return (latest(series)[1] / fair - 1) * 100
 
 
+def income_month(inc, ym):
+    """Household income for a month: each year's figure sits at mid-year, months in between are interpolated, and months
+    after the last published year grow at the last 3 years' average pace (kept between 0% and 4% a year)."""
+    yrs = sorted(int(y) for y, v in (inc or {}).items() if v)
+    if not yrs:
+        return None
+    t = int(ym[:4]) + (int(ym[5:7]) - 7) / 12
+    first, last = yrs[0], yrs[-1]
+    if t >= last:
+        prev = inc.get(str(last - 3))
+        g = min(0.04, max(0.0, (inc[str(last)] / prev) ** (1 / 3) - 1)) if prev else 0.03
+        return inc[str(last)] * (1 + g) ** (t - last)
+    if t <= first:
+        return inc[str(first)] if t > first - 1 else None
+    lo = max(y for y in yrs if y <= t)
+    hi = min(y for y in yrs if y > t)
+    return inc[str(lo)] + (inc[str(hi)] - inc[str(lo)]) * (t - lo) / (hi - lo)
+
+
+def fair_ratio(series, inc, years=20, min_months=60):
+    """The place's average price-to-income ratio over the last 20 years (or as far back as both go). Fair value for any
+    month = that month's income x this ratio; today's price above it = overvalued. Same idea Reventure describes."""
+    if not series or not inc:
+        return None
+    last = max(series)
+    start = months_back(last, years * 12)
+    ratios = [v / i for k, v in series.items() if k > start and v and (i := income_month(inc, k))]
+    return sum(ratios) / len(ratios) if len(ratios) >= min_months else None
+
+
+def fair_gap(series, inc, years=20, min_months=60):
+    r = fair_ratio(series, inc, years, min_months)
+    if not r:
+        return None
+    k, v = latest(series)
+    return (v / (income_month(inc, k) * r) - 1) * 100
+
+
 def house_rent(rent, ratio):
     """Estimated rent for houses: a place's typical rent x its metro's house-to-all-homes rent ratio, month by month."""
     if not rent or not ratio:
@@ -1586,7 +1624,7 @@ def tidy(v):
 EXPENSES = 0.35  # share of rent assumed to go to taxes, insurance, upkeep and vacancy (for the cap rate)
 
 
-def metrics_for(z, zr, rt, income, rate, forecast=None, sfr=None, condo=None, rent_sfr=None, units=None, tax_rate=None):
+def metrics_for(z, zr, rt, income, rate, forecast=None, sfr=None, condo=None, rent_sfr=None, units=None, tax_rate=None, inc_series=None):
     """Monthly-data metrics for one place. z/zr/sfr/condo/rent_sfr: Zillow series, rt: Realtor.com series."""
     m = {}
     hv_k, hv = latest(z or {})
@@ -1596,7 +1634,10 @@ def metrics_for(z, zr, rt, income, rate, forecast=None, sfr=None, condo=None, re
         m["hv_mom"] = rnd(change(z, 1), 2)
         m["hv_yoy"] = rnd(change(z, 12), 1)
         m["hv_5y"] = rnd(change(z, 60), 1)
-        m["overvalued"] = rnd(trend_gap(z), 1)
+        m["overvalued"] = rnd(fair_gap(z, inc_series), 1)
+        r = fair_ratio(z, inc_series)
+        if r:
+            m["fair_value"] = rnd(income_month(inc_series, max(z)) * r, 0)
         peak22 = window_extreme(z, "2022-01", "2022-12", max)
         m["from_2022_peak"] = rnd((hv / peak22 - 1) * 100, 1) if peak22 else None
         peak = window_extreme(z, "2005-01", "2008-12", max)
@@ -1620,7 +1661,7 @@ def metrics_for(z, zr, rt, income, rate, forecast=None, sfr=None, condo=None, re
     if rent:
         m["rent"] = rnd(rent, 0)
         m["rent_yoy"] = rnd(change(zr, 12), 1)
-        m["rent_overvalued"] = rnd(trend_gap(zr, 48), 1)
+        m["rent_overvalued"] = rnd(fair_gap(zr, inc_series, min_months=48), 1)
         if income:
             m["rent_pct_income"] = rnd(rent * 12 / income * 100, 1)
         if hv:
@@ -2105,7 +2146,7 @@ def main():
         fc_series = state_fc.get(pid) if lvl == "state" else fc_hist.get(fc_key)
         rs = srcs(zrs, lvl, pid) or (house_rent(srcs(zr, lvl, pid), rent_ratio.get(fc_key)) if lvl == "county" else None)
         m = metrics_for(z, srcs(zr, lvl, pid), rt[lvl].get(pid), la.get("income"), rate, (fc_series or {}).get(zillow_month),
-                        srcs(zs, lvl, pid), srcs(zc, lvl, pid), rs, la.get("units"), la.get("prop_tax_rate"))
+                        srcs(zs, lvl, pid), srcs(zc, lvl, pid), rs, la.get("units"), la.get("prop_tax_rate"), a.get("income"))
         xs = {key: srcs(zx[key], lvl, pid) for key in ZILLOW_EXTRA}
         m.update(extra_metrics(xs))
         v = {**{k: x for k, x in la.items() if k not in ("prop_tax",)}, **m}
@@ -2186,6 +2227,7 @@ def main():
 
     # ZIP codes: the biggest files, so the state/metro/county data is let go of first.
     county_income = {pid: latest_annual(a).get("income") for pid, a in A["county"].items()}
+    county_inc_hist = {pid: a["income"] for pid, a in A["county"].items() if a.get("income")}
     # ZIP codes show their county's weather and election results (neither is published by ZIP).
     # (and the county's moves in and out, and its air quality: neither is published by ZIP either)
     shared_keys = ("temp", "vote_r", "vote_d", "mig_in", "mig_out", "mig_net", "mig_net_pct", "mig_in_income", "mig_out_income",
@@ -2195,11 +2237,71 @@ def main():
     del zv, zs, zc, zr, zrs, rt, hist, A, R
     zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared,
                                        srat["zip"], zip_schools, haz.get("zip", {}), haz_year, walk.get("zip", {}),
-                                       flood.get("zip") or {}, noise.get("zip") or {}, rent_ratio)
+                                       flood.get("zip") or {}, noise.get("zip") or {}, rent_ratio, county_inc_hist)
     meta["counts"]["zip"] = zip_count
     meta["zipBreaks"] = zip_breaks
     write_json(os.path.join(OUT, "meta.json"), meta)
     print(f"ZIP codes: {zip_count}")
+    data_check(meta, cpi, sscores)
+
+
+def data_check(meta, cpi, sscores):
+    """Looks for data that is late (a download that keeps failing, or a release that changed its address) and for new
+    releases this site can only add by hand. New findings go to notices.txt; the workflow turns that into a GitHub
+    issue, which GitHub emails to the repository owner. Each finding is reported once, until it is resolved."""
+    today = date.today()
+    mo, yr = today.month, today.year
+    found = {}
+
+    def months_old(ym):
+        return (yr - int(ym[:4])) * 12 + mo - int(ym[5:7]) if ym else 99
+
+    m, y = meta.get("months", {}), meta.get("years", {})
+    for name, ym, limit in (("Zillow", m.get("zillow"), 2), ("Realtor.com", m.get("realtor"), 2),
+                            ("CPI inflation (BLS)", max(cpi) if cpi else None, 3)):
+        if months_old(ym) > limit:
+            found[f"late:{name}"] = f"**{name}** is late: the newest month on the site is {ym or 'missing'}. The download may be failing; check the latest run's log."
+    rate_day = (meta.get("mortgage") or {}).get("date")
+    if rate_day and (today - date.fromisoformat(rate_day)).days > 21:
+        found["late:rate"] = f"**Mortgage rate (Freddie Mac)** is late: the newest rate is from {rate_day}."
+    # yearly sources: (label, newest year on the site, year expected by now)
+    expect = [
+        ("Household income (Census SAIPE)", y.get("income"), yr - 2 if mo >= 2 else yr - 3),
+        ("American Community Survey (Census)", y.get("acs"), yr - 2 if mo >= 2 else yr - 3),
+        ("Population (Census)", y.get("pop"), yr - 1 if mo >= 5 else yr - 2),
+        ("Building permits (Census)", y.get("permits"), yr - 1 if mo >= 7 else yr - 2),
+        ("Jobs and pay (BLS QCEW)", y.get("jobs"), yr - 1 if mo >= 11 else yr - 2),
+        ("Moves in and out (IRS)", y.get("migration"), yr - 3 if mo >= 9 else yr - 4),
+        ("Air quality (EPA)", y.get("air"), yr - 1 if mo >= 8 else yr - 2),
+    ]
+    for label, have, want in expect:
+        if have is None or int(have) < want:
+            found[f"late:{label}:{want}"] = f"**{label}** is late: the site has {have or 'nothing'}, and {want} figures are normally out by now. The release may be delayed, or its download address changed."
+    # sources added by hand
+    votes = y.get("votes")
+    if votes and (today >= date(int(votes) + 4, 12, 1)):
+        found[f"new:votes:{int(votes) + 4}"] = f"**New presidential election results ({int(votes) + 4})** should be available. Ask Claude to add them (the site only has up to {votes})."
+    last_school = max(SCHOOL_FILES)
+    for sy in range(last_school + 1, yr + 1):
+        try:
+            urllib.request.urlopen(urllib.request.Request(f"{EDFACTS}EDFacts_{sy}_School_math.csv", headers=PLAIN, method="HEAD"), timeout=30)
+            found[f"new:schools:{sy}"] = f"**Newer school test scores ({sy - 1}–{str(sy)[2:]})** are available. Ask Claude to add them (the site uses {last_school - 1}–{str(last_school)[2:]})."
+            break
+        except Exception:
+            pass
+    # report each finding once; forget the ones that were resolved, so they are reported again if they come back
+    seen = set(load_dcache("notices.json") or [])
+    new = [msg for key, msg in found.items() if key not in seen]
+    save_dcache("notices.json", sorted(found))
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "notices.txt")
+    if new:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("The twice-monthly update found something that needs your attention:\n\n")
+            f.write("\n".join(f"- {msg}" for msg in new))
+            f.write("\n\nEverything else on the site updates by itself. This was posted automatically by the update workflow.\n")
+        print(f"  data check: {len(new)} new notice(s)")
+    elif os.path.exists(path):
+        os.remove(path)
 
 
 # ---------- ZIP codes ----------
@@ -2520,7 +2622,7 @@ ZIP_RANKINGS = {
 
 
 def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared, zip_school_scores, zip_schools,
-               zip_haz, haz_year, zip_walk, zip_claims, zip_noise, rent_ratio):
+               zip_haz, haz_year, zip_walk, zip_claims, zip_noise, rent_ratio, county_inc_hist):
     print("ZIP codes: Zillow, Realtor.com, Census shapes")
     # Zillow's own ZIP forecasts, saved each run to build up a history (the chart uses the metro's until there are two).
     zfc_raw, _ = zillow_zip("zhvf_growth/Zip_zhvf_growth_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
@@ -2593,7 +2695,16 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
                 if hv:
                     a.setdefault("prop_tax", {})[y] = tidy(hv * r / 100)
         rs_d = house_rent(rent_d, rent_ratio.get(county_to_cbsa.get(county)))
-        v = metrics_for(hv_d, rent_d, rt_d, income, rate, fc_now, sfr_d, condo_d, rs_d, la.get("units"), la.get("prop_tax_rate"))
+        # Income history for fair value: the ZIP's own survey years, and before them its county's income scaled by how the
+        # ZIP compared with the county in the years both exist (saved as "inc_est" so the charts use the same figures).
+        zinc, cinc = a.get("income") or {}, county_inc_hist.get(county) or {}
+        both = [y for y in zinc if cinc.get(y)]
+        scale = sum(zinc[y] / cinc[y] for y in both) / len(both) if both else 1
+        est = {y: round(v * scale) for y, v in cinc.items() if y not in zinc and v and (not zinc or int(y) < int(min(zinc)))}
+        if est:
+            a["inc_est"] = est
+        v = metrics_for(hv_d, rent_d, rt_d, income, rate, fc_now, sfr_d, condo_d, rs_d, la.get("units"), la.get("prop_tax_rate"),
+                        {**est, **zinc})
         if not v:
             continue
         v.update({k: x for k, x in la.items() if k not in ("prop_tax",)})
