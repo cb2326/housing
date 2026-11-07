@@ -11,15 +11,16 @@
 <meta property="og:site_name" content="Open Housing Atlas">
 <meta property="og:title" content="Open Housing Atlas: the free US housing data map">
 <meta property="og:description" content="Home values, forecasts, schools, rents, hazard risk and more for every state, metro, county and ZIP code. Free, updated twice a month.">
-<meta property="og:url" content="https://cb2326.github.io/housing/">
-<meta property="og:image" content="https://cb2326.github.io/housing/og.png">
+<meta property="og:url" content="https://openhousingatlas.com/">
+<link rel="canonical" href="https://openhousingatlas.com/">
+<meta property="og:image" content="https://openhousingatlas.com/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Open Housing Atlas: the free US housing data map">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Open Housing Atlas: the free US housing data map">
 <meta name="twitter:description" content="Home values, forecasts, schools, rents, hazard risk and more for every US state, metro, county and ZIP code.">
-<meta name="twitter:image" content="https://cb2326.github.io/housing/og.png">
+<meta name="twitter:image" content="https://openhousingatlas.com/og.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23126b60'/%3E%3Cpath d='M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z' fill='none' stroke='%23e6f4f1' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M25 15v29M39 20v29' stroke='%238ccdc0' stroke-width='3.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
@@ -406,7 +407,7 @@
       <input id="dpSearch" type="search" placeholder="Find a data point" aria-label="Find a data point"></label>
     <div class="groups" id="groups"></div>
     <a class="side-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span><b>Support on Ko-fi</b><small>Keep this atlas free for everyone</small></span></a>
-    <div class="side-foot">Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, BLS, IRS, FEMA, EPA, NOAA, U.S. Department of Education, MIT Election Lab, Freddie Mac. Updated twice a month. Personal use; not financial advice.</div>
+    <div class="side-foot"><a href="/markets/" style="display:block;margin-bottom:6px;font-weight:600;color:#126b60">Browse all markets: state, metro and county reports →</a>Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, BLS, IRS, FEMA, EPA, NOAA, U.S. Department of Education, MIT Election Lab, Freddie Mac. Updated twice a month. Personal use; not financial advice.</div>
   </aside>
   <main class="stage">
     <div class="nudge" id="nudge" role="dialog" aria-label="Support this site" hidden>
@@ -1174,7 +1175,25 @@ async function init() {
   renderGroups();
   setLevel(ui.level);
   document.getElementById('loading').remove();
+  openFromHash();
 }
+// Links to a place: openhousingatlas.com/#county/06037 (optionally /data-point, e.g. #zip/91326/rent) opens it.
+// Opening a place updates the address bar the same way, so it can be copied and shared.
+async function openFromHash() {
+  const m = decodeURIComponent(location.hash).match(/^#(state|metro|county|zip)\/(\w+)(?:\/(\w+))?/);
+  if (!m) return;
+  const [, level, id, metric] = m;
+  if (metric && M[metric] && hasData(metric) && metric !== ui.metric) setMetric(metric);
+  if (level === 'zip') {
+    await loadZipIndex();
+    const h = index.find(x => x.level === 'zip' && x.id === id);
+    if (h) pick(h);
+  } else if (D[level] && D[level][id]) {
+    if (ui.level !== level) setLevel(level); // (so a county link opens the county, even if the map was left on ZIPs)
+    pick({ level, id, label: placeName(level, D[level][id]) });
+  }
+}
+addEventListener('hashchange', () => { if (!openPlace || location.hash !== `#${openPlace.level}/${openPlace.id}`) openFromHash(); });
 
 // ---------- place search ----------
 let index = [], zipIndexLoaded = null;
@@ -1262,6 +1281,7 @@ async function openDetail(level, id) {
   const p = D[level][id];
   if (!p) return;
   openPlace = { level, id };
+  try { history.replaceState(null, '', `#${level}/${id}`); } catch (e) {}
   placesSeen++; if (typeof maybeNudge === 'function') setTimeout(maybeNudge, 1500);
   outline(level, id);
   hist = null;
@@ -1306,7 +1326,7 @@ function outline(level, id) {
     L.geoJSON(feats, { interactive: false, style: { color: '#0b1220', weight: 4.5, fill: false, opacity: 1 } }),
   ]).addTo(map);
 }
-function closeDrawer() { drawer.classList.remove('open'); document.querySelector('.stage').classList.remove('panel-open'); openPlace = null; outline(); }
+function closeDrawer() { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} drawer.classList.remove('open'); document.querySelector('.stage').classList.remove('panel-open'); openPlace = null; outline(); }
 document.getElementById('dClose').addEventListener('click', closeDrawer);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
 
@@ -1726,7 +1746,7 @@ function exportChart() {
     g.fillStyle = '#6b7280'; g.font = `11px ${font}`;
     g.fillText(`Source: ${sourceText(k, keys)}${svg.dataset.cpi ? ' · Inflation: U.S. Bureau of Labor Statistics (CPI)' : ''}${svg.dataset.vals2 && overlayKey ? ` · ${sourceParts(overlayKey).name}` : ''}`, 18, TOP + H + 18);
     g.fillStyle = '#126b60'; g.font = `600 11px ${font}`;
-    g.textAlign = 'right'; g.fillText('Open Housing Atlas · cb2326.github.io/housing', W - 18, TOP + H + 18);
+    g.textAlign = 'right'; g.fillText('Open Housing Atlas · openhousingatlas.com', W - 18, TOP + H + 18);
     c.toBlob(blob => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
