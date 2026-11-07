@@ -115,6 +115,19 @@
   .lg-support { position: absolute; right: 0; bottom: calc(100% + 8px); display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px 4px 8px; border-radius: 999px; background: #fbe9e3; border: 1px solid #f6b89b; color: #9c2f1c; font-size: 12px; font-weight: 600; text-decoration: none; box-shadow: var(--shadow); }
   .lg-support:hover { background: #f8dccf; }
   .lg-support svg { width: 13px; height: 13px; }
+  /* A one-time, closable note asking for support, shown after the visitor has used the map for a while */
+  .nudge { position: absolute; right: 14px; z-index: 560; width: 300px; max-width: calc(100% - 28px); background: var(--panel); border: 1px solid #f6b89b; border-radius: 14px; box-shadow: 0 12px 30px rgba(0,0,0,.18); padding: 14px 16px 12px; font-size: 13px; line-height: 1.45; animation: nudgeIn .35s ease-out; }
+  .nudge[hidden] { display: none; }
+  .nudge::after { content: ''; position: absolute; right: 34px; bottom: -8px; width: 14px; height: 14px; background: var(--panel); border-right: 1px solid #f6b89b; border-bottom: 1px solid #f6b89b; transform: rotate(45deg); }
+  .nudge b { display: block; font: 600 15px var(--display); color: #9c2f1c; margin-bottom: 3px; padding-right: 20px; }
+  .nudge p { margin: 0 0 10px; color: var(--text); }
+  .nudge .n-row { display: flex; gap: 8px; align-items: center; }
+  .nudge .n-go { flex: 1; text-align: center; background: #e76f51; color: #fff; border-radius: 9px; padding: 8px; font-weight: 600; text-decoration: none; }
+  .nudge .n-go:hover { background: #d35d40; }
+  .nudge .n-later { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 12.5px; padding: 8px 4px; }
+  .nudge .n-x { position: absolute; top: 8px; right: 8px; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 13px; width: 24px; height: 24px; }
+  @keyframes nudgeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @media (max-width: 820px) { .nudge { left: 10px; right: 10px; width: auto; max-width: none; } }
   .legend .asof { color: var(--muted); font-size: 11.5px; margin-bottom: 8px; }
   .legend .bar { display: flex; gap: 2px; }
   .legend .bar i { flex: 1; height: 12px; }
@@ -396,6 +409,12 @@
     <div class="side-foot">Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, BLS, IRS, FEMA, EPA, NOAA, U.S. Department of Education, MIT Election Lab, Freddie Mac. Updated twice a month. Personal use; not financial advice.</div>
   </aside>
   <main class="stage">
+    <div class="nudge" id="nudge" role="dialog" aria-label="Support this site" hidden>
+      <button type="button" class="n-x" data-nudge-x aria-label="Close">✕</button>
+      <b>Finding this useful?</b>
+      <p>Open Housing Atlas is free, with no ads and no sign-up. If it helped you, a small tip on Ko-fi keeps the data updated and the site running.</p>
+      <div class="n-row"><a class="n-go" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener" data-nudge-go>♥ Support on Ko-fi</a><button type="button" class="n-later" data-nudge-x>Maybe later</button></div>
+    </div>
     <div class="aff-wrap" id="affordWrap" hidden><div class="afford" id="affordBox" role="dialog" aria-modal="true" aria-label="What can I afford?"></div></div>
     <div id="map"></div>
     <div class="topbar">
@@ -457,6 +476,7 @@
 // ---------- data points ----------
 // f (format): usd, pct (already in %), pct2 (2 decimals), num, ratio (×), r2 (plain, 2 decimals), days, deg, dens, yrs, score.
 // d: diverging scale centred on 0 (else light-to-dark). src: where it comes from (shown under the legend).
+const HUD_I = "The rent HUD sets each year for housing vouchers (Section 8): what a modest, decent home of this size rents for, gross of utilities (40th percentile of local rents). Counties get their own figure; metros and states are averages of their counties; ZIP codes show their own figure where HUD sets rents by ZIP code (Small Area FMRs), otherwise their county's. Year = HUD's fiscal year (starts in October).";
 const M = {
   // home prices (Zillow)
   hv:            { l: 'Home value', f: 'usd', src: 'zillow', i: 'Typical home value (Zillow Home Value Index, mid-tier homes of all kinds).' },
@@ -465,6 +485,8 @@ const M = {
   hv_5y:         { l: 'Price change (5 years)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical home value over the last 5 years.' },
   fc_1y:         { l: 'Price forecast (next 12 months)', f: 'pct', d: 1, src: 'forecast', i: "Zillow's forecast for home values 12 months ahead. Zillow publishes it for metros and ZIP codes; counties show their metro's, and states an average of their metros weighted by population. The chart shows Zillow's past forecasts (saved copies go back to 2022)." },
   overvalued:    { l: 'Overvalued %', f: 'pct', d: 1, src: 'fair', i: "How far today's home value sits above (+) or below (−) its fair value. Fair value = local household income × the place's average home-value-to-income ratio over the last 20 years. A rough gauge, not a prediction." },
+  hv_long:       { l: 'Home value since 1975 (estimate)', f: 'usd', src: 'fhfa', i: "Estimated typical home value every year back to 1975 (or as far back as FHFA has data): FHFA's House Price Index, which tracks repeat sales of the same homes, scaled so its latest year matches Zillow's typical value. Good for the long view; for recent years, Home value is more exact." },
+  hpi_change:    { l: 'Price change by year (since 1975)', f: 'pct', d: 1, src: 'fhfa', i: "How much home prices rose or fell each year, back to 1975 (FHFA House Price Index, based on repeat sales of the same homes)." },
   fair_value:    { l: 'Fair home value', f: 'usd', src: 'fair', i: "What the typical home would cost if prices were at their usual multiple of local income: household income × the place's average home-value-to-income ratio over the last 20 years. ZIP codes use their own income since 2020 and their county's (scaled) before that." },
   from_2022_peak:{ l: 'Change since the 2022 peak', f: 'pct', d: 1, src: 'zillow', i: "Today's home value compared with its highest month in 2022." },
   crash_2007:    { l: 'Drop in the 2007–12 crash', f: 'pct', d: 1, src: 'zillow', i: 'Drop from the 2005–08 peak to the 2008–13 low during the last housing crash. The chart shows the slide from the peak.' },
@@ -569,6 +591,11 @@ const M = {
   // investor metrics
   rent:          { l: 'Typical rent', f: 'usd', src: 'zillow', i: 'Typical asking rent, all rentals (Zillow Observed Rent Index).' },
   rent_sfr:      { l: 'Typical rent for houses', f: 'usd', src: 'zillow', i: "Typical asking rent for single-family houses. Zillow publishes this for metro areas; for counties and ZIP codes it is an estimate: the place's typical rent times its metro's house-to-all-homes rent ratio that month." },
+  fmr_0br:       { l: 'HUD Fair Market Rent: studio', f: 'usd', src: 'hud', i: HUD_I },
+  fmr_1br:       { l: 'HUD Fair Market Rent: 1 bedroom', f: 'usd', src: 'hud', i: HUD_I },
+  fmr_2br:       { l: 'HUD Fair Market Rent: 2 bedrooms', f: 'usd', src: 'hud', i: HUD_I },
+  fmr_3br:       { l: 'HUD Fair Market Rent: 3 bedrooms', f: 'usd', src: 'hud', i: HUD_I },
+  fmr_4br:       { l: 'HUD Fair Market Rent: 4 bedrooms', f: 'usd', src: 'hud', i: HUD_I },
   rent_yoy:      { l: 'Rent change (1 year)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical rent over the last 12 months.' },
   cap_rate:      { l: 'Cap rate (estimate)', f: 'pct2', src: 'zillow', i: 'A year of typical rent, minus 35% for taxes, insurance, upkeep and vacancy, divided by the typical home value. A rough estimate.' },
   vacancy:       { l: 'Rental vacancy', f: 'pct', src: 'acs', i: 'Rental vacancy: homes for rent that are empty, as a share of all rental homes.' },
@@ -590,6 +617,9 @@ const M = {
   market_heat:   { l: 'Market heat index', f: 'score', src: 'zillow', i: "Zillow's market temperature: about 50 is balanced, higher favours sellers, lower favours buyers." },
   // added: jobs and pay (BLS), and more from the Census survey
   unemployment:  { l: 'Unemployment rate', f: 'pct', src: 'acs', i: 'Share of the labor force without a job and looking for one (Census American Community Survey, 5-year average).' },
+  rpp_all:       { l: 'Cost of living (US = 100)', f: 'num1', src: 'bea', i: "How expensive everyday life is compared with the US average (100): 110 means prices are 10% higher. BEA Regional Price Parities, covering goods, rents, utilities and services. Counties and ZIP codes show their metro area's figure (or their state's figure for areas outside metros)." },
+  rpp_housing:   { l: 'Housing costs (US = 100)', f: 'num1', src: 'bea', i: "Rents and housing costs compared with the US average (100), from BEA Regional Price Parities. Counties and ZIP codes show their metro area's figure (or their state's outside metros)." },
+  income_real:   { l: 'Income adjusted for cost of living', f: 'usd', src: 'bea', i: "Median household income divided by the cost of living, so places can be compared fairly: what the income is worth at average US prices. $90,000 where prices are 20% above average counts as $75,000." },
   mig_net:       { l: 'Net moves (IRS)', f: 'num', d: 1, src: 'irs', i: 'People who moved in during the year minus people who moved out, from IRS tax returns (in-state and out-of-state moves; metros and states leave out moves within them). ZIP codes show their county.' },
   mig_net_pct:   { l: 'Net moves, % of population', f: 'pct', d: 1, src: 'irs', i: 'Net moves (in minus out, IRS tax returns) as a share of the population. ZIP codes show their county.' },
   mig_in:        { l: 'People moving in', f: 'num', src: 'irs', i: 'People who moved here from elsewhere in the US (or abroad) during the year, counted from IRS tax returns. ZIP codes show their county.' },
@@ -633,14 +663,14 @@ const M = {
 // Sections in the sidebar (a data point may sit in more than one). START_HERE: the quick buttons at the top.
 const START_HERE = [['afford', 'What can I afford?'], ['hv', 'Home value'], ['hv_yoy', 'Price change'], ['school_score', 'Schools'], ['rent', 'Rent'], ['risk', 'Hazard risk'], ['walk', 'Walkability'], ['fc_1y', 'Forecast'], ['growth_score', 'Growth outlook']];
 const GROUPS = [
-  ['Prices and affordability', ['hv', 'hv_yoy', 'hv_mom', 'hv_5y', 'fc_1y', 'sale_price', 'sale_price_yoy', 'hv_low', 'hv_high', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'fair_value', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
+  ['Prices and affordability', ['hv', 'hv_long', 'hv_yoy', 'hpi_change', 'hv_mom', 'hv_5y', 'fc_1y', 'sale_price', 'sale_price_yoy', 'hv_low', 'hv_high', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'fair_value', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
   ['Market activity', ['market_heat', 'inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'sale_to_list', 'pct_above_list', 'days_to_pending', 'pending_ratio', 'dom', 'dom_yoy', 'cut', 'price_up', 'lp', 'lp_yoy', 'ppsf', 'med_sqft', 'months_supply', 'inv_pct_houses'], 'activity'],
   ['Schools', ['school_score'], 'school'],
-  ['People and income', ['income', 'income_growth', 'unemployment', 'jobs', 'job_growth', 'avg_pay', 'pay_growth', 'commute', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'mig_net', 'mig_net_pct', 'mig_in', 'mig_out', 'mig_in_income', 'mig_out_income', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
+  ['People and income', ['income', 'income_real', 'rpp_all', 'rpp_housing', 'income_growth', 'unemployment', 'jobs', 'job_growth', 'avg_pay', 'pay_growth', 'commute', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'mig_net', 'mig_net_pct', 'mig_in', 'mig_out', 'mig_in_income', 'mig_out_income', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
   ['Climate, risk and walkability', ['risk', 'flood_risk', 'flood_zone_pct', 'flood_ins_pct', 'flood_claims', 'flood_claims_rate', 'flood_paid', 'fire_risk', 'hurricane_risk', 'tornado_risk', 'heat_risk', 'quake_risk', 'aqi_bad_days', 'aqi_median', 'noise_db', 'noise_loud', 'walk', 'temp'], 'leaf'],
   ['Who lives here', ['med_age', 'u18_pct', 'a2544_pct', 'a65_pct', 'a75_pct', 'family_hh', 'single_hh', 'homeown', 'mortgaged', 'rent_burden', 'owner_burden', 'seasonal_pct', 'year_built', 'own_2544_pct', 'own_65_pct', 'own_75_pct', 'rent_2544_pct', 'r_rent2544_own65', 'r_rent2544_own75', 'r_u18_65', 'r_u18_75', 'r_2544_65', 'r_2544_75'], 'building'],
   ['Lending', ['apps', 'origs', 'denial', 'avg_rate', 'conv_pct', 'govt_pct', 'fha_pct', 'va_pct', 'usda_pct', 'ltv', 'dti', 'dti43', 'buyer_income', 'loan_amt', 'price_med', 'second_pct', 'investor_pct', 'si_pct'], 'bank'],
-  ['For investors', ['rent', 'rent_sfr', 'rent_3br', 'rent_4br', 'rent_census', 'rent_yoy', 'rent_pct_income', 'price_rent', 'gross_yield', 'cap_rate', 'rent_overvalued', 'buy_vs_rent', 'vacancy', 'shadow', 'units', 'units_growth', 'permits', 'permits_pct'], 'chart'],
+  ['For investors', ['rent', 'rent_sfr', 'rent_3br', 'rent_4br', 'fmr_0br', 'fmr_1br', 'fmr_2br', 'fmr_3br', 'fmr_4br', 'rent_census', 'rent_yoy', 'rent_pct_income', 'price_rent', 'gross_yield', 'cap_rate', 'rent_overvalued', 'buy_vs_rent', 'vacancy', 'shadow', 'units', 'units_growth', 'permits', 'permits_pct'], 'chart'],
 ];
 // Small line icons for the section headers.
 const ICONS = {
@@ -675,6 +705,7 @@ function fmt(v, f, short) {
     case 'share': return (v * 100).toFixed(1) + '%';
     case 'ratio': return sign + a.toFixed(1) + '×';
     case 'r2': return sign + a.toFixed(2);
+    case 'num1': return sign + a.toFixed(1);
     case 'days': return nf0.format(v) + (short ? 'd' : ' days');
     case 'deg': return sign + a.toFixed(1) + '°F';
     case 'dens': return nf0.format(v) + (short ? '' : ' /sq mi');
@@ -1231,6 +1262,7 @@ async function openDetail(level, id) {
   const p = D[level][id];
   if (!p) return;
   openPlace = { level, id };
+  placesSeen++; if (typeof maybeNudge === 'function') setTimeout(maybeNudge, 1500);
   outline(level, id);
   hist = null;
   renderDrawer();
@@ -1518,6 +1550,9 @@ const SRC = {
   fema: ['FEMA (National Risk Index)', 'https://hazards.fema.gov/nri/'],
   epa: ['EPA (Smart Location Database)', 'https://www.epa.gov/smartgrowth/smart-location-mapping'],
   bls: ['U.S. Bureau of Labor Statistics (QCEW)', 'https://www.bls.gov/cew/'],
+  fhfa: ['FHFA House Price Index (scaled to Zillow’s typical value)', 'https://www.fhfa.gov/data/hpi'],
+  bea: ['U.S. Bureau of Economic Analysis (Regional Price Parities)', 'https://www.bea.gov/data/prices-inflation/regional-price-parities-state-and-metro-area'],
+  hud: ['HUD Fair Market Rents', 'https://www.huduser.gov/portal/datasets/fmr.html'],
   fair: ['Zillow Research (home values, rents); U.S. Census Bureau (household income)', 'https://www.zillow.com/research/data/'],
   irs: ['IRS Statistics of Income (U.S. migration data)', 'https://www.irs.gov/statistics/soi-tax-stats-migration-data'],
   epa_air: ['EPA (Air Quality System, annual AQI by county)', 'https://aqs.epa.gov/aqsweb/airdata/download_files.html'],
@@ -1539,6 +1574,7 @@ const RELEASE = {
   epa: { every: 'none', note: 'EPA has not announced a newer edition' },
   noise: { every: 'none', note: 'a one-time study of 2020 noise levels' },
   hmda: { every: 'year', m: 3 },
+  fhfa: { every: 'year', m: 3 }, bea: { every: 'year', m: 12, note: 'usually December to February' }, hud: { every: 'year', m: 9, note: 'for the year starting in October' },
 };
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 function releaseText(k) {
@@ -1866,6 +1902,37 @@ document.getElementById('affordBox').addEventListener('click', e => {
   if (time.on) stopTime();
   ui.metric = 'afford'; renderGroups(); restyle(); closeSide(); if (openPlace) renderDrawer();
 });
+
+// ---------- the support note ----------
+// Shown once, after a visitor has looked at 2 places and spent a minute on the map; pointing at the Support button.
+// "Maybe later" or ✕ hides it for 30 days; clicking through to Ko-fi hides it for good.
+const NUDGE_KEY = 'hm-nudge', pageStart = Date.now();
+let placesSeen = 0, nudgeTimer = null;
+function nudgeAllowed() {
+  try { const s = JSON.parse(localStorage.getItem(NUDGE_KEY) || '{}'); return !s.supported && !(s.until && Date.now() < s.until); } catch (e) { return true; }
+}
+function nudgeSave(o) { try { localStorage.setItem(NUDGE_KEY, JSON.stringify(o)); } catch (e) {} }
+function placeNudge() {
+  const n = document.getElementById('nudge'), lg = document.getElementById('legend');
+  if (!lg || !n.offsetParent) return;
+  const stage = n.offsetParent.getBoundingClientRect(), r = lg.getBoundingClientRect();
+  n.style.bottom = Math.round(stage.bottom - r.top + 46) + 'px'; // above the Support button that sits on the legend
+}
+function maybeNudge() {
+  const n = document.getElementById('nudge');
+  if (!n.hidden || !nudgeAllowed() || placesSeen < 2) return;
+  const wait = 60000 - (Date.now() - pageStart);
+  if (wait > 0) { clearTimeout(nudgeTimer); nudgeTimer = setTimeout(maybeNudge, wait); return; }
+  if (!document.getElementById('affordWrap').hidden) { nudgeTimer = setTimeout(maybeNudge, 15000); return; } // not on top of the questions
+  n.hidden = false; placeNudge();
+  if (window.goatcounter && goatcounter.count) goatcounter.count({ path: 'support-note-shown', title: 'Support note shown', event: true });
+}
+document.getElementById('nudge').addEventListener('click', e => {
+  if (e.target.closest('[data-nudge-go]')) { nudgeSave({ supported: 1 }); document.getElementById('nudge').hidden = true; return; }
+  if (e.target.closest('[data-nudge-x]')) { nudgeSave({ until: Date.now() + 30 * 864e5 }); document.getElementById('nudge').hidden = true; }
+});
+document.addEventListener('click', e => { if (e.target.closest('.lg-support, .side-support')) nudgeSave({ supported: 1 }); });
+addEventListener('resize', () => { if (!document.getElementById('nudge').hidden) placeNudge(); });
 
 // ---------- Compare places (up to 4) ----------
 const CMP_COLORS = ['#126b60', '#e76f51', '#334155', '#c99a06'];
