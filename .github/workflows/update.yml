@@ -40,6 +40,9 @@ jobs:
           # Optional: a free key from https://api.census.gov/data/key_signup.html, saved as a repository secret
           # (Settings -> Secrets and variables -> Actions -> New repository secret, name CENSUS_API_KEY).
           CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
+          # Optional: a free HUD User API token (https://www.huduser.gov/hudapi/public/register), saved the same way,
+          # name HUD_API_TOKEN. Adds HUD Fair Market Rents.
+          HUD_API_TOKEN: ${{ secrets.HUD_API_TOKEN }}
         run: python build_data.py
 
       - uses: actions/configure-pages@v6
@@ -51,9 +54,7 @@ jobs:
       - name: Publish
         id: deployment
         uses: actions/deploy-pages@v5
-        with:
-          # The site is large (a history file for every place), so give GitHub up to 45 minutes to copy it (default 10).
-          timeout: 2700000
+        # (GitHub allows this step at most 10 minutes; if it ever runs out, re-running the job usually works.)
 
       # Saves the once-a-year results (data_cache/) so later runs don't work them out again. On scheduled runs it also
       # notes the date: GitHub pauses scheduled jobs in repositories with no activity for 60 days.
