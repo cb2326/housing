@@ -2803,6 +2803,8 @@ Estimates are rough guides, not appraisals or financial advice. <a href="https:/
         f.write("</urlset>\n")
     with open(os.path.join(root, "robots.txt"), "w", encoding="utf-8") as f:
         f.write(f"User-agent: *\nAllow: /\nSitemap: {SITE_URL}/sitemap.xml\n")
+    # which place has which page, for the map's "Full report" button
+    write_json(os.path.join(OUT, "pages.json"), {lvl: {pid: p["_url"] for pid, p in places[lvl].items() if "_url" in p} for lvl in places})
     for lvl in places:
         for p in places[lvl].values():
             p.pop("_url", None)
