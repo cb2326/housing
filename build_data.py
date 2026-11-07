@@ -2450,6 +2450,12 @@ def main():
         for pid, bundle in hist[lvl].items():  # one small file per place, loaded when you click it
             write_json(os.path.join(OUT, "hist", lvl, f"{pid}.json"), bundle)
     print(f"Done: {meta['counts']} - Zillow {zillow_month}, Realtor.com {realtor_month}, mortgage {rate}% ({rate_day})")
+    try:
+        write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa)
+    except Exception as e:  # the pages are extra: never let them stop the data update
+        import traceback
+        traceback.print_exc()
+        print(f"  (pages not written: {e})")
 
     # ZIP codes: the biggest files, so the state/metro/county data is let go of first.
     county_income = {pid: latest_annual(a).get("income") for pid, a in A["county"].items()}
@@ -2470,6 +2476,337 @@ def main():
     write_json(os.path.join(OUT, "meta.json"), meta)
     print(f"ZIP codes: {zip_count}")
     data_check(meta, cpi, sscores)
+
+
+# ---------- search-friendly pages (one per state, metro and county) ----------
+SITE_URL = "https://openhousingatlas.com"
+PAGE_SECTIONS = [
+    ("Prices and affordability", [("hv", "Typical home value", "usd"), ("hv_yoy", "Change in 1 year", "spct"), ("hv_5y", "Change in 5 years", "spct"),
+                                  ("fair_value", "Fair home value", "usd"), ("overvalued", "Overvalued %", "spct"),
+                                  ("fc_1y", "Zillow forecast, next 12 months", "spct"), ("hv_income", "Home value to income", "x"),
+                                  ("mtg_pmt", "Monthly mortgage payment (20% down)", "usd"), ("salary_needed", "Income needed to afford it", "usd"),
+                                  ("prop_tax_rate", "Property tax rate", "pct2")]),
+    ("Rent and investing", [("rent", "Typical rent", "usd"), ("rent_sfr", "Typical rent for houses", "usd"), ("fmr_2br", "HUD Fair Market Rent, 2 bedrooms", "usd"),
+                            ("price_rent", "Price-to-rent ratio", "x"), ("gross_yield", "Gross rental yield", "pct2"), ("cap_rate", "Cap rate (estimate)", "pct2")]),
+    ("Market activity", [("inv", "Homes for sale", "num"), ("inv_yoy", "Listings vs a year ago", "spct"), ("dom", "Days on market", "num"),
+                         ("cut", "Listings with a price cut", "pct"), ("pending_ratio", "Pending sales per 100 listings", "num"), ("ppsf", "Asking price per sq ft", "usd")]),
+    ("People and jobs", [("pop", "Population", "num"), ("pop_growth", "Population change (1 year)", "spct"), ("income", "Median household income", "usd"),
+                         ("income_real", "Income adjusted for cost of living", "usd"), ("unemployment", "Unemployment rate", "pct"),
+                         ("mig_net", "Net moves in (IRS)", "snum"), ("rpp_all", "Cost of living (US = 100)", "n1")]),
+    ("Schools, risk and environment", [("school_score", "School rating (1 to 10)", "n1"), ("risk", "FEMA hazard risk score (0 to 100)", "n1"),
+                                       ("flood_risk", "Flood risk score", "n1"), ("fire_risk", "Wildfire risk score", "n1"),
+                                       ("aqi_bad_days", "Unhealthy air days a year", "num"), ("walk", "Walkability (1 to 20)", "n1"),
+                                       ("noise_db", "Road, rail and air noise", "db")]),
+]
+MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+
+def _slug(s):
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+
+
+def _fmt(v, kind):
+    if v is None:
+        return "—"
+    if kind == "usd":
+        return f"${v:,.0f}"
+    if kind == "spct":
+        return f"{'+' if v > 0 else '−' if v < 0 else ''}{abs(v):.1f}%"
+    if kind == "pct":
+        return f"{v:.1f}%"
+    if kind == "pct2":
+        return f"{v:.2f}%"
+    if kind == "x":
+        return f"{v:.1f}×"
+    if kind == "num":
+        return f"{v:,.0f}"
+    if kind == "snum":
+        return f"{'+' if v > 0 else '−' if v < 0 else ''}{abs(v):,.0f}"
+    if kind == "n1":
+        return f"{v:.1f}"
+    if kind == "db":
+        return f"{v:.0f} dB"
+    return str(v)
+
+
+def _chart_svg(points, fair):
+    """A small line chart (inline SVG): typical home value by year, and fair value as a dashed line."""
+    if len(points) < 3:
+        return ""
+    W, H, L, R, T, B = 640, 210, 58, 12, 12, 26
+    ys = [v for _, v in points] + [v for _, v in fair]
+    lo, hi = 0, max(ys) * 1.06
+    x0, x1 = points[0][0], points[-1][0]
+    X = lambda y: L + (W - L - R) * (y - x0) / max(1, x1 - x0)
+    Y = lambda v: T + (H - T - B) * (1 - (v - lo) / (hi - lo))
+    path = lambda pts: " ".join(f"{X(y):.1f},{Y(v):.1f}" for y, v in pts)
+    step = 10 ** max(0, len(str(int(hi))) - 1)
+    for m in (1, 2, 2.5, 5, 10):
+        if hi / (step * m / 10) <= 6:
+            step = step * m / 10
+            break
+    ticks = [t * step for t in range(0, int(hi // step) + 1)]
+    lab = lambda v: f"${v / 1e6:.1f}M" if v >= 1e6 else f"${v / 1e3:.0f}K"
+    years = [y for y in range(x0, x1 + 1) if y % (10 if x1 - x0 > 30 else 5) == 0]
+    out = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Typical home value by year">']
+    out += [f'<line x1="{L}" x2="{W - R}" y1="{Y(t):.1f}" y2="{Y(t):.1f}" stroke="#e7e2d8"/><text x="{L - 6}" y="{Y(t) + 4:.1f}" text-anchor="end">{lab(t)}</text>' for t in ticks]
+    out += [f'<text x="{X(y):.1f}" y="{H - 6}" text-anchor="middle">{y}</text>' for y in years]
+    if len(fair) > 2:
+        out.append(f'<polyline fill="none" stroke="#8a94a3" stroke-width="2" stroke-dasharray="5 4" points="{path(fair)}"/>')
+    out.append(f'<polyline fill="none" stroke="#126b60" stroke-width="2.4" points="{path(points)}"/>')
+    out.append("</svg>")
+    return "".join(out)
+
+
+def _summary(name, v, rate):
+    """Plain-English sentences built from the numbers (a template, not generated text), plus FAQ answers."""
+    s, faq = [], []
+    hv, yoy = v.get("hv"), v.get("hv_yoy")
+    if hv:
+        trend = "about the same as" if yoy is None or abs(yoy) < 0.5 else f"{'up' if yoy > 0 else 'down'} {abs(yoy):.1f}% from"
+        s.append(f"The typical home in {name} is worth {_fmt(hv, 'usd')}, {trend} a year ago.")
+    ov = v.get("overvalued")
+    if ov is not None:
+        word = ("well above" if ov > 10 else "slightly above" if ov > 0 else "slightly below" if ov > -10 else "well below")
+        s.append(f"That is {word} what local incomes have historically supported: fair value is about {_fmt(v.get('fair_value'), 'usd')}, "
+                 f"so the area is {abs(ov):.1f}% {'overvalued' if ov > 0 else 'undervalued'}.")
+        faq.append((f"Is {name} overvalued?", s[-1].replace("That is", f"Home prices in {name} are")))
+    ms, inv_yoy, dom = v.get("months_supply"), v.get("inv_yoy"), v.get("dom")
+    buyer = sum([bool(ms and ms > 4), bool(inv_yoy and inv_yoy > 10), bool(yoy is not None and yoy < 0), bool(v.get("cut") and v["cut"] > 20)])
+    seller = sum([bool(ms and ms < 2.5), bool(inv_yoy is not None and inv_yoy < 0), bool(yoy and yoy > 4), bool(dom and dom < 30)])
+    if ms or dom:
+        kind = "a buyer's market" if buyer - seller >= 2 else "a seller's market" if seller - buyer >= 2 else \
+            "a balanced market, leaning toward buyers" if buyer > seller else "a balanced market, leaning toward sellers" if seller > buyer else "a balanced market"
+        bits = [f"homes take about {dom:.0f} days to sell" if dom else "",
+                f"listings are {'up' if inv_yoy > 0 else 'down'} {abs(inv_yoy):.0f}% from a year ago" if inv_yoy is not None else "",
+                f"{v['cut']:.0f}% of listings have had a price cut" if v.get("cut") is not None else ""]
+        bits = [b for b in bits if b]
+        s.append(f"It is {kind}: " + ", ".join(bits) + "." if bits else f"It is {kind}.")
+        faq.append((f"Is {name} a buyer's or seller's market?", s[-1].replace("It is", f"{name} is", 1)))
+    if yoy is not None:
+        fc = v.get("fc_1y")
+        ans = f"Home values in {name} are {'down' if yoy < 0 else 'up'} {abs(yoy):.1f}% over the last year."
+        if fc is not None:
+            ans += f" Zillow's forecast for the next 12 months is {_fmt(fc, 'spct')}."
+        faq.append((f"Are home prices going down in {name}?", ans))
+        if fc is not None:
+            s.append(f"Zillow expects prices to {'rise' if fc > 0 else 'fall'} about {abs(fc):.1f}% over the next year.")
+    sal = v.get("salary_needed")
+    if sal:
+        inc = v.get("income")
+        txt = (f"A household needs about {_fmt(sal, 'usd')} a year to afford the typical home here at today's {rate}% mortgage rate "
+               f"(20% down, payment at 30% of income)" + (f"; the median household earns {_fmt(inc, 'usd')}." if inc else "."))
+        s.append(txt)
+        faq.append((f"How much do you need to earn to buy a home in {name}?", txt.replace(" here", f" in {name}")))
+    if v.get("rent"):
+        s.append(f"Typical rent is {_fmt(v['rent'], 'usd')} a month" + (f", or {_fmt(v['rent_sfr'], 'usd')} for a house." if v.get("rent_sfr") else "."))
+    if v.get("mig_net") is not None:
+        n = v["mig_net"]
+        s.append(f"In the latest IRS figures, {abs(n):,.0f} more people moved {'in than out' if n > 0 else 'out than in'}.")
+    return s, faq
+
+
+PAGE_CSS = """*{box-sizing:border-box}body{margin:0;font:16px/1.6 Inter,'Segoe UI',system-ui,sans-serif;color:#1d1b17;background:#faf7f1}
+a{color:#126b60}header.top{background:#fff;border-bottom:1px solid #e7e2d8}header.top div{max-width:960px;margin:0 auto;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.logo{font:600 20px Fraunces,Georgia,serif;color:#06463f;text-decoration:none}.btn{background:#126b60;color:#fff;padding:8px 14px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;white-space:nowrap}
+main{max-width:960px;margin:0 auto;padding:20px}.crumbs{font-size:13px;color:#6b6457}.crumbs a{color:#6b6457}
+h1{font:600 32px/1.2 Fraunces,Georgia,serif;margin:6px 0 4px;color:#06463f}h2{font:600 21px Fraunces,Georgia,serif;margin:28px 0 10px;color:#06463f}
+.sub{color:#6b6457;font-size:14px;margin:0 0 18px}.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kpi{background:#fff;border:1px solid #e7e2d8;border-radius:12px;padding:12px 14px}.kpi span{display:block;font-size:13px;color:#6b6457}.kpi b{font-size:22px}
+.kpi small{display:block;font-size:13px}.up{color:#9c2f1c}.dn{color:#0b5d5a}.lede{background:#fff;border:1px solid #e7e2d8;border-radius:12px;padding:16px 18px;margin-top:16px}
+.chart{background:#fff;border:1px solid #e7e2d8;border-radius:12px;padding:12px 14px}.chart svg{width:100%;height:auto;font-size:11px;fill:#6b6457}
+.legend{font-size:12.5px;color:#6b6457}table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e7e2d8;border-radius:12px;overflow:hidden}
+td{padding:8px 14px;border-bottom:1px solid #efeae0;font-size:15px}td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.links{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:15px}.faq dt{font-weight:600;margin-top:12px}.faq dd{margin:4px 0 0}
+footer{max-width:960px;margin:30px auto 0;padding:18px 20px 40px;font-size:13px;color:#6b6457;border-top:1px solid #e7e2d8}
+@media(max-width:600px){h1{font-size:26px}}"""
+
+
+def write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa):
+    """One static, search-friendly page per state, metro and county (site/state/…, site/metro/…, site/county/…),
+    a list of every market (site/markets/), sitemap.xml and robots.txt. Rebuilt on every run from the same data."""
+    from html import escape as esc
+    import shutil
+    root = os.path.dirname(OUT)
+    for d in ("state", "metro", "county", "markets"):
+        shutil.rmtree(os.path.join(root, d), ignore_errors=True)
+    zm = meta["months"].get("zillow") or ""
+    data_month = f"{MONTH_NAMES[int(zm[5:7]) - 1]} {zm[:4]}" if zm else ""
+    built = meta["built"][:10]
+    rate = meta["mortgage"]["rate"]
+    st_name = {f: n for f, (a, n) in STATES.items()}
+    st_abbr = {f: a for f, (a, n) in STATES.items()}
+    try:
+        zip_county = zcta_counties()
+    except Exception:
+        zip_county = {}
+    zips_of = {}
+    for z, c in zip_county.items():
+        zips_of.setdefault(c, []).append(z)
+
+    def url(lvl, pid):
+        p = places[lvl][pid]
+        if lvl == "state":
+            return f"/state/{_slug(st_name.get(pid, p['n']))}/"
+        if lvl == "metro":
+            return f"/metro/{_slug(p['n'])}/"
+        return f"/county/{st_abbr[pid[:2]].lower()}/{_slug(p['n'])}/"
+
+    def title(lvl, pid):
+        p = places[lvl][pid]
+        return st_name.get(pid, p["n"]) if lvl == "state" else p["n"] if lvl == "metro" else f"{p['n']}, {p['s']}"
+
+    used, urls = set(), []
+    for lvl in ("state", "metro", "county"):
+        for pid, p in places[lvl].items():
+            if lvl == "county" and pid[:2] not in STATES:
+                continue
+            if not p["v"].get("hv") and sum(1 for x in p["v"].values() if x is not None) < 15:
+                continue  # too little data for a useful page (search engines penalise near-empty pages)
+            u = url(lvl, pid)
+            if u in used:  # two places with the same name: keep both by adding the code
+                u = u.rstrip("/") + f"-{pid}/"
+            used.add(u)
+            p["_url"] = u
+    for lvl in ("state", "metro", "county"):
+        for pid, p in places[lvl].items():
+            if "_url" not in p:
+                continue
+            v, name = p["v"], title(lvl, pid)
+            b = hist[lvl].get(pid, {})
+            a = b.get("a") or {}
+            # chart: FHFA history since 1975 (scaled to Zillow), else Zillow yearly averages; fair value from income
+            if a.get("hv_long"):
+                pts = sorted((int(y), val) for y, val in a["hv_long"].items())
+            else:
+                yrs = {}
+                for k, val in (b.get("hv") or {}).items():
+                    yrs.setdefault(int(k[:4]), []).append(val)
+                pts = sorted((y, sum(vs) / len(vs)) for y, vs in yrs.items())
+            fair = []
+            r = fair_ratio(b.get("hv") or {}, a.get("income"))
+            if r:
+                fair = [(y, income_month(a["income"], f"{y}-07") * r) for y, _ in pts if income_month(a["income"], f"{y}-07")]
+            chart = _chart_svg(pts, fair)
+            lines, faq = _summary(name, v, rate)
+            # breadcrumbs and links
+            crumbs = [("Open Housing Atlas", "/"), ("All markets", "/markets/")]
+            if lvl != "state":
+                st = pid[:2] if lvl == "county" else next((c[:2] for c in metro_counties.get(pid, [])), None)
+                if st and st in places["state"]:
+                    crumbs.append((st_name[st], places["state"][st]["_url"]))
+            if lvl == "county" and county_to_cbsa.get(pid) in places["metro"] and "_url" in places["metro"][county_to_cbsa[pid]]:
+                m = county_to_cbsa[pid]
+                crumbs.append((places["metro"][m]["n"], places["metro"][m]["_url"]))
+            link_groups = []
+            if lvl == "state":
+                ms = sorted((m for m in places["metro"] if "_url" in places["metro"][m] and any(c[:2] == pid for c in metro_counties.get(m, []))),
+                            key=lambda m: -(places["metro"][m]["v"].get("pop") or 0))
+                cs = sorted((c for c in places["county"] if c[:2] == pid and "_url" in places["county"][c]), key=lambda c: places["county"][c]["n"])
+                link_groups += [("Metro areas", [(places["metro"][m]["n"], places["metro"][m]["_url"]) for m in ms]),
+                                ("Counties", [(places["county"][c]["n"], places["county"][c]["_url"]) for c in cs])]
+            elif lvl == "metro":
+                cs = sorted((c for c in metro_counties.get(pid, []) if c in places["county"] and "_url" in places["county"][c]),
+                            key=lambda c: -(places["county"][c]["v"].get("pop") or 0))
+                link_groups.append(("Counties in this metro", [(title("county", c), places["county"][c]["_url"]) for c in cs]))
+            else:
+                m = county_to_cbsa.get(pid)
+                near = [c for c in metro_counties.get(m, []) if c != pid and c in places["county"] and "_url" in places["county"][c]]
+                if len(near) < 6 and v.get("hv"):
+                    same = [c for c in places["county"] if c[:2] == pid[:2] and c != pid and c not in near and "_url" in places["county"][c]
+                            and places["county"][c]["v"].get("hv")]
+                    same.sort(key=lambda c: abs(places["county"][c]["v"]["hv"] - v["hv"]))
+                    near += same[: 8 - len(near)]
+                link_groups.append(("Nearby and similar counties", [(title("county", c), places["county"][c]["_url"]) for c in near[:10]]))
+                zl = sorted(zips_of.get(pid, []))
+                if zl:
+                    link_groups.append((f"ZIP codes in {p['n']} (open on the map)", [(z, f"/#zip/{z}") for z in zl]))
+            kpi = lambda k, label, kind, note="": (f'<div class="kpi"><span>{label}</span><b>{_fmt(v[k], kind)}</b>{note}</div>' if v.get(k) is not None else "")
+            yo = v.get("hv_yoy")
+            ov = v.get("overvalued")
+            kpis = "".join([
+                kpi("hv", "Typical home value", "usd", f'<small class="{"up" if (yo or 0) > 0 else "dn"}">{_fmt(yo, "spct")} in a year</small>' if yo is not None else ""),
+                kpi("fair_value", "Fair home value", "usd", f'<small class="{"up" if (ov or 0) > 0 else "dn"}">{abs(ov):.1f}% {"overvalued" if ov > 0 else "undervalued"}</small>' if ov is not None else ""),
+                kpi("rent", "Typical rent", "usd"),
+                kpi("dom", "Days on market", "num"),
+                kpi("fc_1y", "Forecast, next 12 months", "spct"),
+            ])
+            tables = ""
+            for title_s, rows in PAGE_SECTIONS:
+                trs = "".join(f"<tr><td>{lab}</td><td>{_fmt(v[k], kind)}</td></tr>" for k, lab, kind in rows if v.get(k) is not None)
+                if trs:
+                    tables += f"<h2>{title_s}</h2><table>{trs}</table>"
+            links = "".join(f"<h2>{esc(t)}</h2><div class=\"links\">" + "".join(f'<a href="{h}">{esc(n)}</a>' for n, h in items) + "</div>"
+                            for t, items in link_groups if items)
+            faq_html = "".join(f"<dt>{esc(q)}</dt><dd>{esc(ans)}</dd>" for q, ans in faq)
+            ld = [{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
+                {"@type": "ListItem", "position": i + 1, "name": n, "item": SITE_URL + h} for i, (n, h) in enumerate(crumbs + [(name, p["_url"])])]}]
+            if faq:
+                ld.append({"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
+                    {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": ans}} for q, ans in faq]})
+            desc = (f"{name} housing market: typical home value {_fmt(v.get('hv'), 'usd')}"
+                    + (f" ({_fmt(yo, 'spct')} in a year)" if yo is not None else "")
+                    + (f", fair value {_fmt(v.get('fair_value'), 'usd')}" if v.get("fair_value") else "")
+                    + (f", rent {_fmt(v.get('rent'), 'usd')}" if v.get("rent") else "")
+                    + ". Forecast, schools, risk and more. Free, updated twice a month.")
+            hash_link = f"/#{lvl}/{pid}"
+            page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{esc(name)} Housing Market: Home Prices, Rent and Forecast ({zm[:4]}) | Open Housing Atlas</title>
+<meta name="description" content="{esc(desc)}"><link rel="canonical" href="{SITE_URL}{p['_url']}">
+<meta property="og:title" content="{esc(name)} housing market"><meta property="og:description" content="{esc(desc)}">
+<meta property="og:url" content="{SITE_URL}{p['_url']}"><meta property="og:image" content="{SITE_URL}/og.png"><meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+<style>{PAGE_CSS}</style><script type="application/ld+json">{json.dumps(ld, separators=(",", ":"))}</script>
+<script data-goatcounter="https://openhousingatlas.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script></head><body>
+<header class="top"><div><a class="logo" href="/">Open Housing Atlas</a><a class="btn" href="{hash_link}">Open on the map</a></div></header>
+<main><nav class="crumbs">{" › ".join(f'<a href="{h}">{esc(n)}</a>' for n, h in crumbs)}</nav>
+<h1>{esc(name)} housing market</h1><p class="sub">Data through {data_month} · updated {built} · free, from Zillow, Realtor.com, the Census Bureau and other public sources</p>
+<div class="kpis">{kpis}</div>
+{f'<div class="lede"><p style="margin:0">{esc(" ".join(lines))}</p></div>' if lines else ""}
+{f'<h2>Home value over time</h2><div class="chart">{chart}<div class="legend">Solid: typical home value · dashed: fair value (household income × the 20-year average price-to-income ratio). Sources: FHFA, Zillow, U.S. Census Bureau.</div></div>' if chart else ""}
+{tables}
+{f'<h2>Questions people ask</h2><dl class="faq">{faq_html}</dl>' if faq_html else ""}
+{links}
+<p style="margin-top:26px"><a class="btn" href="{hash_link}">See every chart for {esc(name)} on the map</a></p></main>
+<footer>Open Housing Atlas is free, with no ads. Data: Zillow Research, Realtor.com, U.S. Census Bureau, BLS, IRS, FEMA, EPA, FHFA, BEA, HUD, U.S. Department of Education, Freddie Mac.
+Estimates are rough guides, not appraisals or financial advice. <a href="https://ko-fi.com/chrisbogh">Support this site on Ko-fi</a>.</footer></body></html>"""
+            path = os.path.join(root, *p["_url"].strip("/").split("/"), "index.html")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(page)
+            urls.append(p["_url"])
+    # every market, by state
+    rows = []
+    for st in sorted(places["state"], key=lambda s: st_name.get(s, "")):
+        if "_url" not in places["state"][st]:
+            continue
+        cs = sorted((c for c in places["county"] if c[:2] == st and "_url" in places["county"][c]), key=lambda c: places["county"][c]["n"])
+        rows.append(f'<h2><a href="{places["state"][st]["_url"]}">{esc(st_name[st])}</a></h2><div class="links">'
+                    + "".join(f'<a href="{places["county"][c]["_url"]}">{esc(places["county"][c]["n"])}</a>' for c in cs) + "</div>")
+    ms = sorted((m for m in places["metro"] if "_url" in places["metro"][m]), key=lambda m: places["metro"][m]["n"])
+    rows.append('<h2>Metro areas</h2><div class="links">' + "".join(f'<a href="{places["metro"][m]["_url"]}">{esc(places["metro"][m]["n"])}</a>' for m in ms) + "</div>")
+    hub = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Housing markets by state, metro and county ({zm[:4]}) | Open Housing Atlas</title><meta name="description" content="Home values, rent, forecasts and more for every US state, metro area and county. Free, updated twice a month.">
+<link rel="canonical" href="{SITE_URL}/markets/"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet"><style>{PAGE_CSS}</style>
+<script data-goatcounter="https://openhousingatlas.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script></head><body>
+<header class="top"><div><a class="logo" href="/">Open Housing Atlas</a><a class="btn" href="/">Open the map</a></div></header>
+<main><h1>US housing markets</h1><p class="sub">Every state, metro area and county · data through {data_month}</p>{"".join(rows)}</main></body></html>"""
+    os.makedirs(os.path.join(root, "markets"), exist_ok=True)
+    with open(os.path.join(root, "markets", "index.html"), "w", encoding="utf-8") as f:
+        f.write(hub)
+    with open(os.path.join(root, "sitemap.xml"), "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')
+        for u in ["/", "/markets/"] + urls:
+            f.write(f"<url><loc>{SITE_URL}{u}</loc><lastmod>{built}</lastmod></url>\n")
+        f.write("</urlset>\n")
+    with open(os.path.join(root, "robots.txt"), "w", encoding="utf-8") as f:
+        f.write(f"User-agent: *\nAllow: /\nSitemap: {SITE_URL}/sitemap.xml\n")
+    for lvl in places:
+        for p in places[lvl].values():
+            p.pop("_url", None)
+    print(f"  pages: {len(urls)} (states, metros, counties) + markets list + sitemap")
 
 
 def data_check(meta, cpi, sscores):
