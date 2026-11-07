@@ -175,7 +175,8 @@ def zillow(path, level):
 REALTOR_FIELDS = {
     "inv": "active_listing_count", "dom": "median_days_on_market", "newl": "new_listing_count",
     "cut": "price_reduced_share", "lp": "median_listing_price", "pend": "pending_listing_count",
-    "ppsf": "median_listing_price_per_square_foot", "sqft": "median_square_feet",  # for the Price check calculator
+    "ppsf": "median_listing_price_per_square_foot", "sqft": "median_square_feet",
+    "inc": "price_increased_share",
 }
 
 
@@ -1331,6 +1332,140 @@ def mortgage_rate():
     return monthly, weekly[-1][1], weekly[-1][0]
 
 
+def irs_migration(county_to_cbsa, names):
+    """Who moves in and out of each place, from IRS tax returns (one file per year, people = exemptions, income = AGI).
+    Metros and states leave out moves between their own counties. Saved by year, so each year is downloaded once.
+    Returns {year: {"county"|"metro"|"state": {id: {key: value}}}} and the latest year's top origins and destinations."""
+    cache = load_dcache("irs.json") or {}
+    years = cache.setdefault("years", {})
+    flows_out = cache.get("flows") or {}
+    for y in range(THIS_YEAR - 1, 2014, -1):
+        ys = str(y)
+        if ys in years:
+            if int(ys) < THIS_YEAR - 3:
+                break  # everything older is saved already
+            continue
+        tag = f"{(y - 1) % 100:02d}{y % 100:02d}"
+        try:
+            inflow = fetch(f"https://www.irs.gov/pub/irs-soi/countyinflow{tag}.csv", f"irs_in_{tag}.csv", PLAIN, timeout=90, tries=2)
+            outflow = fetch(f"https://www.irs.gov/pub/irs-soi/countyoutflow{tag}.csv", f"irs_out_{tag}.csv", PLAIN, timeout=90, tries=2)
+        except Exception as e:
+            print(f"  (IRS migration {y} not available: {e})")
+            continue
+        tot = {}    # county -> [in returns, in people, in agi, out returns, out people, out agi, same-state in (3), same-state out (3)]
+        pairs = {}  # (from county, to county) -> [returns, people, agi]
+        top = {}    # county -> {"in": [...], "out": [...]}
+        for data, inbound in ((inflow, True), (outflow, False)):
+            r = rows(data, "latin-1")
+            next(r)
+            for row in r:
+                if len(row) < 9:
+                    continue
+                a, b = row[0].zfill(2) + row[1].zfill(3), row[2].zfill(2) + row[3].zfill(3)  # the county, the other place
+                if a[:2] not in STATES:
+                    continue
+                n1, n2, agi = num(row[6]), num(row[7]), num(row[8])
+                if n1 is None or n1 < 0 or n2 is None or n2 < 0:
+                    continue
+                agi = agi if agi is not None and agi >= 0 else 0
+                t = tot.setdefault(a, [0] * 12)
+                off = 0 if inbound else 3
+                if b == "96000":
+                    t[off:off + 3] = [n1, n2, agi]
+                elif b == "97001":
+                    t[6 + off:9 + off] = [n1, n2, agi]
+                elif b[:2] in STATES and b != a:
+                    if inbound:
+                        pairs[(b, a)] = [n1, n2, agi]
+                    lst = top.setdefault(a, {"in": [], "out": []})["in" if inbound else "out"]
+                    lst.append([b, int(n2), round(agi * 1000 / n1) if n1 else None])
+        res = {"county": {}, "metro": {}, "state": {}}
+
+        def put(lvl, pid, n):
+            if n[1] or n[4]:
+                res[lvl][pid] = {"mig_in": int(n[1]), "mig_out": int(n[4]), "mig_net": int(n[1] - n[4]),
+                                 "mig_in_income": round(n[2] * 1000 / n[0]) if n[0] else None,
+                                 "mig_out_income": round(n[5] * 1000 / n[3]) if n[3] else None}
+        for c, t in tot.items():
+            put("county", c, t)
+        groups = {}
+        for c, m in county_to_cbsa.items():
+            groups.setdefault(m, []).append(c)
+        for m, cs in groups.items():
+            members = set(cs)
+            n = [sum(tot.get(c, [0] * 12)[i] for c in cs) for i in range(6)]
+            for (src, dst), v in pairs.items():
+                if src in members and dst in members:  # a move between two of the metro's own counties
+                    for i in range(3):
+                        n[i] -= v[i]
+                        n[3 + i] -= v[i]
+            put("metro", m, n)
+        for st in STATES:
+            cs = [c for c in tot if c[:2] == st]
+            n = [sum(tot[c][i] - tot[c][6 + i] for c in cs) for i in range(6)]  # minus moves within the state
+            put("state", st, n)
+        years[ys] = res
+        if not flows_out or y >= int(cache.get("flows_year") or 0):
+            flows_out, cache["flows_year"] = {}, y
+            for c, d in top.items():
+                flows_out[c] = {k: [[f, n, inc] for f, n, inc in sorted(v, key=lambda x: -x[1])[:8]] for k, v in d.items()}
+        print(f"  IRS migration {y}: {len(res['county'])} counties")
+    cache["flows"] = flows_out
+    save_dcache("irs.json", cache)
+    return years, flows_out, cache.get("flows_year")
+
+
+def _plain_name(s):
+    """'Doña Ana County' -> 'dona ana', 'Baltimore city' / 'Baltimore (City)' -> 'baltimore city': for matching names."""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
+    s = s.replace("(city)", "city").replace(".", "").replace("'", "")
+    for suffix in (" county", " parish", " borough", " census area", " city and borough", " municipality", " municipio"):
+        if s.endswith(suffix):
+            s = s[: -len(suffix)]
+    return " ".join(s.split())
+
+
+def air_quality(names):
+    """EPA's yearly air quality by county: unhealthy days per year (scaled to a full year of readings) and median AQI.
+    Counties are matched by name (EPA's file has no codes); counties without a monitor have no figures."""
+    cache = load_dcache("aqi.json") or {}
+    lookup = {}
+    for pid, n in names.items():
+        if len(pid) == 5:
+            lookup[(pid[:2], _plain_name(n))] = pid
+    by_state_name = {n.lower(): f for f, (a, n) in STATES.items()}
+    cache.pop(str(THIS_YEAR), None)
+    for y in range(2015, THIS_YEAR):  # full years only (this year's file covers just the months so far)
+        ys = str(y)
+        if ys in cache and y < THIS_YEAR - 2:
+            continue  # the last two years are refreshed, as EPA adds late readings
+        try:
+            data = fetch(f"https://aqs.epa.gov/aqsweb/airdata/annual_aqi_by_county_{y}.zip", f"aqi_{y}.zip", PLAIN, timeout=60, tries=2)
+        except Exception as e:
+            print(f"  (EPA air quality {y} not available: {e})")
+            continue
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            text = zf.read(zf.namelist()[0])
+        r = rows(text, "latin-1")
+        head = next(r)
+        col = {h: i for i, h in enumerate(head)}
+        out = {}
+        for row in r:
+            st = by_state_name.get(row[col["State"]].lower())
+            pid = st and lookup.get((st, _plain_name(row[col["County"]])))
+            days = num(row[col["Days with AQI"]])
+            if not pid or not days or days < 90:
+                continue
+            bad = sum(num(row[col[k]]) or 0 for k in ("Unhealthy for Sensitive Groups Days", "Unhealthy Days", "Very Unhealthy Days", "Hazardous Days"))
+            out[pid] = [round(bad / days * 365, 1), num(row[col["Median AQI"]])]
+        if out:
+            cache[ys] = out
+            print(f"  EPA air quality {y}: {len(out)} counties")
+    save_dcache("aqi.json", cache)
+    return cache
+
+
 def cpi_inflation():
     """US consumer price inflation, % change from a year earlier, by month (BLS CPI-U, all items, not seasonally adjusted).
     BLS's public API first (10 years per request), FRED as a backup; saved, so a failed download keeps the last copy."""
@@ -1512,6 +1647,9 @@ def metrics_for(z, zr, rt, income, rate, forecast=None, sfr=None, condo=None, re
         kk, v = latest(rt["cut"])
         if v is not None:
             m["cut"] = rnd(v * 100, 1)
+        kk, v = latest(rt.get("inc") or {})
+        if v is not None:
+            m["price_up"] = rnd(v * 100, 1)
         m["inv_vs_2019"] = rnd(vs_prepandemic(rt["inv"]), 1)
         _, pend = latest(rt["pend"])
         _, inv = latest(rt["inv"])
@@ -1521,6 +1659,7 @@ def metrics_for(z, zr, rt, income, rate, forecast=None, sfr=None, condo=None, re
             m["sales_vs_2019"] = rnd(vs_prepandemic(rt["pend"]), 1)
         if pend and inv:
             m["months_supply"] = rnd(inv / pend, 1)  # rough: active listings per pending sale
+            m["pending_ratio"] = rnd(pend / inv * 100, 0)  # pending sales per 100 listings
         if inv and units:
             m["inv_pct_houses"] = rnd(inv / units * 100, 2)
     return {k: v for k, v in m.items() if v is not None}
@@ -1828,6 +1967,38 @@ def main():
                 for y, v in s_.items():
                     if s_.get(str(int(y) - 1)):
                         a.setdefault(g, {})[y] = round((v / s_[str(int(y) - 1)] - 1) * 100, 2)
+    print("Moves in and out (IRS), air quality (EPA)")
+    mig_years, mig_flows, mig_flows_year = irs_migration(county_to_cbsa, pop_names)
+    for y, res in mig_years.items():
+        for lvl in ("county", "metro", "state"):
+            for pid, d in res.get(lvl, {}).items():
+                a = A[lvl].setdefault(pid, {})
+                for k, v in d.items():
+                    if v is not None:
+                        a.setdefault(k, {})[y] = v
+                p = (a.get("pop") or {}).get(y) or (a.get("pop") or {}).get(str(int(y) - 1))
+                if p:
+                    a.setdefault("mig_net_pct", {})[y] = round(d["mig_net"] / p * 100, 2)
+    aqi = air_quality(pop_names)
+    for y, d in aqi.items():
+        for fips, (bad, med) in d.items():
+            a = A["county"].setdefault(fips, {})
+            a.setdefault("aqi_bad_days", {})[y] = bad
+            if med is not None:
+                a.setdefault("aqi_median", {})[y] = med
+    # metros and states: population-weighted averages of their monitored counties
+    st_groups = {}
+    for f in A["county"]:
+        st_groups.setdefault(f[:2], []).append(f)
+    for lvl, groups in (("metro", metro_counties), ("state", st_groups)):
+        for pid, members in groups.items():
+            for y, d in aqi.items():
+                for i, k in ((0, "aqi_bad_days"), (1, "aqi_median")):
+                    acc = [(d[c][i], (A["county"].get(c, {}).get("pop") or {}).get(y) or latest_annual(A["county"].get(c, {})).get("pop") or 0)
+                           for c in members if c in d and d[c][i] is not None]
+                    acc = [(v, w) for v, w in acc if w]
+                    if acc:
+                        A[lvl].setdefault(pid, {}).setdefault(k, {})[y] = round(sum(v * w for v, w in acc) / sum(w for _, w in acc), 1)
     # flood insurance: shares of homes in high-risk zones and insured (counts add up to metros and states), and claims
     flood_year = (flood.get("built") or str(THIS_YEAR))[:4]
     pen = flood.get("pen") or {}
@@ -1950,7 +2121,7 @@ def main():
             b["rent_sfr"] = trim_series(rs, HSTART)
         rr = rt[lvl].get(pid)
         if rr:
-            for k in ("inv", "dom", "cut", "lp", "newl", "pend"):
+            for k in ("inv", "dom", "cut", "lp", "newl", "pend", "ppsf", "sqft", "inc"):
                 if rr.get(k):
                     b[k] = trim_series(rr[k], HSTART)
         if fc_series:
@@ -1960,6 +2131,8 @@ def main():
                 b[key] = trim_series(sx, HSTART)
         if a:
             b["a"] = a
+        if lvl == "county" and mig_flows.get(pid):
+            b["mig"] = mig_flows[pid]  # top places people came from and moved to
         hist[lvl][pid] = b
 
     for fips, (abbr, name) in STATES.items():
@@ -1999,7 +2172,8 @@ def main():
         "months": {"zillow": zillow_month, "realtor": realtor_month, "income": inc_year, "population": pop_year},
         "years": {"pop": pop_year, "age": age_year, "income": inc_year, "permits": permit_year, "units": unit_year, "temp": temp_year,
                   "votes": vote_year, "acs": acs_year, "hmda": hmda_year_, "schools": max(sscores) if sscores else None,
-                  "school_list": sdir_year, "hazards": haz.get("ver"), "walk": 2021, "jobs": max(qcew) if qcew else None},
+                  "school_list": sdir_year, "hazards": haz.get("ver"), "walk": 2021, "jobs": max(qcew) if qcew else None,
+                  "migration": max(mig_years) if mig_years else None, "air": max(aqi) if aqi else None},
         "mortgage": {"rate": rate, "date": rate_day, "history": trim_series(rate_hist, "2000-01")},
         "cpi": {k: v for k, v in cpi.items() if k >= "2000-01"},
         "counts": {k: len(v) for k, v in places.items()},
@@ -2013,7 +2187,10 @@ def main():
     # ZIP codes: the biggest files, so the state/metro/county data is let go of first.
     county_income = {pid: latest_annual(a).get("income") for pid, a in A["county"].items()}
     # ZIP codes show their county's weather and election results (neither is published by ZIP).
-    county_shared = {pid: {k: a[k] for k in ("temp", "vote_r", "vote_d") if a.get(k)} for pid, a in A["county"].items()}
+    # (and the county's moves in and out, and its air quality: neither is published by ZIP either)
+    shared_keys = ("temp", "vote_r", "vote_d", "mig_in", "mig_out", "mig_net", "mig_net_pct", "mig_in_income", "mig_out_income",
+                   "aqi_bad_days", "aqi_median")
+    county_shared = {pid: {k: a[k] for k in shared_keys if a.get(k)} for pid, a in A["county"].items()}
     acs_zip = {y: res.get("zip", {}) for y, res in acs.items() if res.get("zip")}
     del zv, zs, zc, zr, zrs, rt, hist, A, R
     zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared,
@@ -2295,7 +2472,7 @@ def scale_breaks(vals, diverging):
 
 
 # Data points coloured blue-to-red around zero (same list as the "d: 1" entries in index.html).
-DIVERGING = {"hv_yoy", "hv_mom", "hv_5y", "fc_1y", "overvalued", "from_2022_peak", "crash_2007", "buy_vs_rent", "inv_yoy",
+DIVERGING = {"mig_net", "mig_net_pct", "hv_yoy", "hv_mom", "hv_5y", "fc_1y", "overvalued", "from_2022_peak", "crash_2007", "buy_vs_rent", "inv_yoy",
              "inv_vs_2019", "newl_yoy", "dom_yoy", "lp_yoy", "rent_yoy", "sfr_yoy", "condo_yoy", "inv_mom", "sales_yoy",
              "sales_vs_2019", "rent_overvalued"}
 
@@ -2436,7 +2613,7 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
             if d:
                 b[key] = compact(d, start)
         if rt_d:
-            for k in ("inv", "dom", "cut", "lp", "newl", "pend"):  # all of it (from 2016), so 2017-19 can be the baseline
+            for k in ("inv", "dom", "cut", "lp", "newl", "pend", "ppsf", "inc"):  # all of it (from 2016), so 2017-19 can be the baseline
                 if rt_d.get(k):
                     b[k] = compact(rt_d[k], "2016-01")
         fc_s = own_fc if len(own_fc) >= 2 else {**metro_fc, **own_fc}  # metro's past forecasts, ZIP's own for now
