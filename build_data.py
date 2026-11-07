@@ -1332,6 +1332,192 @@ def mortgage_rate():
     return monthly, weekly[-1][1], weekly[-1][0]
 
 
+def xlsx_rows(data):
+    """Rows of the first sheet of an Excel file, as lists of text (empty cells are ''). Standard library only."""
+    import xml.etree.ElementTree as ET
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    zf = zipfile.ZipFile(io.BytesIO(data))
+    shared = []
+    if "xl/sharedStrings.xml" in zf.namelist():
+        for si in ET.fromstring(zf.read("xl/sharedStrings.xml")).iter(ns + "si"):
+            shared.append("".join(t.text or "" for t in si.iter(ns + "t")))
+    sheet = sorted(n for n in zf.namelist() if n.startswith("xl/worksheets/sheet"))[0]
+    with zf.open(sheet) as f:
+        for _, el in ET.iterparse(f):
+            if el.tag != ns + "row":
+                continue
+            out = []
+            for c in el.iter(ns + "c"):
+                ref = c.get("r", "")
+                col = 0
+                for ch in ref:
+                    if ch.isalpha():
+                        col = col * 26 + ord(ch.upper()) - 64
+                while len(out) < col - 1:
+                    out.append("")
+                v = c.find(ns + "v")
+                text = "" if v is None else v.text or ""
+                if c.get("t") == "s" and text:
+                    text = shared[int(text)]
+                elif c.get("t") == "inlineStr":
+                    text = "".join(t.text or "" for t in c.iter(ns + "t"))
+                out.append(text)
+            el.clear()
+            yield out
+
+
+def price_parities():
+    """BEA Regional Price Parities (US = 100): overall prices and housing costs, every year since 2008, for states,
+    metros, and each state's area outside metros. Returns {"state"|"metro"|"nonmetro": {id: {key: {year: v}}}}."""
+    out = {"state": {}, "metro": {}, "nonmetro": {}}
+    lines = {"1": "rpp_all", "3": "rpp_housing"}
+    for name in ("SARPP", "MARPP", "PARPP"):
+        try:
+            data = fetch(f"https://apps.bea.gov/regional/zip/{name}.zip", f"bea_{name}.zip", PLAIN, timeout=60, tries=2)
+            zf = zipfile.ZipFile(io.BytesIO(data))
+            fname = next(n for n in zf.namelist() if n.startswith(name) and n.endswith(".csv"))
+            text = zf.read(fname)
+        except Exception as e:
+            print(f"  (BEA {name} not available: {e})")
+            continue
+        r = csv.reader(io.StringIO(text.decode("latin-1")), skipinitialspace=True)
+        head = next(r)
+        years = [(i, h) for i, h in enumerate(head) if h.isdigit()]
+        for row in r:
+            if len(row) < len(head) or row[4].strip() not in lines:
+                continue
+            geo = row[0].strip().strip('"')
+            if name == "SARPP" and geo.endswith("000") and geo[:2] in STATES:
+                lvl, pid = "state", geo[:2]
+            elif name == "MARPP" and geo not in ("00000", "00999"):
+                lvl, pid = "metro", geo
+            elif name == "PARPP" and geo.endswith("999") and geo[:2] in STATES:
+                lvl, pid = "nonmetro", geo[:2]
+            else:
+                continue
+            series = {y: round(v, 1) for i, y in years if (v := num(row[i])) is not None}
+            if series:
+                out[lvl].setdefault(pid, {})[lines[row[4].strip()]] = series
+    print(f"  BEA price parities: {len(out['state'])} states, {len(out['metro'])} metros")
+    return out
+
+
+def fhfa_hpi():
+    """FHFA house price index (all transactions), one value a year back to 1975, for states, metros, counties and ZIPs.
+    Returns {"state"|"metro"|"county"|"zip": {id: {year: index}}}."""
+    out = {}
+    for lvl, name, idc, yc in (("state", "hpi_at_state", 2, 3), ("metro", "hpi_at_cbsa", 0, 2), ("county", "hpi_at_county", 2, 3),
+                               ("zip", "hpi_at_zip5", 0, 1)):
+        try:
+            data = fetch(f"https://www.fhfa.gov/hpi/download/annual/{name}.xlsx", f"fhfa_{name}.xlsx", PLAIN, timeout=180, tries=2)
+        except Exception as e:
+            print(f"  (FHFA {name} not available: {e})")
+            continue
+        d = out.setdefault(lvl, {})
+        for row in xlsx_rows(data):
+            if len(row) <= yc + 2 or not row[yc].isdigit():
+                continue
+            pid = row[idc].strip()
+            hpi = num(row[yc + 2])
+            if hpi is None or (lvl == "metro" and len(pid) != 5):
+                continue
+            d.setdefault(pid, {})[row[yc]] = round(hpi, 2)
+        print(f"  FHFA {lvl}: {len(d)} places")
+    return out
+
+
+def hpi_long(hpi, z):
+    """FHFA's index turned into dollars: scaled so its latest year matches Zillow's typical value that year.
+    Gives an estimated typical home value for every year back to 1975 (or whenever FHFA starts)."""
+    if not hpi or not z:
+        return None
+    for y in sorted(hpi, reverse=True):
+        months = [v for k, v in z.items() if k.startswith(y + "-")]
+        if len(months) >= 6 and hpi[y]:
+            f = sum(months) / len(months) / hpi[y]
+            return {yy: tidy(v * f) for yy, v in hpi.items()}
+    return None
+
+
+def hpi_change(hpi):
+    return {y: round((v / hpi[str(int(y) - 1)] - 1) * 100, 2) for y, v in hpi.items() if hpi.get(str(int(y) - 1))}
+
+
+HUD_TOKEN = os.environ.get("HUD_API_TOKEN", "").strip()
+FMR_KEYS = ("fmr_0br", "fmr_1br", "fmr_2br", "fmr_3br", "fmr_4br")
+
+
+def hud_fmr():
+    """HUD Fair Market Rents (studio to 4 bedrooms) by county, every year since 2017, and by ZIP code for the latest year
+    where HUD sets them by ZIP (Small Area FMRs). Needs a free HUD API token (repository secret HUD_API_TOKEN).
+    Saved in data_cache/hud.json: past years never change, so each is downloaded once."""
+    cache = load_dcache("hud.json") or {"years": {}, "zip": {}, "zip_year": None}
+    if not HUD_TOKEN:
+        print("  (no HUD_API_TOKEN set: HUD Fair Market Rents saved earlier are used)")
+        return cache
+    base = "https://www.huduser.gov/hudapi/public/fmr/"
+
+    def get(path):
+        for attempt in range(4):
+            try:
+                req = urllib.request.Request(base + path, headers={**PLAIN, "Authorization": f"Bearer {HUD_TOKEN}", "Accept": "application/json"})
+                return json.loads(urllib.request.urlopen(req, timeout=90).read())["data"]
+            except urllib.error.HTTPError as e:
+                if e.code in (401, 403):
+                    raise RuntimeError(f"HUD refused the token ({e.code}): check the HUD_API_TOKEN secret and that the FMR API is selected on your HUD account")
+                if e.code == 404:
+                    return None
+                time.sleep(10 * (attempt + 1))  # 429 / 5xx: wait and try again
+            except Exception:
+                time.sleep(5 * (attempt + 1))
+        return None
+
+    bed = ("Efficiency", "One-Bedroom", "Two-Bedroom", "Three-Bedroom", "Four-Bedroom")
+    try:
+        latest = None
+        for y in [None] + list(range(THIS_YEAR, 2016, -1)):
+            if y is not None and (str(y) in cache["years"] or (latest and y >= int(latest))):
+                continue
+            counties, sa_metros, year = {}, [], None
+            for st, (abbr, _) in STATES.items():
+                d = get(f"statedata/{abbr}" + (f"?year={y}" if y else ""))
+                time.sleep(0.4)
+                if not d:
+                    continue
+                year = str(d.get("year") or y)
+                for c in d.get("counties") or []:
+                    f = str(c.get("fips_code") or "")[:5]
+                    vals = [num(c.get(b)) for b in bed]
+                    if len(f) == 5 and all(v is not None for v in vals):
+                        counties.setdefault(f, []).append(vals)
+                if y is None:
+                    sa_metros += [m["code"] for m in d.get("metroareas") or [] if str(m.get("smallarea_status")) == "1"]
+            if not counties:
+                continue
+            # New England towns: one county can have several; use their average
+            cache["years"][year] = {f: [round(sum(v[i] for v in vs) / len(vs)) for i in range(5)] for f, vs in counties.items()}
+            print(f"  HUD Fair Market Rents {year}: {len(counties)} counties")
+            if y is None:
+                latest = year
+                if cache.get("zip_year") != year:
+                    zips = {}
+                    for code in sorted(set(sa_metros)):
+                        d = get(f"data/{code}")
+                        time.sleep(0.4)
+                        for row in (d or {}).get("basicdata") or []:
+                            z = str(row.get("zip_code", ""))
+                            vals = [num(row.get(b)) for b in bed]
+                            if len(z) == 5 and z.isdigit() and all(v is not None for v in vals):
+                                zips[z] = [round(v) for v in vals]
+                    if zips:
+                        cache["zip"], cache["zip_year"] = zips, year
+                        print(f"  HUD Small Area FMRs {year}: {len(zips)} ZIP codes in {len(set(sa_metros))} metro areas")
+            save_dcache("hud.json", cache)
+    except Exception as e:
+        print(f"  (HUD Fair Market Rents: {e})")
+    return cache
+
+
 def irs_migration(county_to_cbsa, names):
     """Who moves in and out of each place, from IRS tax returns (one file per year, people = exemptions, income = AGI).
     Metros and states leave out moves between their own counties. Saved by year, so each year is downloaded once.
@@ -2040,6 +2226,41 @@ def main():
                     acc = [(v, w) for v, w in acc if w]
                     if acc:
                         A[lvl].setdefault(pid, {}).setdefault(k, {})[y] = round(sum(v * w for v, w in acc) / sum(w for _, w in acc), 1)
+    print("Cost of living (BEA), price history (FHFA), Fair Market Rents (HUD)")
+    rpp = price_parities()
+    for lvl in ("state", "metro"):
+        for pid, d in rpp[lvl].items():
+            A[lvl].setdefault(pid, {}).update(d)
+    for f in list(A["county"]):  # counties use their metro's figures, or their state's figures outside metros
+        src = rpp["metro"].get(county_to_cbsa.get(f)) or rpp["nonmetro"].get(f[:2])
+        if src:
+            A["county"][f].update(src)
+    for lvl in A:
+        for a in A[lvl].values():
+            inc, r = a.get("income"), a.get("rpp_all")
+            if inc and r:
+                a["income_real"] = {y: round(v / r[y] * 100) for y, v in inc.items() if r.get(y)}
+    hpi = fhfa_hpi()
+    for lvl in ("state", "metro", "county"):
+        for pid, s in (hpi.get(lvl) or {}).items():
+            if lvl != "county" or pid[:2] in STATES:
+                A[lvl].setdefault(pid, {})["hpi_change"] = hpi_change(s)
+    hud = hud_fmr()
+    for y, d in (hud.get("years") or {}).items():
+        for f, vals in d.items():
+            if f[:2] in STATES:
+                a = A["county"].setdefault(f, {})
+                for i, k in enumerate(FMR_KEYS):
+                    a.setdefault(k, {})[y] = vals[i]
+        cpop = {f: latest_annual(A["county"].get(f, {})).get("pop") or 0 for f in d}
+        for lvl, groups in (("metro", metro_counties), ("state", {s: [f for f in d if f[:2] == s] for s in STATES})):
+            for pid, members in groups.items():
+                acc = [(d[f], cpop.get(f) or 0) for f in members if f in d and cpop.get(f)]
+                tw = sum(w for _, w in acc)
+                if tw:
+                    a = A[lvl].setdefault(pid, {})
+                    for i, k in enumerate(FMR_KEYS):
+                        a.setdefault(k, {})[y] = round(sum(v[i] * w for v, w in acc) / tw)
     # flood insurance: shares of homes in high-risk zones and insured (counts add up to metros and states), and claims
     flood_year = (flood.get("built") or str(THIS_YEAR))[:4]
     pen = flood.get("pen") or {}
@@ -2140,8 +2361,12 @@ def main():
 
     def build(lvl, pid, name, st, extra, fc_key):
         a = A[lvl].get(pid, {})
-        la = latest_annual(a)
         z = srcs(zv, lvl, pid)
+        hl = hpi_long((hpi.get(lvl) or {}).get(pid), z)
+        if hl:
+            a = A[lvl].setdefault(pid, a)
+            a["hv_long"] = hl
+        la = latest_annual(a)
         yearly_tax(a, z)
         fc_series = state_fc.get(pid) if lvl == "state" else fc_hist.get(fc_key)
         rs = srcs(zrs, lvl, pid) or (house_rent(srcs(zr, lvl, pid), rent_ratio.get(fc_key)) if lvl == "county" else None)
@@ -2214,7 +2439,8 @@ def main():
         "years": {"pop": pop_year, "age": age_year, "income": inc_year, "permits": permit_year, "units": unit_year, "temp": temp_year,
                   "votes": vote_year, "acs": acs_year, "hmda": hmda_year_, "schools": max(sscores) if sscores else None,
                   "school_list": sdir_year, "hazards": haz.get("ver"), "walk": 2021, "jobs": max(qcew) if qcew else None,
-                  "migration": max(mig_years) if mig_years else None, "air": max(aqi) if aqi else None},
+                  "migration": max(mig_years) if mig_years else None, "air": max(aqi) if aqi else None,
+                  "hud": max(hud.get("years") or {"": 0}) or None},
         "mortgage": {"rate": rate, "date": rate_day, "history": trim_series(rate_hist, "2000-01")},
         "cpi": {k: v for k, v in cpi.items() if k >= "2000-01"},
         "counts": {k: len(v) for k, v in places.items()},
@@ -2231,13 +2457,14 @@ def main():
     # ZIP codes show their county's weather and election results (neither is published by ZIP).
     # (and the county's moves in and out, and its air quality: neither is published by ZIP either)
     shared_keys = ("temp", "vote_r", "vote_d", "mig_in", "mig_out", "mig_net", "mig_net_pct", "mig_in_income", "mig_out_income",
-                   "aqi_bad_days", "aqi_median")
+                   "aqi_bad_days", "aqi_median", "rpp_all", "rpp_housing") + FMR_KEYS
     county_shared = {pid: {k: a[k] for k in shared_keys if a.get(k)} for pid, a in A["county"].items()}
     acs_zip = {y: res.get("zip", {}) for y, res in acs.items() if res.get("zip")}
     del zv, zs, zc, zr, zrs, rt, hist, A, R
     zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared,
                                        srat["zip"], zip_schools, haz.get("zip", {}), haz_year, walk.get("zip", {}),
-                                       flood.get("zip") or {}, noise.get("zip") or {}, rent_ratio, county_inc_hist)
+                                       flood.get("zip") or {}, noise.get("zip") or {}, rent_ratio, county_inc_hist,
+                                       hpi.get("zip") or {}, hud.get("zip") or {}, hud.get("zip_year"))
     meta["counts"]["zip"] = zip_count
     meta["zipBreaks"] = zip_breaks
     write_json(os.path.join(OUT, "meta.json"), meta)
@@ -2574,7 +2801,7 @@ def scale_breaks(vals, diverging):
 
 
 # Data points coloured blue-to-red around zero (same list as the "d: 1" entries in index.html).
-DIVERGING = {"mig_net", "mig_net_pct", "hv_yoy", "hv_mom", "hv_5y", "fc_1y", "overvalued", "from_2022_peak", "crash_2007", "buy_vs_rent", "inv_yoy",
+DIVERGING = {"hpi_change", "mig_net", "mig_net_pct", "hv_yoy", "hv_mom", "hv_5y", "fc_1y", "overvalued", "from_2022_peak", "crash_2007", "buy_vs_rent", "inv_yoy",
              "inv_vs_2019", "newl_yoy", "dom_yoy", "lp_yoy", "rent_yoy", "sfr_yoy", "condo_yoy", "inv_mom", "sales_yoy",
              "sales_vs_2019", "rent_overvalued"}
 
@@ -2622,7 +2849,7 @@ ZIP_RANKINGS = {
 
 
 def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared, zip_school_scores, zip_schools,
-               zip_haz, haz_year, zip_walk, zip_claims, zip_noise, rent_ratio, county_inc_hist):
+               zip_haz, haz_year, zip_walk, zip_claims, zip_noise, rent_ratio, county_inc_hist, zip_hpi, safmr, safmr_year):
     print("ZIP codes: Zillow, Realtor.com, Census shapes")
     # Zillow's own ZIP forecasts, saved each run to build up a history (the chart uses the metro's until there are two).
     zfc_raw, _ = zillow_zip("zhvf_growth/Zip_zhvf_growth_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
@@ -2671,7 +2898,17 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
             if inc_s.get(str(int(y) - 1)):
                 a.setdefault("income_growth", {})[y] = tidy((v / inc_s[str(int(y) - 1)] - 1) * 100)
         for k, s in county_shared.get(county, {}).items():
-            a[k] = s
+            a[k] = dict(s) if k in FMR_KEYS else s
+        if safmr.get(z) and safmr_year:  # HUD sets this ZIP's own rents (Small Area FMRs): use them for that year
+            for i, k in enumerate(FMR_KEYS):
+                a.setdefault(k, {})[safmr_year] = safmr[z][i]
+        if a.get("income") and a.get("rpp_all"):
+            a["income_real"] = {y: round(v / a["rpp_all"][y] * 100) for y, v in a["income"].items() if a["rpp_all"].get(y)}
+        if zip_hpi.get(z):
+            a["hpi_change"] = hpi_change(zip_hpi[z])
+            hl = hpi_long(zip_hpi[z], hv_d)
+            if hl:
+                a["hv_long"] = hl
         if zip_school_scores.get(z):
             a["school_score"] = zip_school_scores[z]
         for k, v in (zip_haz.get(z) or {}).items():
