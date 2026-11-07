@@ -1284,10 +1284,15 @@ let pagesIndex = null;
 async function syncReportLink(level, id) {
   const a = document.getElementById('dReport');
   a.hidden = true;
-  if (level === 'zip') return;
   try { pagesIndex ||= await fetch('data/pages.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : {}); } catch (e) { pagesIndex = {}; }
-  const u = pagesIndex[level] && pagesIndex[level][id];
-  if (u && openPlace && openPlace.level === level && openPlace.id === id) { a.href = u; a.hidden = false; }
+  // ZIP codes have no page of their own: they link to their county's report.
+  const zipCounty = level === 'zip' && D.zip && D.zip[id] && D.zip[id].k;
+  const u = zipCounty ? pagesIndex.county && pagesIndex.county[zipCounty] : pagesIndex[level] && pagesIndex[level][id];
+  if (u && openPlace && openPlace.level === level && openPlace.id === id) {
+    a.href = u; a.hidden = false;
+    a.textContent = zipCounty ? 'County report ↗' : 'Full report ↗';
+    a.title = zipCounty ? `The report page for ${D.county[zipCounty] ? D.county[zipCounty].n : 'this county'}` : "A shareable page with this place's key numbers, summary and charts";
+  }
 }
 async function openDetail(level, id) {
   const p = D[level][id];
