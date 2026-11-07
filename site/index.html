@@ -183,17 +183,35 @@
   .seg-sm button { border: 0; background: none; border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
   .seg-sm button.on { background: var(--text); color: #fff; }
   /* What can I afford? */
-  .afford { margin: 0 14px 10px; padding: 12px; border: 1px solid #8ccdc0; background: #f3faf8; border-radius: 12px; }
-  .afford h3 { margin: 0 0 8px; font: 600 14px var(--sans); color: #06463f; }
-  .aff-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .aff-form label span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
-  .aff-form input { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
-  .aff-actions { display: flex; gap: 6px; margin-top: 8px; }
-  .aff-go { flex: 1; border: 0; background: var(--accent); color: #fff; font-weight: 600; border-radius: 8px; padding: 7px; cursor: pointer; }
-  .aff-x { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 10px; cursor: pointer; }
-  .aff-err { color: #b42318; font-size: 12px; margin: 6px 0 0; min-height: 0; }
+  /* "What can I afford?": one question at a time, in a card over the map */
+  .aff-wrap { position: absolute; inset: 0; z-index: 900; background: rgba(6, 70, 63, .28); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .aff-wrap[hidden] { display: none; }
+  .afford { position: relative; width: 440px; max-width: 100%; padding: 22px 24px 18px; background: var(--panel); border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+  .afford h3 { margin: 0 0 4px; font: 600 22px var(--display); color: #06463f; }
+  .aff-steps { display: flex; gap: 5px; margin: 0 0 16px; }
+  .aff-steps i { flex: 1; height: 4px; border-radius: 4px; background: #e6f4f1; }
+  .aff-steps i.on { background: #2b8f80; }
+  .aff-count { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+  .aff-q { display: block; font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .aff-help { font-size: 12.5px; color: var(--muted); margin: 0 0 10px; }
+  .aff-in { display: flex; align-items: center; border: 1.5px solid #8ccdc0; border-radius: 12px; padding: 0 12px; background: #fff; }
+  .aff-in:focus-within { border-color: #126b60; box-shadow: 0 0 0 3px #e6f4f1; }
+  .aff-in b { color: var(--muted); font-size: 18px; font-weight: 500; }
+  .aff-in input { flex: 1; border: 0; outline: 0; font-size: 20px; padding: 11px 8px; background: none; min-width: 0; }
+  .aff-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .aff-quick button { border: 1px solid var(--line); background: var(--panel-2); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; cursor: pointer; }
+  .aff-quick button:hover { border-color: #8ccdc0; }
+  .aff-actions { display: flex; gap: 8px; margin-top: 18px; align-items: center; }
+  .aff-go { flex: 1; border: 0; background: #e76f51; color: #fff; font-weight: 600; font-size: 14.5px; border-radius: 10px; padding: 11px; cursor: pointer; }
+  .aff-go:hover { background: #d35d40; }
+  .aff-back { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 11px 14px; cursor: pointer; font-weight: 600; }
+  .aff-close { position: absolute; top: 12px; right: 12px; border: 0; background: var(--panel-2); width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 13px; }
+  .aff-err { color: #b42318; font-size: 12.5px; margin: 8px 0 0; }
   .aff-err:empty { display: none; }
-  .afford .note { font-size: 11.5px; margin-top: 8px; }
+  .afford .note { font-size: 11.5px; margin: 14px 0 0; }
+  .aff-sum { margin: 0; padding: 0; list-style: none; font-size: 14px; }
+  .aff-sum li { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .aff-sum li b { font-variant-numeric: tabular-nums; }
   /* Compare */
   .cmp-add { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; color: var(--accent); cursor: pointer; flex: none; margin-top: 2px; }
   .cmp-add.on { background: var(--accent-soft); border-color: #8ccdc0; }
@@ -273,6 +291,8 @@
   .ctip .dot.dash { width: 10px; height: 0; border-radius: 0; border-top: 2px dashed #b8c0cc; vertical-align: 3px; }
   .ctip .gap { color: #f6b89b; }
   .gap-note b { font-weight: 600; }
+  .rel { display: inline-block; margin-top: 3px; color: #126b60; font-size: 11.5px; }
+  .rel::before { content: '↻ '; }
   .mig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .mig-grid h5 { margin: 0 0 4px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
   .mig td:nth-child(n+2), .mig th:nth-child(n+2) { text-align: right; white-space: nowrap; }
@@ -367,16 +387,16 @@
   <aside class="side" id="side" aria-label="Data points">
     <div class="brand">
       <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#126b60"/><path d="M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z" fill="none" stroke="#e6f4f1" stroke-width="3.5" stroke-linejoin="round"/><path d="M25 15v29M39 20v29" stroke="#8ccdc0" stroke-width="3.5"/></svg>
-      <div><h1>Open Housing Atlas</h1><small class="byline">by Chris B · free</small><small id="asof">Loading data…</small></div>
+      <div><h1>Open Housing Atlas</h1><small class="byline">Free US housing data</small><small id="asof">Loading data…</small></div>
     </div>
     <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="dpSearch" type="search" placeholder="Find a data point" aria-label="Find a data point"></label>
-    <div class="afford" id="affordBox" hidden></div>
     <div class="groups" id="groups"></div>
     <a class="side-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span><b>Support on Ko-fi</b><small>Keep this atlas free for everyone</small></span></a>
-    <div class="side-foot">Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, CFPB (HMDA), NOAA, MIT Election Lab, Freddie Mac. Updated twice a month. Personal use; not financial advice.</div>
+    <div class="side-foot">Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, BLS, IRS, FEMA, EPA, NOAA, U.S. Department of Education, MIT Election Lab, Freddie Mac. Updated twice a month. Personal use; not financial advice.</div>
   </aside>
   <main class="stage">
+    <div class="aff-wrap" id="affordWrap" hidden><div class="afford" id="affordBox" role="dialog" aria-modal="true" aria-label="What can I afford?"></div></div>
     <div id="map"></div>
     <div class="topbar">
       <button class="pill-btn menu-btn" id="menuBtn" type="button" aria-label="Data points"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Data</button>
@@ -444,7 +464,8 @@ const M = {
   hv_mom:        { l: 'Price change (1 month)', f: 'pct2', d: 1, src: 'zillow', i: 'Change in typical home value over the last month.' },
   hv_5y:         { l: 'Price change (5 years)', f: 'pct', d: 1, src: 'zillow', i: 'Change in typical home value over the last 5 years.' },
   fc_1y:         { l: 'Price forecast (next 12 months)', f: 'pct', d: 1, src: 'forecast', i: "Zillow's forecast for home values 12 months ahead. Zillow publishes it for metros and ZIP codes; counties show their metro's, and states an average of their metros weighted by population. The chart shows Zillow's past forecasts (saved copies go back to 2022)." },
-  overvalued:    { l: 'Above or below long-term trend', f: 'pct', d: 1, src: 'zillow', i: "How far today's home value sits above (+) or below (−) its long-term 2000–2019 trend line, extended to today. A rough gauge, not a prediction." },
+  overvalued:    { l: 'Overvalued %', f: 'pct', d: 1, src: 'fair', i: "How far today's home value sits above (+) or below (−) its fair value. Fair value = local household income × the place's average home-value-to-income ratio over the last 20 years. A rough gauge, not a prediction." },
+  fair_value:    { l: 'Fair home value', f: 'usd', src: 'fair', i: "What the typical home would cost if prices were at their usual multiple of local income: household income × the place's average home-value-to-income ratio over the last 20 years. ZIP codes use their own income since 2020 and their county's (scaled) before that." },
   from_2022_peak:{ l: 'Change since the 2022 peak', f: 'pct', d: 1, src: 'zillow', i: "Today's home value compared with its highest month in 2022." },
   crash_2007:    { l: 'Drop in the 2007–12 crash', f: 'pct', d: 1, src: 'zillow', i: 'Drop from the 2005–08 peak to the 2008–13 low during the last housing crash. The chart shows the slide from the peak.' },
   hv_income:     { l: 'Price-to-income ratio', f: 'ratio', src: 'zillow', i: 'Typical home value divided by median household income. Around 3 to 4 has historically been considered affordable.' },
@@ -552,7 +573,7 @@ const M = {
   cap_rate:      { l: 'Cap rate (estimate)', f: 'pct2', src: 'zillow', i: 'A year of typical rent, minus 35% for taxes, insurance, upkeep and vacancy, divided by the typical home value. A rough estimate.' },
   vacancy:       { l: 'Rental vacancy', f: 'pct', src: 'acs', i: 'Rental vacancy: homes for rent that are empty, as a share of all rental homes.' },
   price_rent:    { l: 'Price-to-rent ratio', f: 'ratio', src: 'zillow', i: 'Home value divided by a year of rent. Higher means buying is expensive relative to renting.' },
-  rent_overvalued:{ l: 'Rent above or below trend', f: 'pct', d: 1, src: 'zillow', i: "How far today's rent sits above (+) or below (−) its 2015–2019 trend line, extended to today. Rough. Zillow publishes rents for metros, counties and ZIP codes (not states)." },
+  rent_overvalued:{ l: 'Overvalued % (rents)', f: 'pct', d: 1, src: 'fair', i: "How far today's rent sits above (+) or below (−) its usual share of local household income (the average rent-to-income ratio since Zillow's rent data starts in 2015). Rough. Zillow publishes rents for metros, counties and ZIP codes (not states)." },
   rent_pct_income:{ l: 'Rent as % of income', f: 'pct', src: 'zillow', i: 'A year of typical rent as a share of median household income.' },
   shadow:        { l: 'Empty homes held off the market', f: 'pct2', src: 'acs', i: 'Homes sitting empty that are not for sale or rent (not seasonal homes either), as a share of all homes: possible future supply.' },
   permits:       { l: 'New homes permitted', f: 'num', src: 'permits', i: 'New homes authorised by building permits during the year (Census). Published for counties, metros and states, not ZIP codes.' },
@@ -612,7 +633,7 @@ const M = {
 // Sections in the sidebar (a data point may sit in more than one). START_HERE: the quick buttons at the top.
 const START_HERE = [['afford', 'What can I afford?'], ['hv', 'Home value'], ['hv_yoy', 'Price change'], ['school_score', 'Schools'], ['rent', 'Rent'], ['risk', 'Hazard risk'], ['walk', 'Walkability'], ['fc_1y', 'Forecast'], ['growth_score', 'Growth outlook']];
 const GROUPS = [
-  ['Prices and affordability', ['hv', 'hv_yoy', 'hv_mom', 'hv_5y', 'fc_1y', 'sale_price', 'sale_price_yoy', 'hv_low', 'hv_high', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
+  ['Prices and affordability', ['hv', 'hv_yoy', 'hv_mom', 'hv_5y', 'fc_1y', 'sale_price', 'sale_price_yoy', 'hv_low', 'hv_high', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'fair_value', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
   ['Market activity', ['market_heat', 'inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'sale_to_list', 'pct_above_list', 'days_to_pending', 'pending_ratio', 'dom', 'dom_yoy', 'cut', 'price_up', 'lp', 'lp_yoy', 'ppsf', 'med_sqft', 'months_supply', 'inv_pct_houses'], 'activity'],
   ['Schools', ['school_score'], 'school'],
   ['People and income', ['income', 'income_growth', 'unemployment', 'jobs', 'job_growth', 'avg_pay', 'pay_growth', 'commute', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'mig_net', 'mig_net_pct', 'mig_in', 'mig_out', 'mig_in_income', 'mig_out_income', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
@@ -690,9 +711,7 @@ const HAS = new Set();
 const hasData = k => !HAS.size || HAS.has(k);
 function renderGroups() {
   const q = document.getElementById('dpSearch').value.trim().toLowerCase();
-  // "Start here": quick buttons for the most-used data points (hidden while searching).
-  const start = q ? '' : `<div class="start"><h3>Start here</h3><div class="chips">${START_HERE.filter(([k]) => k === 'afford' || hasData(k)).map(([k, l]) =>
-    `<button type="button" class="chip ${ui.metric === k ? 'on' : ''}" data-pick="${k}">${esc(l)}</button>`).join('')}</div></div>`;
+  const start = ''; // (the "Start here" quick buttons were removed; "What can I afford?" is the button on the map)
   // Each section has its own radio group, so a data point listed in two sections (e.g. Typical rent under
   // For investors and in Start here) shows as selected everywhere.
   document.getElementById('groups').innerHTML = start + (GROUPS.map(([name, keys, ic], gi) => {
@@ -719,7 +738,7 @@ document.getElementById('groups').addEventListener('change', e => {
 document.getElementById('dpSearch').addEventListener('input', renderGroups);
 function showInfo(btn) {
   const pop = document.getElementById('infoPop'), r = btn.getBoundingClientRect();
-  pop.innerHTML = `<b>${esc(M[btn.dataset.info].l)}</b><br>${esc(M[btn.dataset.info].i)}`;
+  pop.innerHTML = `<b>${esc(M[btn.dataset.info].l)}</b><br>${esc(M[btn.dataset.info].i)}${releaseText(btn.dataset.info) ? `<br><span class="rel">${esc(releaseText(btn.dataset.info))}</span>` : ''}`;
   pop.style.display = 'block';
   pop.style.left = Math.min(r.right + 8, innerWidth - 290) + 'px';
   pop.style.top = Math.min(r.top - 6, innerHeight - pop.offsetHeight - 10) + 'px';
@@ -1285,12 +1304,37 @@ function trendGapSeries(s, minPts = 120) {
   const t = trendLine(s, minPts);
   return t && mapSeries(s, (v, k) => t[k] ? (v / t[k] - 1) * 100 : null);
 }
+// Fair value (same as build_data.py): each year's household income sits at mid-year, months in between are
+// interpolated, and months after the last published year grow at the last 3 years' pace (0–4% a year).
+function incomeMonth(inc, k) {
+  const yrs = Object.keys(inc || {}).filter(y => inc[y]).map(Number).sort((a, b) => a - b);
+  if (!yrs.length) return null;
+  const t = +k.slice(0, 4) + (+k.slice(5, 7) - 7) / 12, first = yrs[0], last = yrs[yrs.length - 1];
+  if (t >= last) { const prev = inc[last - 3]; const g = prev ? Math.min(0.04, Math.max(0, Math.pow(inc[last] / prev, 1 / 3) - 1)) : 0.03; return inc[last] * Math.pow(1 + g, t - last); }
+  if (t <= first) return t > first - 1 ? inc[first] : null;
+  const lo = Math.max(...yrs.filter(y => y <= t)), hi = Math.min(...yrs.filter(y => y > t));
+  return inc[lo] + (inc[hi] - inc[lo]) * (t - lo) / (hi - lo);
+}
+// The place's average price-to-income ratio over the last 20 years; fair value = that month's income x the ratio.
+function fairLine(s, inc, minMonths = 60) {
+  if (!s || !inc) return null;
+  const keys = Object.keys(s).sort(), last = keys[keys.length - 1], start = backKey(last, 240);
+  const ratios = keys.filter(k => k > start).map(k => { const i = incomeMonth(inc, k); return i && s[k] ? s[k] / i : null; }).filter(x => x != null);
+  if (ratios.length < minMonths) return null;
+  const r = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+  return mapSeries(s, (v, k) => { const i = incomeMonth(inc, k); return i ? i * r : null; });
+}
+const incomeHist = h => { const a = (h && h.a) || {}; return a.income || a.inc_est ? { ...(a.inc_est || {}), ...(a.income || {}) } : null; };
+function fairGapSeries(s, h, minMonths) {
+  const f = fairLine(s, incomeHist(h), minMonths);
+  return f && mapSeries(s, (v, k) => f[k] ? (v / f[k] - 1) * 100 : null);
+}
 // Reference lines a chart can show next to its data point (the checkbox above the chart).
-const REF_TREND = { hv: 120, sfr: 120, condo: 120, rent: 48 };
+const REF_TREND = { hv: 60, sfr: 60, condo: 60, rent: 48 };
 const REF_CPI = new Set(['hv_yoy', 'sfr_yoy', 'condo_yoy', 'rent_yoy', 'sale_price_yoy', 'lp_yoy', 'pay_growth', 'income_growth']);
 let showRef = true;
 function refFor(k, h, p) {
-  if (REF_TREND[k]) { const s = seriesFor(k, h, p); const t = s && trendLine(s, REF_TREND[k]); return t && { s: t, l: 'Fair value (long-term trend)', short: 'Show fair value' }; }
+  if (REF_TREND[k]) { const s = seriesFor(k, h, p); const t = s && fairLine(s, incomeHist(h), REF_TREND[k]); return t && { s: t, l: k === 'rent' ? 'Fair rent (income-based)' : 'Fair value (income-based)', short: k === 'rent' ? 'Show fair rent' : 'Show fair value' }; }
   if (REF_CPI.has(k) && D.meta.cpi && Object.keys(D.meta.cpi).length) {
     let s = D.meta.cpi;
     // Yearly data points compare with each year's December inflation.
@@ -1333,7 +1377,8 @@ function seriesFor(key, h, p) {
     case 'hv_yoy': return hv && pctSeries(hv, 12);
     case 'hv_mom': return hv && pctSeries(hv, 1);
     case 'hv_5y': return hv && pctSeries(hv, 60);
-    case 'overvalued': return hv && trendGapSeries(hv);
+    case 'overvalued': return hv && fairGapSeries(hv, h);
+    case 'fair_value': return hv && fairLine(hv, incomeHist(h));
     case 'from_2022_peak': { if (!hv) return null; const peak = Math.max(...Object.keys(hv).filter(k => k.startsWith('2022')).map(k => hv[k])); return isFinite(peak) ? mapSeries(hv, (x, k) => k >= '2022-01' ? (x / peak - 1) * 100 : null) : null; }
     case 'crash_2007': { if (!hv) return null; let peak = 0; const out = {}; for (const k of Object.keys(hv).sort()) { if (k < '2005-01' || k > '2013-12') continue; if (k <= '2008-12') peak = Math.max(peak, hv[k]); if (peak) out[k] = (hv[k] / peak - 1) * 100; } return out; }
     case 'hv_income': return per(hv, (x, k) => income(k) ? x / income(k) : null);
@@ -1349,7 +1394,7 @@ function seriesFor(key, h, p) {
     case 'rent': return rent;
     case 'rent_sfr': return h.rent_sfr;
     case 'rent_yoy': return rent && pctSeries(rent, 12);
-    case 'rent_overvalued': return rent && trendGapSeries(rent, 48);
+    case 'rent_overvalued': return rent && fairGapSeries(rent, h, 48);
     case 'rent_pct_income': return per(rent, (r, k) => income(k) ? r * 12 / income(k) * 100 : null);
     case 'price_rent': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? hv[k] / (r * 12) : null);
     case 'gross_yield': return hv && rent && mapSeries(rent, (r, k) => hv[k] ? r * 12 / hv[k] * 100 : null);
@@ -1473,12 +1518,40 @@ const SRC = {
   fema: ['FEMA (National Risk Index)', 'https://hazards.fema.gov/nri/'],
   epa: ['EPA (Smart Location Database)', 'https://www.epa.gov/smartgrowth/smart-location-mapping'],
   bls: ['U.S. Bureau of Labor Statistics (QCEW)', 'https://www.bls.gov/cew/'],
+  fair: ['Zillow Research (home values, rents); U.S. Census Bureau (household income)', 'https://www.zillow.com/research/data/'],
   irs: ['IRS Statistics of Income (U.S. migration data)', 'https://www.irs.gov/statistics/soi-tax-stats-migration-data'],
   epa_air: ['EPA (Air Quality System, annual AQI by county)', 'https://aqs.epa.gov/aqsweb/airdata/download_files.html'],
   nfip: ['FEMA (National Flood Insurance Program)', 'https://www.fema.gov/about/openfema/data-sets'],
   noise: ['US DOT National Transportation Noise Map (tract figures: Seto & Huang, University of Washington)', 'https://www.bts.gov/geospatial/national-transportation-noise-map'],
   afford: ['Zillow Research, Freddie Mac (mortgage rates) and your budget', 'https://www.zillow.com/research/data/'],
 };
+// When each source publishes new numbers. every: 'month' (m = day of the month it usually lands), 'year' (m = month),
+// 'years' (fixed next date), or 'none' (a one-time study). manual: this site only picks it up after a code change.
+const RELEASE = {
+  zillow: { every: 'month', day: 16 }, forecast: { every: 'month', day: 16 }, afford: { every: 'month', day: 16 }, fair: { every: 'month', day: 16 },
+  realtor: { every: 'month', day: 3 }, temp: { every: 'month', day: 8 },
+  income: { every: 'year', m: 12 }, acs: { every: 'year', m: 12 }, pop: { every: 'year', m: 3 }, age: { every: 'year', m: 6 },
+  permits: { every: 'year', m: 5 }, units: { every: 'year', m: 5 }, bls: { every: 'year', m: 9 }, irs: { every: 'year', m: 6 },
+  epa_air: { every: 'year', m: 6 }, fema: { every: 'year', m: 12, note: 'FEMA updates it about once a year' },
+  nfip: { every: 'half', note: 'FEMA adds new claims monthly' },
+  votes: { every: 'years', next: 'December 2028', note: 'after the next presidential election', manual: 1 },
+  schools: { every: 'none', note: 'the Department of Education publishes these irregularly', manual: 1 },
+  epa: { every: 'none', note: 'EPA has not announced a newer edition' },
+  noise: { every: 'none', note: 'a one-time study of 2020 noise levels' },
+  hmda: { every: 'year', m: 3 },
+};
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function releaseText(k) {
+  const r = RELEASE[(M[k] || {}).src]; if (!r) return '';
+  const now = new Date(), y = now.getFullYear(), mo = now.getMonth();
+  let when = '';
+  if (r.every === 'month') { const d = new Date(y, now.getDate() < r.day ? mo : mo + 1, 1); when = `Updated monthly · next about mid-${MONTHS[d.getMonth()]} ${d.getFullYear()}`.replace('mid-', r.day < 10 ? 'early ' : 'mid-'); }
+  else if (r.every === 'year') { const ny = mo + 1 < r.m ? y : y + 1; when = `Updated yearly · next expected ${MONTHS[r.m - 1]} ${ny}`; }
+  else if (r.every === 'half') when = 'Updated every 6 months';
+  else if (r.every === 'years') when = `Next update ${r.next}`;
+  else when = 'No scheduled update';
+  return `${when}${r.note ? ` (${r.note})` : ''}${r.every === 'none' ? '' : r.manual ? ' · added here by hand' : ' · appears here automatically'}`;
+}
 // Data points worked out from more than one source.
 const EXTRA_SRC = {
   mtg_pmt: 'Freddie Mac (mortgage rates)', mtg_pct_income: 'Freddie Mac, U.S. Census Bureau', salary_needed: 'Freddie Mac (mortgage rates)',
@@ -1570,7 +1643,7 @@ function chartSvg(series, def, s2, def2, ref) {
   const legend = items.length > 1 ? `<g font-size="12" font-weight="600">${items.map(([t, c, dash], i) => { const x0 = L0 + i * colW; return `${dash ? `<line x1="${x0}" x2="${x0 + 14}" y1="14" y2="14" stroke="${c}" stroke-width="2.4" stroke-dasharray="4 3"/>` : `<circle cx="${x0 + 6}" cy="14" r="5" fill="${c}"/>`}<text x="${x0 + 19}" y="18" fill="var(--text)">${t}</text>`; }).join('')}</g>` : '';
   const pathR = hasR ? valsR.map((v, i) => v == null ? '' : `${i && valsR[i - 1] != null ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('') : '';
   const refSrc = hasR && ref.cpi ? `<a href="https://www.bls.gov/cpi/" target="_blank" rel="noopener">U.S. Bureau of Labor Statistics (CPI)</a>` : '';
-  const src = `Source: ${sourceHtml(ui.metric, keys)}${refSrc ? ` · Inflation: ${refSrc}` : ''}${has2 ? ` · ${sourceHtml(overlayKey, Object.keys(s2).sort().filter(x => x.slice(0, 4) >= keys[0].slice(0, 4) && x.slice(0, 4) <= last.slice(0, 4)))}` : ''}${hasR && !ref.cpi ? '<br>Fair value = the steady growth trend of 2000–2019 (2015–2019 for rent), extended to today. A rough guide, not an appraisal.' : ''}`;
+  const src = `Source: ${sourceHtml(ui.metric, keys)}${refSrc ? ` · Inflation: ${refSrc}` : ''}${has2 ? ` · ${sourceHtml(overlayKey, Object.keys(s2).sort().filter(x => x.slice(0, 4) >= keys[0].slice(0, 4) && x.slice(0, 4) <= last.slice(0, 4)))}` : ''}${hasR && !ref.cpi ? `<br>${ref.l.startsWith('Fair rent') ? 'Fair rent' : 'Fair value'} = local household income (U.S. Census Bureau) × this place’s average price-to-income ratio over the last 20 years${ref.l.startsWith('Fair rent') ? ' (since 2015 for rents)' : ''}. Income after the latest published year is projected at its recent pace. A rough guide, not an appraisal.` : ''}`;
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.l)} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}"${has2 ? ` data-vals2='${JSON.stringify(vals2)}' data-f2="${f2}" data-l1="${esc(def.l)}" data-l2="${esc(def2.l)}"${shared ? ' data-shared="1"' : ''}` : ''}${hasR ? ` data-valsr='${JSON.stringify(valsR)}' data-rl="${esc(ref.l)}"${ref.cpi ? ' data-cpi="1"' : ''}` : ''} data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi, lo2, hi2 })}'>
     <defs><linearGradient id="cfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
     ${legend}
@@ -1588,7 +1661,7 @@ function chartSvg(series, def, s2, def2, ref) {
     <rect x="${L0}" y="${T0}" width="${W - L0 - R0}" height="${H - T0 - B0}" fill="transparent"/>
   </svg><p class="note" style="margin-top:4px">${ymLabel(keys[0])} → ${ymLabel(keys[keys.length - 1])}: ${fmtV(ui.metric, first)} → ${fmtV(ui.metric, lastV)}${!def.d && first > 0 ? ` (${signed((lastV / first - 1) * 100, 'pct')})` : ''}</p>
   ${shared && vals2[vals2.length - 1] != null ? `<p class="note gap-note">Gap in ${ymLabel(last)}: <b style="color:${C2}">${esc(def2.l)}</b> is ${gapText(lastV, vals2[vals2.length - 1], f)} than ${esc(def.l)}</p>` : ''}
-  <p class="chart-src">${src}</p>`;
+  <p class="chart-src">${src}${releaseText(ui.metric) ? `<br><span class="rel">${esc(releaseText(ui.metric))}</span>` : ''}</p>`;
 }
 // Download the chart as a PNG: the place and data point on top, the chart, then the source and this site's name.
 function exportChart() {
@@ -1729,24 +1802,63 @@ function computeAfford(places) {
   const rate = +aff.rate || D.meta.mortgage.rate;
   for (const p of places) { const x = affordPct(p.v.hv, p, rate); if (x == null) delete p.v.afford; else p.v.afford = Math.round(x * 10) / 10; }
 }
-function openAfford() {
-  const box = document.getElementById('affordBox');
-  const f = (k, label, ph) => `<label><span>${label}</span><input data-aff="${k}" inputmode="decimal" placeholder="${ph}" value="${esc(aff[k])}"></label>`;
-  box.innerHTML = `<h3>What can I afford?</h3>
-    <div class="aff-form">${f('income', 'Yearly household income', '$120,000')}${f('down', 'Down payment', '$60,000')}${f('debts', 'Other monthly debts', '$400')}${f('rate', 'Mortgage rate (%)', String(D.meta.mortgage.rate))}</div>
-    <p class="aff-err" id="affErr"></p>
-    <div class="aff-actions"><button type="button" class="aff-go" data-aff-go>Show on map</button><button type="button" class="aff-x" data-aff-close>Close</button></div>
-    <p class="note">Colors the map by what the typical home there would cost you each month (mortgage, property tax, insurance, plus your debts) as a share of income. Teal = comfortable (under 28%), coral = a stretch (over 36%).</p>`;
-  box.hidden = false;
-  box.querySelector('input').focus();
+// The questions, asked one at a time in a card over the map, then a summary and "Show on map".
+const AFF_STEPS = [
+  { k: 'income', q: 'What is your yearly household income?', help: 'Before taxes, for everyone who will be on the mortgage.', pre: '$', ph: '120,000' },
+  { k: 'down', q: 'How much can you put down?', help: 'Cash for the down payment (not counting closing costs).', pre: '$', ph: '60,000', quick: ['20,000', '50,000', '100,000', '200,000'] },
+  { k: 'debts', q: 'Any other monthly debt payments?', help: 'Car loan, student loans, credit card minimums. Enter 0 if none.', pre: '$', ph: '400', quick: ['0', '250', '500', '1,000'] },
+  { k: 'rate', q: 'What mortgage rate should we use?', help: '', post: '%', ph: '' },
+];
+let affStep = 0;
+const affWrap = () => document.getElementById('affordWrap');
+function closeAfford() { affWrap().hidden = true; }
+function openAfford() { affStep = 0; affWrap().hidden = false; renderAfford(); }
+function renderAfford() {
+  const box = document.getElementById('affordBox'), n = AFF_STEPS.length, rate = D.meta.mortgage.rate;
+  const bar = `<div class="aff-steps">${[...Array(n + 1)].map((_, i) => `<i class="${i <= affStep ? 'on' : ''}"></i>`).join('')}</div>`;
+  const head = `<button type="button" class="aff-close" data-aff-close aria-label="Close">✕</button><h3>What can I afford?</h3>`;
+  if (affStep < n) {
+    const s = AFF_STEPS[affStep];
+    const help = s.k === 'rate' ? `Today’s average 30-year fixed rate is ${rate}% (Freddie Mac). Change it if you have your own quote.` : s.help;
+    box.innerHTML = `${head}<p class="aff-count">Question ${affStep + 1} of ${n}</p>${bar}
+      <label class="aff-q" for="affIn">${s.q}</label><p class="aff-help">${help}</p>
+      <div class="aff-in">${s.pre ? `<b>${s.pre}</b>` : ''}<input id="affIn" data-aff="${s.k}" inputmode="decimal" autocomplete="off" placeholder="${s.k === 'rate' ? rate : s.ph}" value="${esc(aff[s.k] || '')}">${s.post ? `<b>${s.post}</b>` : ''}</div>
+      ${s.quick ? `<div class="aff-quick">${s.quick.map(v => `<button type="button" data-aff-quick="${v}">$${v}</button>`).join('')}</div>` : ''}
+      <p class="aff-err" id="affErr"></p>
+      <div class="aff-actions">${affStep ? '<button type="button" class="aff-back" data-aff-back>Back</button>' : ''}<button type="button" class="aff-go" data-aff-next>${affStep === n - 1 ? 'See summary' : 'Next'}</button></div>`;
+    const inp = box.querySelector('#affIn'); inp.focus(); inp.select();
+  } else {
+    const r = +aff.rate || rate;
+    box.innerHTML = `${head}<p class="aff-count">Your budget</p>${bar}
+      <ul class="aff-sum"><li><span>Yearly household income</span><b>${fmt(money(aff.income), 'usd')}</b></li><li><span>Down payment</span><b>${fmt(money(aff.down), 'usd')}</b></li>
+      <li><span>Other monthly debts</span><b>${fmt(money(aff.debts), 'usd')}</b></li><li><span>Mortgage rate</span><b>${r}%</b></li></ul>
+      <p class="aff-err" id="affErr"></p>
+      <div class="aff-actions"><button type="button" class="aff-back" data-aff-back>Back</button><button type="button" class="aff-go" data-aff-go>Show on map</button></div>
+      <p class="note">The map is colored by what the typical home in each place would cost you each month (mortgage, property tax, insurance, plus your debts) as a share of your income. Teal = comfortable (under 28%), coral = a stretch (over 36%).</p>`;
+    box.querySelector('[data-aff-go]').focus();
+  }
+}
+function affNext() {
+  const s = AFF_STEPS[affStep];
+  if (s && s.k === 'income' && !money(aff.income)) { document.getElementById('affErr').textContent = 'Enter your yearly household income to continue.'; return; }
+  affStep++; renderAfford();
 }
 document.getElementById('affordBox').addEventListener('input', e => { const k = e.target.dataset.aff; if (k) aff[k] = e.target.value; });
-document.getElementById('affordBox').addEventListener('keydown', e => { if (e.key === 'Enter') document.querySelector('[data-aff-go]').click(); });
+document.getElementById('affordBox').addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeAfford(); return; }
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  if (affStep < AFF_STEPS.length) affNext(); else document.querySelector('[data-aff-go]').click();
+});
+affWrap().addEventListener('click', e => { if (e.target === affWrap()) closeAfford(); }); // click outside the card
 document.getElementById('affordBox').addEventListener('click', e => {
-  if (e.target.closest('[data-aff-close]')) { document.getElementById('affordBox').hidden = true; return; }
+  if (e.target.closest('[data-aff-close]')) { closeAfford(); return; }
+  if (e.target.closest('[data-aff-back]')) { affStep = Math.max(0, affStep - 1); renderAfford(); return; }
+  const q = e.target.closest('[data-aff-quick]'); if (q) { aff[AFF_STEPS[affStep].k] = q.dataset.affQuick; affNext(); return; }
+  if (e.target.closest('[data-aff-next]')) { affNext(); return; }
   if (!e.target.closest('[data-aff-go]')) return;
-  if (!money(aff.income)) { document.getElementById('affErr').textContent = 'Enter your yearly household income first.'; return; }
-  document.getElementById('affErr').textContent = '';
+  if (!money(aff.income)) { affStep = 0; renderAfford(); return; }
+  closeAfford();
   try { localStorage.setItem('hm-ui', JSON.stringify(Object.assign(JSON.parse(localStorage.getItem('hm-ui') || '{}'), { afford: aff }))); } catch (err) {}
   saved.afford = aff;
   for (const level of ['state', 'metro', 'county', 'zip']) computeAfford(Object.values(D[level]));
