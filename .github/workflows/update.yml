@@ -15,6 +15,7 @@ permissions:
   contents: write   # to save data_cache/ and last-update.txt back into the repository
   pages: write
   id-token: write
+  issues: write     # to open an issue (GitHub emails it to you) when some data needs attention
 
 concurrency:
   group: pages
@@ -67,3 +68,16 @@ jobs:
           git commit -m "Save yearly data" || true
           git pull --rebase || true
           git push || true
+
+      # If the data check found something late or a new release that has to be added by hand, post it as an issue.
+      # GitHub emails new issues and comments to the repository owner. One open issue is reused for later findings.
+      - name: Tell the owner about data that needs attention
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -s notices.txt ]; then
+            title="Data check: something needs attention"
+            n=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number' || true)
+            if [ -n "$n" ]; then gh issue comment "$n" --body-file notices.txt; else gh issue create --title "$title" --body-file notices.txt; fi
+          fi
