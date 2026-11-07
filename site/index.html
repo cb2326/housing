@@ -266,9 +266,19 @@
   .chart-tabs button, .ranges button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
   .chart-tabs button.on, .ranges button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   .ranges { display: flex; gap: 4px; justify-content: flex-end; margin-bottom: 4px; }
-  .chart { position: relative; }
+  .chart { position: relative; overflow: hidden; }
   .chart svg { width: 100%; height: auto; display: block; }
-  .chart .ctip { position: absolute; pointer-events: none; background: #1d1b17; color: #f4eee4; font-size: 12px; padding: 5px 8px; border-radius: 7px; white-space: nowrap; display: none; transform: translate(-50%, -110%); font-variant-numeric: tabular-nums; }
+  .chart .ctip { position: absolute; z-index: 2; pointer-events: none; background: #1d1b17; color: #f4eee4; font-size: 12px; line-height: 1.5; padding: 6px 9px; border-radius: 7px; white-space: nowrap; display: none; font-variant-numeric: tabular-nums; }
+  .ctip .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+  .ctip .dot.dash { width: 10px; height: 0; border-radius: 0; border-top: 2px dashed #b8c0cc; vertical-align: 3px; }
+  .ctip .gap { color: #f6b89b; }
+  .gap-note b { font-weight: 600; }
+  .mig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .mig-grid h5 { margin: 0 0 4px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .mig td:nth-child(n+2), .mig th:nth-child(n+2) { text-align: right; white-space: nowrap; }
+  .linkish { border: 0; background: none; padding: 0; color: #126b60; font: inherit; text-align: left; cursor: pointer; }
+  .linkish:hover { text-decoration: underline; }
+  @media (max-width: 820px) { .mig-grid { grid-template-columns: 1fr; } }
   .sec { margin-top: 18px; }
   .sec h4 { margin: 0 0 6px; font: 600 15px var(--serif); }
   .sec table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -457,6 +467,8 @@ const M = {
   sales_yoy:     { l: 'Sales change (1 year)', f: 'pct', d: 1, src: 'realtor', i: 'Change in pending home sales versus the same month last year.' },
   sales_vs_2019: { l: 'Sales vs 2017–19 normal', f: 'pct', d: 1, src: 'realtor', i: 'Pending home sales compared with the same month in 2017–2019.' },
   cut:           { l: 'Listings with a price cut', f: 'pct', src: 'realtor', i: 'Share of active listings with a price reduction this month.' },
+  price_up:      { l: 'Listings with a price increase', f: 'pct', src: 'realtor', i: 'Share of active listings whose asking price went up this month. More of these = sellers feel the market is strong.' },
+  pending_ratio: { l: 'Pending sales per 100 listings', f: 'num', src: 'realtor', i: 'Homes under contract for every 100 homes listed for sale. Higher = homes are being snapped up (a seller’s market); low = buyers have plenty of choice.' },
   dom:           { l: 'Days to sell', f: 'days', src: 'realtor', i: 'Median days homes stay listed (Realtor.com).' },
   dom_yoy:       { l: 'Days to sell change (1 year)', f: 'pct', d: 1, src: 'realtor', i: 'Change in median days on market versus a year ago.' },
   inv_pct_houses:{ l: 'Listings as % of all homes', f: 'pct2', src: 'realtor', i: 'Active listings as a share of all housing units (Census estimates).' },
@@ -557,6 +569,12 @@ const M = {
   market_heat:   { l: 'Market heat index', f: 'score', src: 'zillow', i: "Zillow's market temperature: about 50 is balanced, higher favours sellers, lower favours buyers." },
   // added: jobs and pay (BLS), and more from the Census survey
   unemployment:  { l: 'Unemployment rate', f: 'pct', src: 'acs', i: 'Share of the labor force without a job and looking for one (Census American Community Survey, 5-year average).' },
+  mig_net:       { l: 'Net moves (IRS)', f: 'num', d: 1, src: 'irs', i: 'People who moved in during the year minus people who moved out, from IRS tax returns (in-state and out-of-state moves; metros and states leave out moves within them). ZIP codes show their county.' },
+  mig_net_pct:   { l: 'Net moves, % of population', f: 'pct', d: 1, src: 'irs', i: 'Net moves (in minus out, IRS tax returns) as a share of the population. ZIP codes show their county.' },
+  mig_in:        { l: 'People moving in', f: 'num', src: 'irs', i: 'People who moved here from elsewhere in the US (or abroad) during the year, counted from IRS tax returns. ZIP codes show their county.' },
+  mig_out:       { l: 'People moving out', f: 'num', src: 'irs', i: 'People who moved away during the year, counted from IRS tax returns. ZIP codes show their county.' },
+  mig_in_income: { l: 'Income of households moving in', f: 'usd', src: 'irs', i: 'Average adjusted gross income of the households that moved in (IRS). Compare with the households moving out to see who is arriving.' },
+  mig_out_income:{ l: 'Income of households moving out', f: 'usd', src: 'irs', i: 'Average adjusted gross income of the households that moved away (IRS).' },
   jobs:          { l: 'Jobs', f: 'num', src: 'bls', i: 'Average number of jobs located in the place during the year (BLS Quarterly Census of Employment and Wages). Not available for ZIP codes.' },
   job_growth:    { l: 'Job growth (1 year)', f: 'pct2', d: 1, src: 'bls', i: 'Change in the number of jobs over the year.' },
   avg_pay:       { l: 'Average pay per job', f: 'usd', src: 'bls', i: 'Average yearly pay of the jobs located in the place (BLS).' },
@@ -575,6 +593,8 @@ const M = {
   flood_claims:  { l: 'Flood insurance claims (10 years)', f: 'num', src: 'nfip', warm: 1, i: 'Number of National Flood Insurance Program claims for floods in the last 10 years (by year of the flood).' },
   flood_paid:    { l: 'Flood claims paid (10 years)', f: 'usd', src: 'nfip', warm: 1, i: 'Dollars paid on those flood insurance claims over the last 10 years.' },
   flood_claims_rate:{ l: 'Flood claims per 1,000 homes (10 years)', f: 'r2', src: 'nfip', warm: 1, i: 'Flood insurance claims in the last 10 years for every 1,000 homes.' },
+  aqi_bad_days:  { l: 'Unhealthy air days', f: 'num', src: 'epa_air', warm: 1, i: 'Days a year when the air was unhealthy for sensitive groups or worse (EPA Air Quality Index over 100), from the county’s air monitors. Counties without a monitor have no figure; ZIP codes show their county.' },
+  aqi_median:    { l: 'Typical air quality (AQI)', f: 'num', src: 'epa_air', warm: 1, i: 'Median daily Air Quality Index over the year (EPA). 0–50 is good, 51–100 moderate, over 100 unhealthy for sensitive groups. ZIP codes show their county.' },
   noise_db:      { l: 'Road, rail and air noise (dB)', f: 'db', src: 'noise', warm: 1, i: 'Average transportation noise where people live (24-hour average, decibels), for residents exposed to 45 dB or more. 55 dB is a busy suburb; 65+ is next to a highway or airport.' },
   noise_loud:    { l: 'Residents exposed to 60+ dB noise', f: 'pct', src: 'noise', warm: 1, i: 'Share of residents living with road, rail or aircraft noise of 60 dB or more (24-hour average).' },
   // natural hazards (FEMA National Risk Index: national percentile, 0–100) and walkability (EPA)
@@ -593,10 +613,10 @@ const M = {
 const START_HERE = [['afford', 'What can I afford?'], ['hv', 'Home value'], ['hv_yoy', 'Price change'], ['school_score', 'Schools'], ['rent', 'Rent'], ['risk', 'Hazard risk'], ['walk', 'Walkability'], ['fc_1y', 'Forecast'], ['growth_score', 'Growth outlook']];
 const GROUPS = [
   ['Prices and affordability', ['hv', 'hv_yoy', 'hv_mom', 'hv_5y', 'fc_1y', 'sale_price', 'sale_price_yoy', 'hv_low', 'hv_high', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
-  ['Market activity', ['market_heat', 'inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'sale_to_list', 'pct_above_list', 'days_to_pending', 'dom', 'dom_yoy', 'cut', 'lp', 'lp_yoy', 'ppsf', 'med_sqft', 'months_supply', 'inv_pct_houses'], 'activity'],
+  ['Market activity', ['market_heat', 'inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'sale_to_list', 'pct_above_list', 'days_to_pending', 'pending_ratio', 'dom', 'dom_yoy', 'cut', 'price_up', 'lp', 'lp_yoy', 'ppsf', 'med_sqft', 'months_supply', 'inv_pct_houses'], 'activity'],
   ['Schools', ['school_score'], 'school'],
-  ['People and income', ['income', 'income_growth', 'unemployment', 'jobs', 'job_growth', 'avg_pay', 'pay_growth', 'commute', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
-  ['Climate, risk and walkability', ['risk', 'flood_risk', 'flood_zone_pct', 'flood_ins_pct', 'flood_claims', 'flood_claims_rate', 'flood_paid', 'fire_risk', 'hurricane_risk', 'tornado_risk', 'heat_risk', 'quake_risk', 'noise_db', 'noise_loud', 'walk', 'temp'], 'leaf'],
+  ['People and income', ['income', 'income_growth', 'unemployment', 'jobs', 'job_growth', 'avg_pay', 'pay_growth', 'commute', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'mig_net', 'mig_net_pct', 'mig_in', 'mig_out', 'mig_in_income', 'mig_out_income', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
+  ['Climate, risk and walkability', ['risk', 'flood_risk', 'flood_zone_pct', 'flood_ins_pct', 'flood_claims', 'flood_claims_rate', 'flood_paid', 'fire_risk', 'hurricane_risk', 'tornado_risk', 'heat_risk', 'quake_risk', 'aqi_bad_days', 'aqi_median', 'noise_db', 'noise_loud', 'walk', 'temp'], 'leaf'],
   ['Who lives here', ['med_age', 'u18_pct', 'a2544_pct', 'a65_pct', 'a75_pct', 'family_hh', 'single_hh', 'homeown', 'mortgaged', 'rent_burden', 'owner_burden', 'seasonal_pct', 'year_built', 'own_2544_pct', 'own_65_pct', 'own_75_pct', 'rent_2544_pct', 'r_rent2544_own65', 'r_rent2544_own75', 'r_u18_65', 'r_u18_75', 'r_2544_65', 'r_2544_75'], 'building'],
   ['Lending', ['apps', 'origs', 'denial', 'avg_rate', 'conv_pct', 'govt_pct', 'fha_pct', 'va_pct', 'usda_pct', 'ltv', 'dti', 'dti43', 'buyer_income', 'loan_amt', 'price_med', 'second_pct', 'investor_pct', 'si_pct'], 'bank'],
   ['For investors', ['rent', 'rent_sfr', 'rent_3br', 'rent_4br', 'rent_census', 'rent_yoy', 'rent_pct_income', 'price_rent', 'gross_yield', 'cap_rate', 'rent_overvalued', 'buy_vs_rent', 'vacancy', 'shadow', 'units', 'units_growth', 'permits', 'permits_pct'], 'chart'],
@@ -1210,7 +1230,7 @@ async function loadHist(level, id) {
     if (level === 'zip') {
       // ZIP histories come bundled by the first three digits, stored as [first month, [values…]].
       const bundle = await fetch(`data/hist/zip/${id.slice(0, 3)}.json`).then(r => r.ok ? r.json() : {});
-      for (const [k, s] of Object.entries(bundle[id] || {})) h[k] = k === 'a' || k === 'sch' ? s : expand(s);
+      for (const [k, s] of Object.entries(bundle[id] || {})) h[k] = k === 'a' || k === 'sch' || k === 'mig' ? s : expand(s);
     } else h = await fetch(`data/hist/${level}/${id}.json`).then(r => r.ok ? r.json() : {});
   } catch (e) { return {}; }
   return (histCache[key] = h);
@@ -1348,6 +1368,10 @@ function seriesFor(key, h, p) {
     case 'dom': return h.dom;
     case 'dom_yoy': return h.dom && pctSeries(h.dom, 12);
     case 'cut': return h.cut && mapSeries(h.cut, x => x * 100);
+    case 'price_up': return h.inc && mapSeries(h.inc, x => x * 100);
+    case 'pending_ratio': return h.pend && h.inv && mapSeries(h.pend, (x, k) => h.inv[k] ? x / h.inv[k] * 100 : null);
+    case 'ppsf': return h.ppsf;
+    case 'med_sqft': return h.sqft;
     case 'lp': return h.lp;
     case 'lp_yoy': return h.lp && pctSeries(h.lp, 12);
     default: return a[key] || null; // every yearly data point (Census, mortgages, permits, weather, votes…)
@@ -1390,7 +1414,19 @@ function renderDrawer() {
     ${chart}
     <h4 class="snap-h">At a glance</h4>
     <div class="kpis">${['hv', 'rent', 'school_score', 'dom', 'income', 'growth_score'].map(tile).join('')}</div>
-    ${level === 'zip' ? schoolList() : ''}`;
+    ${level === 'zip' ? schoolList() : ''}${level === 'county' ? migList() : ''}`;
+}
+// Counties: the places people moved here from, and moved to, in the latest IRS year.
+function migList() {
+  const m = hist && hist.mig;
+  if (!m || !((m.in || []).length || (m.out || []).length)) return '';
+  const yr = (D.meta.years || {}).migration;
+  const name = f => D.county[f] ? `${D.county[f].n}, ${D.county[f].s}` : f;
+  const table = (title, list) => !list || !list.length ? '' : `<div><h5>${title}</h5><table class="schools mig"><thead><tr><th>County</th><th>People</th><th>Avg. income</th></tr></thead><tbody>${
+    list.map(([f, n, inc]) => `<tr><td>${D.county[f] ? `<button type="button" class="linkish" data-goto="${f}">${esc(name(f))}</button>` : esc(name(f))}</td><td>${nf0.format(n)}</td><td>${inc ? fmt(inc, 'usd') : '—'}</td></tr>`).join('')}</tbody></table></div>`;
+  return `<h4 class="snap-h">Where people move from and to${yr ? ` <small>(${yr - 1}–${String(yr).slice(2)})</small>` : ''}</h4>
+    <div class="mig-grid">${table('Moved here from', m.in)}${table('Moved away to', m.out)}</div>
+    <p class="note">Top counties by number of people, from IRS tax returns filed in consecutive years. Avg. income = average adjusted gross income per household that moved.</p>`;
 }
 // ZIP codes: their public schools, best rated first (rating 1–10 from state tests, ranked within the state).
 function schoolList() {
@@ -1407,6 +1443,7 @@ function schoolList() {
 }
 document.getElementById('dBody').addEventListener('click', e => {
   const m = e.target.closest('[data-metric]'); if (m) { setMetric(m.dataset.metric); return; }
+  const g = e.target.closest('[data-goto]'); if (g) { openDetail('county', g.dataset.goto); return; }
   const c = e.target.closest('[data-cmode]'); if (c) { chartMode = c.dataset.cmode; renderDrawer(); return; }
   const r = e.target.closest('[data-range]'); if (r) { chartRange = r.dataset.range; renderDrawer(); return; }
   if (e.target.closest('[data-ov-clear]')) { overlayKey = ''; renderDrawer(); return; }
@@ -1436,6 +1473,8 @@ const SRC = {
   fema: ['FEMA (National Risk Index)', 'https://hazards.fema.gov/nri/'],
   epa: ['EPA (Smart Location Database)', 'https://www.epa.gov/smartgrowth/smart-location-mapping'],
   bls: ['U.S. Bureau of Labor Statistics (QCEW)', 'https://www.bls.gov/cew/'],
+  irs: ['IRS Statistics of Income (U.S. migration data)', 'https://www.irs.gov/statistics/soi-tax-stats-migration-data'],
+  epa_air: ['EPA (Air Quality System, annual AQI by county)', 'https://aqs.epa.gov/aqsweb/airdata/download_files.html'],
   nfip: ['FEMA (National Flood Insurance Program)', 'https://www.fema.gov/about/openfema/data-sets'],
   noise: ['US DOT National Transportation Noise Map (tract figures: Seto & Huang, University of Washington)', 'https://www.bts.gov/geospatial/national-transportation-noise-map'],
   afford: ['Zillow Research, Freddie Mac (mortgage rates) and your budget', 'https://www.zillow.com/research/data/'],
@@ -1465,6 +1504,12 @@ function valueAt(s, k) {
   return s[k.slice(0, 4)] ?? null;
 }
 
+// How far b is above or below a, in words: "$237,000 (19.1%) higher", or "2.3 points lower" for percentages.
+function gapText(a, b, f) {
+  const d = b - a, word = d >= 0 ? 'higher' : 'lower';
+  if (f.startsWith('pct')) return `${Math.abs(d).toFixed(1)} points ${word}`;
+  return `${fmt(Math.abs(d), f)}${a ? ` (${Math.abs(d / a * 100).toFixed(1)}%)` : ''} ${word}`;
+}
 // History chart for the selected data point. Yearly = the same month each year (labelled), Monthly = every month.
 function chartSvg(series, def, s2, def2, ref) {
   const f = def.f, f2 = def2 && def2.f;
@@ -1484,9 +1529,12 @@ function chartSvg(series, def, s2, def2, ref) {
   const has2 = vals2 && vals2.filter(v => v != null).length >= 1;
   const valsR = ref ? keys.map(k => valueAt(ref.s, k)) : null;
   const hasR = valsR && valsR.filter(v => v != null).length >= 2;
+  // Two data points in the same unit (two prices, two percentages…) share one scale, so the gap between them is real.
+  const unit = ff => ff && ff.startsWith('pct') ? 'pct' : ff;
+  const shared = has2 && unit(def2.f) === unit(def.f);
   // Phones get a smaller drawing so the numbers stay readable once it is fitted to the screen.
   const narrow = innerWidth <= 820;
-  const W = narrow ? 400 : 760, H = narrow ? 290 : 380, L0 = narrow ? 50 : 62, R0 = has2 ? (narrow ? 46 : 62) : (narrow ? 12 : 18), T0 = has2 || hasR ? 40 : 26, B0 = 28;
+  const W = narrow ? 400 : 760, H = narrow ? 290 : 380, L0 = narrow ? 50 : 62, R0 = has2 && !shared ? (narrow ? 46 : 62) : (narrow ? 12 : 18), T0 = has2 || hasR ? 40 : 26, B0 = 28;
   const range = (vs, d) => {
     let lo = Math.min(...vs), hi = Math.max(...vs);
     if (d) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
@@ -1494,12 +1542,12 @@ function chartSvg(series, def, s2, def2, ref) {
     if (!d && lo > 0 && lo < (hi - lo) * 0.3) lo = 0;
     return [lo, hi];
   };
-  const [lo, hi] = range(hasR ? [...vals, ...valsR.filter(v => v != null)] : vals, def.d);
-  const [lo2, hi2] = has2 ? range(vals2.filter(v => v != null), def2.d) : [0, 1];
+  const [lo, hi] = range([...vals, ...(hasR ? valsR.filter(v => v != null) : []), ...(shared ? vals2.filter(v => v != null) : [])], def.d);
+  const [lo2, hi2] = shared ? [lo, hi] : has2 ? range(vals2.filter(v => v != null), def2.d) : [0, 1];
   const x = i => L0 + (W - L0 - R0) * i / (keys.length - 1), y = v => T0 + (H - T0 - B0) * (1 - (v - lo) / (hi - lo));
   const y2 = v => T0 + (H - T0 - B0) * (1 - (v - lo2) / (hi2 - lo2));
   const tickList = (a, b) => { const step = niceStep((b - a) / 5), t = []; for (let v = Math.ceil(a / step) * step; v <= b + 1e-9; v += step) t.push(Math.abs(v) < step / 1e6 ? 0 : v); return t; };
-  const ticks = tickList(lo, hi), ticks2 = has2 ? tickList(lo2, hi2) : [];
+  const ticks = tickList(lo, hi), ticks2 = has2 && !shared ? tickList(lo2, hi2) : [];
   const years = [...new Set(keys.map(k => k.slice(0, 4)))];
   const every = Math.ceil(years.length / (narrow ? 6 : 10));
   const yearly = chartMode === 'yearly' || keys[0].length === 4;
@@ -1515,15 +1563,15 @@ function chartSvg(series, def, s2, def2, ref) {
   const first = vals[0], lastV = vals[vals.length - 1];
   const C2 = '#e76f51', CR = '#8a94a3';
   // Legend: the data point, then the reference line (same scale), then the second data point (right-hand scale).
-  const items = [[esc(def.l) + (has2 ? ' (left)' : ''), 'var(--accent)', '']];
+  const items = [[esc(def.l) + (has2 && !shared ? ' (left)' : ''), 'var(--accent)', '']];
   if (hasR) items.push([esc(ref.l), CR, 'dash']);
-  if (has2) items.push([esc(def2.l) + ' (right)', C2, '']);
+  if (has2) items.push([esc(def2.l) + (shared ? '' : ' (right)'), C2, '']);
   const colW = (W - L0) / items.length;
   const legend = items.length > 1 ? `<g font-size="12" font-weight="600">${items.map(([t, c, dash], i) => { const x0 = L0 + i * colW; return `${dash ? `<line x1="${x0}" x2="${x0 + 14}" y1="14" y2="14" stroke="${c}" stroke-width="2.4" stroke-dasharray="4 3"/>` : `<circle cx="${x0 + 6}" cy="14" r="5" fill="${c}"/>`}<text x="${x0 + 19}" y="18" fill="var(--text)">${t}</text>`; }).join('')}</g>` : '';
   const pathR = hasR ? valsR.map((v, i) => v == null ? '' : `${i && valsR[i - 1] != null ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('') : '';
   const refSrc = hasR && ref.cpi ? `<a href="https://www.bls.gov/cpi/" target="_blank" rel="noopener">U.S. Bureau of Labor Statistics (CPI)</a>` : '';
   const src = `Source: ${sourceHtml(ui.metric, keys)}${refSrc ? ` · Inflation: ${refSrc}` : ''}${has2 ? ` · ${sourceHtml(overlayKey, Object.keys(s2).sort().filter(x => x.slice(0, 4) >= keys[0].slice(0, 4) && x.slice(0, 4) <= last.slice(0, 4)))}` : ''}${hasR && !ref.cpi ? '<br>Fair value = the steady growth trend of 2000–2019 (2015–2019 for rent), extended to today. A rough guide, not an appraisal.' : ''}`;
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.l)} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}"${has2 ? ` data-vals2='${JSON.stringify(vals2)}' data-f2="${f2}"` : ''}${hasR ? ` data-valsr='${JSON.stringify(valsR)}' data-rl="${esc(ref.l)}"${ref.cpi ? ' data-cpi="1"' : ''}` : ''} data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi, lo2, hi2 })}'>
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.l)} history" data-keys='${JSON.stringify(keys)}' data-vals='${JSON.stringify(vals)}' data-f="${f}"${has2 ? ` data-vals2='${JSON.stringify(vals2)}' data-f2="${f2}" data-l1="${esc(def.l)}" data-l2="${esc(def2.l)}"${shared ? ' data-shared="1"' : ''}` : ''}${hasR ? ` data-valsr='${JSON.stringify(valsR)}' data-rl="${esc(ref.l)}"${ref.cpi ? ' data-cpi="1"' : ''}` : ''} data-dims='${JSON.stringify({ W, H, L0, R0, T0, B0, lo, hi, lo2, hi2 })}'>
     <defs><linearGradient id="cfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
     ${legend}
     ${ticks.map(t => `<line x1="${L0}" x2="${W - R0}" y1="${y(t)}" y2="${y(t)}" stroke="${def.d && t === 0 ? '#374151' : 'var(--line)'}" stroke-width="${def.d && t === 0 ? 1.4 : 1}"/><text x="${L0 - 8}" y="${y(t) + 3.5}" text-anchor="end" font-size="11" fill="var(--muted)">${short(t)}</text>`).join('')}
@@ -1539,6 +1587,7 @@ function chartSvg(series, def, s2, def2, ref) {
     <circle class="xd" r="5" fill="var(--warm)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
     <rect x="${L0}" y="${T0}" width="${W - L0 - R0}" height="${H - T0 - B0}" fill="transparent"/>
   </svg><p class="note" style="margin-top:4px">${ymLabel(keys[0])} → ${ymLabel(keys[keys.length - 1])}: ${fmtV(ui.metric, first)} → ${fmtV(ui.metric, lastV)}${!def.d && first > 0 ? ` (${signed((lastV / first - 1) * 100, 'pct')})` : ''}</p>
+  ${shared && vals2[vals2.length - 1] != null ? `<p class="note gap-note">Gap in ${ymLabel(last)}: <b style="color:${C2}">${esc(def2.l)}</b> is ${gapText(lastV, vals2[vals2.length - 1], f)} than ${esc(def.l)}</p>` : ''}
   <p class="chart-src">${src}</p>`;
 }
 // Download the chart as a PNG: the place and data point on top, the chart, then the source and this site's name.
@@ -1595,8 +1644,17 @@ document.getElementById('dBody').addEventListener('mousemove', e => {
   const t = svg.parentElement.querySelector('.ctip');
   const v2s = svg.dataset.vals2 ? JSON.parse(svg.dataset.vals2) : null;
   const vrs = svg.dataset.valsr ? JSON.parse(svg.dataset.valsr) : null;
-  t.textContent = `${ymLabel(keys[i])}: ${fmt(vals[i], f)}` + (vrs && vrs[i] != null ? ` · ${svg.dataset.cpi ? 'Inflation' : 'Fair value'} ${fmt(vrs[i], f)}` : '') + (v2s && v2s[i] != null ? ` · ${fmt(v2s[i], svg.dataset.f2)}` : '');
-  t.style.display = 'block'; t.style.left = (cx * r.width / d.W) + 'px'; t.style.top = (cy * r.height / d.H) + 'px';
+  // One line per value, then how far apart they are.
+  const lines = [`<b>${ymLabel(keys[i])}</b>`, `<i class="dot" style="background:var(--accent)"></i>${esc(svg.dataset.l1 || M[ui.metric].l)}: ${fmt(vals[i], f)}`];
+  if (vrs && vrs[i] != null) lines.push(`<i class="dot dash"></i>${svg.dataset.cpi ? 'Inflation' : 'Fair value'}: ${fmt(vrs[i], f)} <br><span class="gap">Actual is ${gapText(vrs[i], vals[i], f).replace(/higher$/, 'above').replace(/lower$/, 'below')}</span>`);
+  if (v2s && v2s[i] != null) lines.push(`<i class="dot" style="background:#e76f51"></i>${esc(svg.dataset.l2)}: ${fmt(v2s[i], svg.dataset.f2)}`);
+  if (svg.dataset.shared && v2s && v2s[i] != null) lines.push(`<span class="gap">Gap: ${gapText(vals[i], v2s[i], f)}</span>`);
+  t.innerHTML = lines.join('<br>');
+  t.style.display = 'block';
+  // Keep the box inside the chart: centred on the point, but pushed in near the edges, and below the point near the top.
+  const px = cx * r.width / d.W, py = cy * r.height / d.H, tw = t.offsetWidth, th = t.offsetHeight;
+  t.style.left = Math.max(0, Math.min(r.width - tw, px - tw / 2)) + 'px';
+  t.style.top = (py - th - 12 >= 0 ? py - th - 12 : py + 14) + 'px';
 });
 document.getElementById('dBody').addEventListener('mouseleave', () => {
   document.querySelectorAll('.chart .ctip').forEach(t => t.style.display = 'none');
