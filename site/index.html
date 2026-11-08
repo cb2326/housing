@@ -194,6 +194,13 @@
   .plabel .in { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; font: 600 11px/1.2 var(--sans); color: #111827; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff, 0 0 1px #fff; pointer-events: none; }
   .plabel .in b { display: block; font-weight: 600; }
   .plabel .in span { display: block; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .us-label .in { font-size: 30px; line-height: 1.15; color: #06463f; }
+  .us-label .in b { font-family: var(--display); font-weight: 700; }
+  .us-label .in span { font-size: 34px; color: #111827; }
+  .us-val { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 6px; padding: 8px 10px; background: var(--panel-2); border-radius: 10px; }
+  .us-val span { font-size: 13px; color: var(--muted); }
+  .us-val b { font-size: 20px; font-family: var(--display); color: #06463f; }
+  @media (max-width: 820px) { .us-label .in { font-size: 20px; } .us-label .in span { font-size: 22px; } }
   .drawer header { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: flex-start; }
   .drawer header h2 { margin: 0; font: 700 26px/1.15 var(--serif); flex: 1; color: var(--accent); letter-spacing: -0.02em; }
   .drawer header h2 small { color: var(--muted); font-weight: 500; letter-spacing: 0; }
@@ -452,7 +459,7 @@
         <div class="results" id="results"></div>
       </div>
       <div class="seg" id="levels" role="tablist" aria-label="Map level">
-        <button data-us type="button" title="The whole United States">US</button><button data-level="state" type="button">State</button><button data-level="metro" type="button">Metro</button><button data-level="county" type="button" class="on">County</button><button data-level="zip" type="button">Zip</button>
+        <button data-level="us" type="button" title="The whole United States">US</button><button data-level="state" type="button">State</button><button data-level="metro" type="button">Metro</button><button data-level="county" type="button" class="on">County</button><button data-level="zip" type="button">Zip</button>
       </div>
       <button class="pill-btn" id="tableBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg><span class="btxt">Table</span></button>
       <button class="pill-btn app-pill" id="appBtn" type="button" hidden title="Install Open Housing Atlas as an app on this device"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7.5v7M9 12l3 3 3-3M10.5 18.5h3"/></svg><span class="btxt">Get the app</span></button>
@@ -863,6 +870,7 @@ function buildScale() {
     const vals = viewValues(key);
     if (vals.length >= 8) { scale = { breaks: breaksFrom(vals, def.d), colors, key, count: vals.length, mode: 'view' }; return; }
   }
+  if (ui.level === 'us') { scale = { breaks: [], colors, key, count: 1, mode: 'us' }; return; } // one place: one colour
   if (ui.level === 'zip') {
     // Nationwide ZIP colours come from all 32,000 ZIPs (worked out by the data builder), not just the ones loaded.
     const b = (D.meta.zipBreaks || {})[key];
@@ -873,7 +881,10 @@ function buildScale() {
   scale = { breaks: breaksFrom(vals, def.d), colors, key, count: vals.filter(v => v != null).length, mode: 'national' };
 }
 function colorFor(v) {
-  if (v == null || !isFinite(v) || !scale || !scale.breaks.length) return null;
+  if (v == null || !isFinite(v) || !scale) return null;
+  // The whole country: a middle shade (for changes: coral when rising, teal when falling)
+  if (scale.mode === 'us') return M[scale.key].d ? (v > 0 ? scale.colors[4] : v < 0 ? scale.colors[2] : scale.colors[3]) : scale.colors[4];
+  if (!scale.breaks.length) return null;
   let i = 0;
   while (i < scale.breaks.length && v >= scale.breaks[i]) i++;
   return scale.colors[i];
@@ -904,6 +915,14 @@ function renderLegend() {
   const def = M[ui.metric], f = def.f === 'pct2' ? 'pct' : def.f;
   const meta = D.meta || { months: {} }, yr = meta.years || {};
   const src = sourceLine(ui.metric, meta, yr);
+  const support = `<a class="lg-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener" title="This map is free. If it helps you, you can support it on Ko-fi."><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg>Support</a>`;
+  if (ui.level === 'us') { // one place: the national figure instead of a colour scale
+    const p = D.us && D.us.US, v = p ? valOf(p, ui.metric) : null;
+    document.getElementById('legend').innerHTML = `<h3>${esc(def.l)}</h3><div class="asof">${esc(src)} · the whole country</div>
+      <div class="us-val"><span>United States</span><b>${v == null ? 'No national figure' : esc(def.d ? signed(v, def.f) : fmt(v, def.f))}</b></div>
+      <div class="note" style="margin:6px 0 0;font-size:11.5px">Pick State, Metro, County or Zip to compare places.</div>${support}`;
+    return;
+  }
   const noun = { county: 'counties', metro: 'metros', state: 'states', zip: 'ZIP codes' }[ui.level];
   const count = scale.mode === 'fixed' ? 'teal = comfortable, coral = a stretch' : scale.mode === 'time' ? `${time.years[time.idx]}${time.idx === time.years.length - 1 ? ` (${ymLabel(T[ui.level].last)})` : ' (December)'}`
     : !scale.breaks.length ? `not available for ${noun}`
@@ -990,6 +1009,11 @@ function updateLabels() {
   if (!labelLayer) return;
   labelLayer.clearLayers();
   if (!labelsOn || (ui.level === 'zip' && !zipLayer)) return;
+  if (ui.level === 'us') { // one big label in the middle of the lower 48
+    const p = D.us && D.us.US;
+    if (p) L.marker([39.4, -98.4], { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: 'plabel us-label', iconSize: [0, 0], html: `<div class="in"><b>United States</b><span>${esc(labelValue(ui.metric, valOf(p, ui.metric)))}</span></div>` }) }).addTo(labelLayer);
+    return;
+  }
   const level = ui.level, k = ui.metric, size = map.getSize(), view = map.getBounds(), cand = [];
   eachShape(level, l => {
     const b = l._bb || (l._bb = l.getBounds());
@@ -1019,6 +1043,9 @@ function updateLabels() {
   }
 }
 function setLevel(level) {
+  if (level === 'us' && !(D.us && D.us.US)) level = 'state'; // (no national data loaded)
+  if (level === 'us' && time.on) stopTime(); // Over time is for comparing places
+  const wasUS = ui.level === 'us';
   ui.level = level;
   document.querySelectorAll('#levels button').forEach(b => b.classList.toggle('on', b.dataset.level === level));
   for (const [k, l] of Object.entries(layers)) {
@@ -1035,6 +1062,9 @@ function setLevel(level) {
     if (zipLayer) { map.removeLayer(zipLayer); zipLayer = null; }
   }
   if (time.on) { if (level === 'zip') stopTime(); else startTime(); }
+  // US: zoom out to show all 50 states; leaving US: back to the lower 48
+  if (map && level === 'us') map.flyToBounds([[17, -172], [70, -64]], { padding: [20, 20], duration: 0.8 });
+  else if (map && wasUS && level !== 'zip') map.flyToBounds([[24.5, -124.8], [49.4, -66.9]], { padding: [20, 20], duration: 0.8 });
 }
 
 // ---------- ZIP codes: one county at a time ----------
@@ -1113,10 +1143,7 @@ function ensureZips() {
   }
   if (!zipLayer) showZipFocus();
 }
-document.getElementById('levels').addEventListener('click', e => {
-  if (e.target.closest('[data-us]')) { if (D.us && D.us.US) openDetail('us', 'US'); return; } // the whole country: opens its panel, the map stays as it is
-  const b = e.target.closest('[data-level]'); if (b) setLevel(b.dataset.level);
-});
+document.getElementById('levels').addEventListener('click', e => { const b = e.target.closest('[data-level]'); if (b) setLevel(b.dataset.level); });
 
 const tip = document.getElementById('tip');
 function showTip(e, level, id) {
@@ -1191,6 +1218,8 @@ async function init() {
   layers.county = makeLayer('county', counties);
   layers.metro = makeLayer('metro', metros);
   layers.state = makeLayer('state', states.filter(f => D.state[f.id]));
+  // The whole country: every state merged into one shape (Alaska and Hawaii included)
+  layers.us = makeLayer('us', [{ type: 'Feature', id: 'US', properties: {}, geometry: topojson.merge(topo, topo.objects.states.geometries) }]);
   pickLayer = L.geoJSON(counties, {
     style: { color: '#126b60', weight: 0.7, opacity: 0.55, fillColor: '#126b60', fillOpacity: 0.03 },
     onEachFeature: (f, l) => {
@@ -1218,7 +1247,7 @@ async function openFromHash() {
   if (!m) return;
   const [, level, id, metric] = m;
   if (metric && M[metric] && hasData(metric) && metric !== ui.metric) setMetric(metric);
-  if (level === 'us') { if (D.us && D.us.US) openDetail('us', 'US'); return; }
+  if (level === 'us') { if (D.us && D.us.US) { if (ui.level !== 'us') setLevel('us'); openDetail('us', 'US'); } return; }
   if (level === 'zip') {
     await loadZipIndex();
     const h = index.find(x => x.level === 'zip' && x.id === id);
@@ -1278,7 +1307,7 @@ async function pick(h) {
   resultsEl.classList.remove('show');
   searchEl.value = h.label;
   searchEl.blur();
-  if (h.level === 'us') { openDetail('us', 'US'); return; }
+  if (h.level === 'us') { if (ui.level !== 'us') setLevel('us'); openDetail('us', 'US'); return; }
   if (h.level === 'county' && ui.level === 'zip') { setZipFocus(h.id); return; }
   if (h.level === 'zip') {
     await loadZipState(h.st);
@@ -2190,7 +2219,7 @@ document.getElementById('rankBtn').addEventListener('click', () => { const on = 
 document.getElementById('rankClose').addEventListener('click', () => { rankView.classList.remove('show'); document.getElementById('rankBtn').classList.remove('on'); });
 document.getElementById('rankPick').addEventListener('change', e => { rankKey = e.target.value; renderRanks(); });
 async function renderRanks() {
-  const level = ui.level, isZip = level === 'zip';
+  const level = ui.level === 'us' ? 'state' : ui.level, isZip = level === 'zip'; // (on US, rank the states)
   if (isZip && !zipRanks) zipRanks = await fetch('data/zip/rankings.json').then(r => r.ok ? r.json() : {}).catch(() => ({}));
   const lists = RANKS.filter(([key, , m]) => hasData(m) && (!isZip || (zipRanks || {})[key]));
   if (!lists.some(r => r[0] === rankKey)) rankKey = lists[0][0];
