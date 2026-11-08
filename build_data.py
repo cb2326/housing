@@ -181,7 +181,7 @@ REALTOR_FIELDS = {
 
 
 def realtor(level):
-    name = {"county": "County", "metro": "Metro", "state": "State"}[level]
+    name = {"county": "County", "metro": "Metro", "state": "State", "us": "Country"}[level]
     data = fetch(f"{REALTOR}/RDC_Inventory_Core_Metrics_{name}_History.csv", f"realtor_{level}.csv")
     r = rows(data)
     head = next(r)
@@ -195,6 +195,8 @@ def realtor(level):
             pid = row[col["county_fips"]].zfill(5)
         elif level == "metro":
             pid = row[col["cbsa_code"]]
+        elif level == "us":
+            pid = "US"
         else:
             pid = ABBR_TO_FIPS.get(row[col["state_id"]].upper())
         if not pid:
@@ -330,9 +332,9 @@ def census_income(R):
             if len(t) < 23 or not t[0].isdigit():
                 continue
             st, co = t[0].zfill(2), t[1].zfill(3)
-            if st not in STATES:
+            if st not in STATES and st != "00":
                 continue
-            pid = st if co == "000" else st + co
+            pid = "US" if st == "00" else st if co == "000" else st + co  # (row "00" is the whole country)
             inc, pov = num(t[20]), num(t[5])
             if inc and 5000 < inc < 500000:
                 rput(R, pid, "income", y, inc)
@@ -1406,6 +1408,11 @@ def fhfa_hpi():
     """FHFA house price index (all transactions), one value a year back to 1975, for states, metros, counties and ZIPs.
     Returns {"state"|"metro"|"county"|"zip": {id: {year: index}}}."""
     out = {}
+    try:  # the whole country: year, change, index
+        data = fetch("https://www.fhfa.gov/hpi/download/annual/hpi_at_national.xlsx", "fhfa_hpi_at_national.xlsx", PLAIN, timeout=120, tries=2)
+        out["us"] = {"US": {row[0]: round(num(row[2]), 2) for row in xlsx_rows(data) if len(row) > 2 and row[0].isdigit() and num(row[2])}}
+    except Exception as e:
+        print(f"  (FHFA national not available: {e})")
     for lvl, name, idc, yc in (("state", "hpi_at_state", 2, 3), ("metro", "hpi_at_cbsa", 0, 2), ("county", "hpi_at_county", 2, 3),
                                ("zip", "hpi_at_zip5", 0, 1)):
         try:
@@ -1811,6 +1818,56 @@ def house_rent(rent, ratio):
     return out or None
 
 
+US_SUM = {"pop", "births", "deaths", "natural", "intl_mig", "permits", "units", "jobs", "flood_claims", "flood_paid"}
+US_SKIP = {"dom_mig", "dom_mig_pct", "growth_score", "density", "income", "poverty", "income_growth", "income_real", "pop_growth",
+           "pop_growth_5y", "job_growth", "pay_growth", "avg_pay", "hv_long", "hpi_change", "prop_tax", "rpp_all", "rpp_housing"}
+
+
+def us_yearly(A, R, hpi):
+    """Yearly figures for the whole country. Official national numbers where they exist (Census income and poverty,
+    BLS jobs and pay, FHFA prices); otherwise counts are added up over the 50 states and DC, and rates and averages
+    are combined weighted by each state's population. Moves between states cancel out nationally, so they are left out."""
+    states = {s: A["state"][s] for s in STATES if s in A["state"]}
+    pops = {s: a.get("pop") or {} for s, a in states.items()}
+    keys = {k for a in states.values() for k, v in a.items() if isinstance(v, dict)}
+    us = {}
+    for k in keys - US_SKIP:
+        if k.startswith("mig_"):
+            continue
+        for y in {y for a in states.values() for y in (a.get(k) if isinstance(a.get(k), dict) else {})}:
+            vals = [(a[k][y], pops[s].get(y) or latest(pops[s])[1] or 0) for s, a in states.items()
+                    if isinstance(a.get(k), dict) and a[k].get(y) is not None]
+            if len(vals) < 40:  # most of the country has to report it
+                continue
+            if k in US_SUM:
+                us.setdefault(k, {})[y] = tidy(sum(v for v, _ in vals))
+            else:
+                tw = sum(w for _, w in vals)
+                if tw:
+                    us.setdefault(k, {})[y] = tidy(sum(v * w for v, w in vals) / tw)
+    for k in ("income", "poverty"):
+        if (R.get("US") or {}).get(k):
+            us[k] = {str(y): v for y, v in R["US"][k].items()}
+    qa = A["state"].pop("US", None) or {}  # BLS publishes national jobs and pay as area "US000"
+    for k in ("jobs", "avg_pay", "job_growth", "pay_growth"):
+        if qa.get(k):
+            us[k] = qa[k]
+    for k, g, back in (("pop", "pop_growth", 1), ("pop", "pop_growth_5y", 5), ("income", "income_growth", 1)):
+        s = us.get(k) or {}
+        for y, v in s.items():
+            old = s.get(str(int(y) - back))
+            if old:
+                us.setdefault(g, {})[y] = tidy((v / old - 1) * 100)
+    years = {y for a in states.values() for y in (a.get("rpp_all") or {})}
+    if years:  # prices compared with the US average: the US itself is 100 by definition
+        us["rpp_all"] = {y: 100.0 for y in years}
+        us["rpp_housing"] = {y: 100.0 for y in years}
+        us["income_real"] = {y: v for y, v in (us.get("income") or {}).items() if y in years}
+    if (hpi.get("us") or {}).get("US"):
+        us["hpi_change"] = hpi_change(hpi["us"]["US"])
+    return us
+
+
 def window_extreme(series, start, end, fn):
     vals = [v for k, v in series.items() if start <= k <= end]
     return fn(vals) if vals else None
@@ -2116,6 +2173,11 @@ def main():
     zx = {key: {lvl: zillow(path.format(name), lvl) for lvl, name in LV} for key, path in ZILLOW_EXTRA.items()}
     print("Realtor.com")
     rt = {lvl: realtor(lvl) for lvl in ("county", "metro", "state")}
+    try:
+        rt["us"] = realtor("us")
+    except Exception as e:
+        print(f"  (Realtor.com national file not available: {e})")
+        rt["us"] = {}
 
     # Zillow names metros like "Los Angeles, CA"; the Census says "Los Angeles-Long Beach-Anaheim, CA".
     # Match on (first city, first state); where the Census renamed a metro, fall back to Zillow's own
@@ -2140,6 +2202,11 @@ def main():
             if cbsa and cbsa not in out:
                 out[cbsa] = rec
         return out
+    # The whole country: Zillow's metro files carry a "United States" row (kept before metros are matched to the Census).
+    for d in (zv, zs, zc, zr, zrs, *zx.values()):
+        if d["metro"].get("United States"):
+            d["us"] = {"US": d["metro"]["United States"]}
+    us_fc = (fc_raw.get("United States") or {}).get("series") or {}
     for d in (zv, zs, zc, zr, zrs, *zx.values()):
         d["metro"] = zmetro(d["metro"])
     forecast = {}
@@ -2155,6 +2222,8 @@ def main():
         fc_hist["_archive"] = 1
     for cbsa, v in forecast.items():
         fc_hist.setdefault(cbsa, {})[zillow_month] = round(v, 2)
+    if us_fc:
+        fc_hist.setdefault("US", {})[zillow_month] = round(us_fc[max(us_fc)], 2)
     save_dcache("forecast.json", fc_hist)
     # Rent for houses: Zillow publishes single-family rents for metros only. Counties and ZIP codes get an estimate:
     # their own typical rent x their metro's house-to-all-homes rent ratio for the same month.
@@ -2369,6 +2438,7 @@ def main():
                     A[lvl].setdefault(pid, {})[k] = {yr: round(sum(v * w for v, w in acc) / sum(w for _, w in acc), 1)}
     for lvl in A:
         growth_scores(A[lvl])
+    A["us"] = {"US": us_yearly(A, R, hpi)}
 
     def yearly_tax(a, z):
         """Property tax on the typical home: that year's tax rate x the home value that December."""
@@ -2380,8 +2450,8 @@ def main():
             if hv:
                 a.setdefault("prop_tax", {})[y] = tidy(hv * r / 100)
 
-    places = {"state": {}, "metro": {}, "county": {}}
-    hist = {"state": {}, "metro": {}, "county": {}}
+    places = {"us": {}, "state": {}, "metro": {}, "county": {}}
+    hist = {"us": {}, "state": {}, "metro": {}, "county": {}}
     HSTART = "2000-01"
     srcs = lambda d, lvl, pid: (d.get(lvl) or {}).get(pid, {}).get("series")
 
@@ -2442,6 +2512,7 @@ def main():
             b["mig"] = mig_flows[pid]  # top places people came from and moved to
         hist[lvl][pid] = b
 
+    build("us", "US", "United States", "US", {}, "US")
     for fips, (abbr, name) in STATES.items():
         build("state", fips, name, abbr, {}, fips)
     for cbsa, name in metro_names.items():
@@ -2691,7 +2762,14 @@ h1{font:600 32px/1.2 Fraunces,Georgia,serif;margin:6px 0 4px;color:#06463f}h2{fo
 td{padding:8px 14px;border-bottom:1px solid #efeae0;font-size:15px}td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
 .links{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:15px}.faq dt{font-weight:600;margin-top:12px}.faq dd{margin:4px 0 0}
 footer{max-width:960px;margin:30px auto 0;padding:18px 20px 40px;font-size:13px;color:#6b6457;border-top:1px solid #e7e2d8}
-@media(max-width:600px){h1{font-size:26px}}"""
+@media(max-width:600px){h1{font-size:26px}}
+.acts{display:flex;gap:8px;align-items:center}.btn.ghost{background:#fff;color:#126b60;border:1px solid #8ccdc0;cursor:pointer;font:600 14px Inter,'Segoe UI',system-ui,sans-serif}
+.btn.ghost:hover{background:#e6f4f1}.print-only{display:none}
+@media(max-width:520px){.acts .btn{padding:7px 10px;font-size:13px}}
+@media print{@page{margin:12mm}body{background:#fff;font-size:12pt}header.top,.btn,.links,footer a,.more summary{display:none!important}
+main{padding:0;max-width:none}.print-only{display:block;font-size:10pt;color:#6b6457;margin:0 0 10px}
+.kpis{grid-template-columns:repeat(5,1fr)}.kpi,.lede,.chart,table,dl{break-inside:avoid}h2{break-after:avoid}
+h2:has(+ .links){display:none}.kpi,.lede,.chart,table{border-color:#ccc}a{color:#1d1b17;text-decoration:none}}"""
 
 
 def write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa):
@@ -2718,6 +2796,8 @@ def write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa)
 
     def url(lvl, pid):
         p = places[lvl][pid]
+        if lvl == "us":
+            return "/united-states/"
         if lvl == "state":
             return f"/state/{_slug(st_name.get(pid, p['n']))}/"
         if lvl == "metro":
@@ -2726,10 +2806,11 @@ def write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa)
 
     def title(lvl, pid):
         p = places[lvl][pid]
-        return st_name.get(pid, p["n"]) if lvl == "state" else p["n"] if lvl == "metro" else f"{p['n']}, {p['s']}"
+        return st_name.get(pid, p["n"]) if lvl == "state" else p["n"] if lvl in ("metro", "us") else f"{p['n']}, {p['s']}"
 
     used, urls = set(), []
-    for lvl in ("state", "metro", "county"):
+    LVLS = [l for l in ("us", "state", "metro", "county") if places.get(l)]
+    for lvl in LVLS:
         for pid, p in places[lvl].items():
             if lvl == "county" and pid[:2] not in STATES:
                 continue
@@ -2740,7 +2821,8 @@ def write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa)
                 u = u.rstrip("/") + f"-{pid}/"
             used.add(u)
             p["_url"] = u
-    for lvl in ("state", "metro", "county"):
+    us_url = (places.get("us", {}).get("US") or {}).get("_url")
+    for lvl in LVLS:
         for pid, p in places[lvl].items():
             if "_url" not in p:
                 continue
@@ -2760,10 +2842,15 @@ def write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa)
             if r:
                 fair = [(y, income_month(a["income"], f"{y}-07") * r) for y, _ in pts if income_month(a["income"], f"{y}-07")]
             chart = _chart_svg(pts, fair)
-            lines, faq = _summary(name, v, rate)
+            lines, faq = _summary("the United States" if lvl == "us" else name, v, rate)
+            if lvl == "us":  # sentences that start with the name
+                lines = [s[0].upper() + s[1:] for s in lines]
+                faq = [(q, a[0].upper() + a[1:]) for q, a in faq]
             # breadcrumbs and links
             crumbs = [("Open Housing Atlas", "/"), ("All markets", "/markets/")]
-            if lvl != "state":
+            if us_url and lvl != "us":
+                crumbs.append(("United States", us_url))
+            if lvl not in ("state", "us"):
                 st = pid[:2] if lvl == "county" else next((c[:2] for c in metro_counties.get(pid, [])), None)
                 if st and st in places["state"]:
                     crumbs.append((st_name[st], places["state"][st]["_url"]))
@@ -2771,7 +2858,12 @@ def write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa)
                 m = county_to_cbsa[pid]
                 crumbs.append((places["metro"][m]["n"], places["metro"][m]["_url"]))
             link_groups = []
-            if lvl == "state":
+            if lvl == "us":
+                ss = sorted((s for s in places["state"] if "_url" in places["state"][s]), key=lambda s: st_name.get(s, ""))
+                ms = sorted((m for m in places["metro"] if "_url" in places["metro"][m]), key=lambda m: -(places["metro"][m]["v"].get("pop") or 0))[:50]
+                link_groups += [("States", [(st_name[s], places["state"][s]["_url"]) for s in ss]),
+                                ("Largest metro areas", [(places["metro"][m]["n"], places["metro"][m]["_url"]) for m in ms])]
+            elif lvl == "state":
                 ms = sorted((m for m in places["metro"] if "_url" in places["metro"][m] and any(c[:2] == pid for c in metro_counties.get(m, []))),
                             key=lambda m: -(places["metro"][m]["v"].get("pop") or 0))
                 cs = sorted((c for c in places["county"] if c[:2] == pid and "_url" in places["county"][c]), key=lambda c: places["county"][c]["n"])
@@ -2851,13 +2943,14 @@ def write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa)
 <title>{esc(name)} Housing Market: Home Prices, Rent and Forecast ({zm[:4]}) | Open Housing Atlas</title>
 <meta name="description" content="{esc(desc)}"><link rel="canonical" href="{SITE_URL}{p['_url']}">
 <meta property="og:title" content="{esc(name)} housing market"><meta property="og:description" content="{esc(desc)}">
-<meta property="og:url" content="{SITE_URL}{p['_url']}"><meta property="og:image" content="{SITE_URL}/og.png"><meta name="twitter:card" content="summary_large_image">
+<meta property="og:url" content="{SITE_URL}{p['_url']}"><meta property="og:image" content="{SITE_URL}/og.png?v=2"><meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
 <style>{PAGE_CSS}</style><script type="application/ld+json">{json.dumps(ld, separators=(",", ":"))}</script>
 <script data-goatcounter="https://openhousingatlas.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script></head><body>
-<header class="top"><div><a class="logo" href="/">Open Housing Atlas</a><a class="btn" href="{hash_link}">Open on the map</a></div></header>
+<header class="top"><div><a class="logo" href="/">Open Housing Atlas</a><span class="acts"><button type="button" class="btn ghost" id="dlPdf" title="Save this report as a PDF (choose “Save as PDF” in the print window)">⤓ Download PDF</button><a class="btn" href="{hash_link}">Open on the map</a></span></div></header>
 <main><nav class="crumbs">{" › ".join(f'<a href="{h}">{esc(n)}</a>' for n, h in crumbs)}</nav>
 <h1>{esc(name)} housing market</h1><p class="sub">Data through {data_month} · updated {built} · free, from Zillow, Realtor.com, the Census Bureau and other public sources</p>
+<p class="print-only">Open Housing Atlas · {SITE_URL}{p['_url']} · data through {data_month}, printed from the report updated {built}</p>
 <div class="kpis">{kpis}</div>
 {f'<div class="lede"><p style="margin:0">{esc(" ".join(lines))}</p></div>' if lines else ""}
 {f'<h2>Home value over time</h2><div class="chart">{chart}<div class="legend">Solid: typical home value · dashed: fair value (household income × the 20-year average price-to-income ratio). Sources: FHFA, Zillow, U.S. Census Bureau.</div></div>' if chart else ""}
@@ -2866,14 +2959,24 @@ def write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa)
 {links}
 <p style="margin-top:26px"><a class="btn" href="{hash_link}">See every chart for {esc(name)} on the map</a></p></main>
 <footer>Open Housing Atlas is free, with no ads. Data: Zillow Research, Realtor.com, U.S. Census Bureau, BLS, IRS, FEMA, EPA, FHFA, BEA, HUD, U.S. Department of Education, Freddie Mac.
-Estimates are rough guides, not appraisals or financial advice. <a href="https://ko-fi.com/chrisbogh">Support this site on Ko-fi</a>.</footer></body></html>"""
+Estimates are rough guides, not appraisals or financial advice. <a href="https://ko-fi.com/chrisbogh">Support this site on Ko-fi</a>.</footer>
+<script>
+// "Download PDF": the browser's own print window, where "Save as PDF" is one of the printers. Every "Show more" opens first.
+const openAll = () => document.querySelectorAll('details').forEach(d => d.open = true);
+addEventListener('beforeprint', openAll);
+document.getElementById('dlPdf').addEventListener('click', () => {{
+  openAll();
+  if (window.goatcounter && goatcounter.count) goatcounter.count({{ path: 'report-pdf', title: 'Report downloaded', event: true }});
+  setTimeout(() => window.print(), 50);
+}});
+</script></body></html>"""
             path = os.path.join(root, *p["_url"].strip("/").split("/"), "index.html")
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:
                 f.write(page)
             urls.append(p["_url"])
     # every market, by state
-    rows = []
+    rows = [f'<p style="font-size:17px"><a href="{us_url}"><b>United States: the national housing market →</b></a></p>'] if us_url else []
     for st in sorted(places["state"], key=lambda s: st_name.get(s, "")):
         if "_url" not in places["state"][st]:
             continue
