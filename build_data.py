@@ -96,13 +96,23 @@ def fetch(url, name=None, headers=None, timeout=180, tries=3):
     raise last
 
 
-def fetch_first(urls, name):
-    """The first of several URLs that works (e.g. this year's Census file, else last year's)."""
+def fetch_first(urls, name, must_have=None):
+    """The first of several URLs that works (e.g. this year's Census file, else last year's). must_have: text the
+    file has to contain near its start, so an error or maintenance page sent in place of the file is skipped."""
     for url in urls:
         try:
-            return fetch(url, name), url
+            data = fetch(url, name)
         except Exception as e:
             print(f"  (not available: {url.split('&key=')[0]} - {e})")
+            continue
+        if must_have and must_have not in data[:20000]:
+            print(f"  (not a real data file, skipped: {url.split('&key=')[0]})")
+            try:
+                os.remove(os.path.join(CACHE, name))
+            except OSError:
+                pass
+            continue
+        return data, url
     return None, None
 
 
@@ -213,7 +223,7 @@ def realtor(level):
 def census_metros():
     """County -> metro (CBSA code) list and metro names (Census Population Estimates, metro file)."""
     urls = [f"{CENSUS}/popest/datasets/2020-{y}/metro/totals/cbsa-est{y}-alldata.csv" for y in range(THIS_YEAR, THIS_YEAR - 4, -1)]
-    data, url = fetch_first(urls, "census_cbsa.csv")
+    data, url = fetch_first(urls, "census_cbsa.csv", b"POPESTIMATE")
     r = rows(data, "latin-1")
     head = next(r)
     col = {h: i for i, h in enumerate(head)}
@@ -240,7 +250,7 @@ def rput(R, pid, field, year, v):
 def census_population(R):
     """Population, births, deaths and migration for every year since 2010 (two Census vintages). Returns the latest year."""
     old = try_fetch(f"{CENSUS}/popest/datasets/2010-2019/counties/totals/co-est2019-alldata.csv", "census_pop_2010s.csv")
-    new, _ = fetch_first([f"{CENSUS}/popest/datasets/2020-{y}/counties/totals/co-est{y}-alldata.csv" for y in range(THIS_YEAR, THIS_YEAR - 4, -1)], "census_pop.csv")
+    new, _ = fetch_first([f"{CENSUS}/popest/datasets/2020-{y}/counties/totals/co-est{y}-alldata.csv" for y in range(THIS_YEAR, THIS_YEAR - 4, -1)], "census_pop.csv", b"POPESTIMATE")
     latest = None
     names = {}
     for data, first in ((old, 2010), (new, 2020)):
@@ -278,7 +288,7 @@ def census_population(R):
 def census_age(R):
     """Age groups and median age by county for every year since 2010 (Population Estimates by age). Returns the latest year."""
     old = try_fetch(f"{CENSUS}/popest/datasets/2010-2020/counties/asrh/CC-EST2020-AGESEX-ALL.csv", "census_age_2010s.csv")
-    new, url = fetch_first([f"{CENSUS}/popest/datasets/2020-{y}/counties/asrh/cc-est{y}-agesex-all.csv" for y in range(THIS_YEAR, THIS_YEAR - 4, -1)], "census_age.csv")
+    new, url = fetch_first([f"{CENSUS}/popest/datasets/2020-{y}/counties/asrh/cc-est{y}-agesex-all.csv" for y in range(THIS_YEAR, THIS_YEAR - 4, -1)], "census_age.csv", b"POPESTIMATE")
     latest = None
     for data, year_of in ((old, lambda k: 2007 + k if 3 <= k <= 12 else None), (new, lambda k: 2018 + k if k >= 2 else None)):
         if not data:
