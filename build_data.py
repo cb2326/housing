@@ -1656,9 +1656,10 @@ def cpi_inflation():
     """US consumer price inflation, % change from a year earlier, by month (BLS CPI-U, all items, not seasonally adjusted).
     BLS's public API first (10 years per request), FRED as a backup; saved, so a failed download keeps the last copy."""
     cached = load_dcache("cpi.json") or {}
+    cached_index = load_dcache("cpi_index.json") or {}
     index = {}
     try:
-        for start in range(1999, THIS_YEAR + 1, 10):
+        for start in range(1974, THIS_YEAR + 1, 10):  # from 1974, for prices and payments in today's dollars since 1975
             body = json.dumps({"seriesid": ["CUUR0000SA0"], "startyear": str(start), "endyear": str(min(start + 9, THIS_YEAR))}).encode()
             req = urllib.request.Request("https://api.bls.gov/publicAPI/v1/timeseries/data/", data=body,
                                          headers={**PLAIN, "Content-Type": "application/json"})
@@ -1677,13 +1678,51 @@ def cpi_inflation():
         except Exception as e2:
             print(f"  (FRED CPI unavailable: {e2})")
     yoy = {k: round((v / index[months_back(k, 12)] - 1) * 100, 2) for k, v in index.items() if index.get(months_back(k, 12))}
-    if len(yoy) < len(cached) * 0.9:
+    if len(yoy) < len(cached) * 0.9 or len(index) < len(cached_index) * 0.9:
         print("  CPI: keeping the saved copy")
-        return cached
-    yoy = dict(sorted(yoy.items()))
+        return cached, cached_index
+    yoy, index = dict(sorted(yoy.items())), dict(sorted(index.items()))
     save_dcache("cpi.json", yoy)
-    print(f"  CPI inflation through {max(yoy) if yoy else None}")
-    return yoy
+    save_dcache("cpi_index.json", index)
+    print(f"  CPI inflation through {max(yoy) if yoy else None}, index since {min(index) if index else None}")
+    return yoy, index
+
+
+def long_view(rate_hist, cpi_index):
+    """Yearly averages for the long-run charts: the 30-year mortgage rate (Freddie Mac, since 1971) and the CPI index,
+    plus the latest CPI month, used to restate past prices and payments in today's dollars."""
+    by = lambda d: {y: round(sum(v) / len(v), 3) for y, v in _group_years(d).items()}
+    cpi_year = {y: v for y, v in by(cpi_index).items() if int(y) >= 1975}
+    now_k = max(cpi_index) if cpi_index else None
+    return {"rate": {y: round(v, 2) for y, v in by(rate_hist).items()}, "cpi": cpi_year,
+            "cpi_now": cpi_index.get(now_k) if now_k else None, "cpi_now_month": now_k}
+
+
+def _group_years(d):
+    out = {}
+    for k, v in (d or {}).items():
+        if v is not None:
+            out.setdefault(k[:4], []).append(v)
+    return out
+
+
+def long_values(a, lv):
+    """Latest-year values of the long-run data points (the charts show every year since 1975):
+    mortgage payment on the typical home (20% down, that year's average rate), the same in today's dollars,
+    and the home value in today's dollars."""
+    hl = (a or {}).get("hv_long")
+    if not hl or not lv or not lv.get("cpi_now"):
+        return {}
+    y = max(hl)
+    rate, c = lv["rate"].get(y), lv["cpi"].get(y)
+    out = {}
+    if rate:
+        out["mtg_long"] = rnd(payment(hl[y], rate), 0)
+        if c:
+            out["mtg_real"] = rnd(payment(hl[y], rate) * lv["cpi_now"] / c, 0)
+    if c:
+        out["hv_real"] = rnd(hl[y] * lv["cpi_now"] / c, 0)
+    return out
 
 
 # ---------- metric math ----------
@@ -2063,7 +2102,8 @@ def main():
     print("Mortgage rate")
     rate_hist, rate, rate_day = mortgage_rate()
     print("Inflation (CPI)")
-    cpi = cpi_inflation()
+    cpi, cpi_index = cpi_inflation()
+    LONG = long_view(rate_hist, cpi_index)
 
     print("Zillow")
     LV = (("county", "County"), ("metro", "Metro"), ("state", "State"))
@@ -2374,6 +2414,7 @@ def main():
                         srcs(zs, lvl, pid), srcs(zc, lvl, pid), rs, la.get("units"), la.get("prop_tax_rate"), a.get("income"))
         xs = {key: srcs(zx[key], lvl, pid) for key in ZILLOW_EXTRA}
         m.update(extra_metrics(xs))
+        m.update(long_values(a, LONG))
         v = {**{k: x for k, x in la.items() if k not in ("prop_tax",)}, **m}
         if not v:
             return
@@ -2443,6 +2484,7 @@ def main():
                   "hud": max(hud.get("years") or {"": 0}) or None},
         "mortgage": {"rate": rate, "date": rate_day, "history": trim_series(rate_hist, "2000-01")},
         "cpi": {k: v for k, v in cpi.items() if k >= "2000-01"},
+        "long": LONG,
         "counts": {k: len(v) for k, v in places.items()},
     }
     for lvl, ps in places.items():
@@ -2470,7 +2512,7 @@ def main():
     zip_count, zip_breaks = build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared,
                                        srat["zip"], zip_schools, haz.get("zip", {}), haz_year, walk.get("zip", {}),
                                        flood.get("zip") or {}, noise.get("zip") or {}, rent_ratio, county_inc_hist,
-                                       hpi.get("zip") or {}, hud.get("zip") or {}, hud.get("zip_year"))
+                                       hpi.get("zip") or {}, hud.get("zip") or {}, hud.get("zip_year"), LONG)
     meta["counts"]["zip"] = zip_count
     meta["zipBreaks"] = zip_breaks
     write_json(os.path.join(OUT, "meta.json"), meta)
@@ -3241,7 +3283,7 @@ ZIP_RANKINGS = {
 
 
 def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_zip, area, county_shared, zip_school_scores, zip_schools,
-               zip_haz, haz_year, zip_walk, zip_claims, zip_noise, rent_ratio, county_inc_hist, zip_hpi, safmr, safmr_year):
+               zip_haz, haz_year, zip_walk, zip_claims, zip_noise, rent_ratio, county_inc_hist, zip_hpi, safmr, safmr_year, long_view_=None):
     print("ZIP codes: Zillow, Realtor.com, Census shapes")
     # Zillow's own ZIP forecasts, saved each run to build up a history (the chart uses the metro's until there are two).
     zfc_raw, _ = zillow_zip("zhvf_growth/Zip_zhvf_growth_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
@@ -3338,6 +3380,7 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
             continue
         v.update({k: x for k, x in la.items() if k not in ("prop_tax",)})
         v.update(extra_metrics(zx_d))
+        v.update(long_values(a, long_view_))
         city = (zinfo.get(z) or ("", ""))[0] or (rnames.get(z, "").rsplit(",", 1)[0].title())
         rec = {"c": city, "k": county}
         if county_to_cbsa.get(county):
