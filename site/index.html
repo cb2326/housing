@@ -13,15 +13,22 @@
 <meta property="og:description" content="Home values, forecasts, schools, rents, hazard risk and more for every state, metro, county and ZIP code. Free, updated twice a month.">
 <meta property="og:url" content="https://openhousingatlas.com/">
 <link rel="canonical" href="https://openhousingatlas.com/">
-<meta property="og:image" content="https://openhousingatlas.com/og.png">
+<meta property="og:image" content="https://openhousingatlas.com/og.png?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Open Housing Atlas: the free US housing data map">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Open Housing Atlas: the free US housing data map">
 <meta name="twitter:description" content="Home values, forecasts, schools, rents, hazard risk and more for every US state, metro, county and ZIP code.">
-<meta name="twitter:image" content="https://openhousingatlas.com/og.png">
+<meta name="twitter:image" content="https://openhousingatlas.com/og.png?v=2">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23126b60'/%3E%3Cpath d='M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z' fill='none' stroke='%23e6f4f1' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M25 15v29M39 20v29' stroke='%238ccdc0' stroke-width='3.5'/%3E%3C/svg%3E">
+<!-- Installable as a phone/desktop app -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Housing Atlas">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -145,6 +152,12 @@
   .zip-hint.show { display: block; }
   .zip-hint b { display: block; font-size: 15px; margin-bottom: 4px; }
   .zip-hint span { color: var(--muted); font-size: 13px; }
+  .pill-btn.app-pill { background: #126b60; color: #fff; border-color: #126b60; }
+  .pill-btn.app-pill:hover { background: #0b5d5a; }
+  .pill-btn[hidden] { display: none; }
+  .ios-steps { margin: 4px 0 0; padding-left: 20px; font-size: 14.5px; line-height: 1.6; }
+  .ios-steps li { margin: 6px 0; }
+  .ios-steps svg { width: 17px; height: 17px; vertical-align: -3px; color: #126b60; }
   .pill-btn.afford-pill { background: #e76f51; color: #fff; border-color: #e76f51; }
   .pill-btn.afford-pill:hover { background: #d35d40; }
   .ref-chk { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 6px; font-size: 12.5px; color: var(--text); cursor: pointer; user-select: none; }
@@ -264,6 +277,7 @@
   .chart-src a:hover { text-decoration: underline; }
   .ov-pick { display: flex; align-items: center; gap: 8px; margin: 2px 0 6px; font-size: 12.5px; color: var(--muted); }
   .ov-pick select { flex: 1; max-width: 340px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); font-size: 12.5px; color: #9c2f1c; }
+  .ax-pick { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 12.5px; color: var(--muted); }
   .ov-x { border: 0; background: var(--panel-2); border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 11px; }
   .ctrl-right { display: flex; align-items: center; gap: 6px; }
   .dl-btn { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
@@ -355,7 +369,7 @@
     .place-search { flex-basis: 100%; max-width: none; order: -1; }
     .seg button { padding: 6px 8px; font-size: 13px; }
     .pill-btn { padding: 8px 12px; font-size: 13px; }
-    #tableBtn .btxt, #labelBtn .btxt, #rankBtn .btxt, #timeBtn .btxt, #affordBtn .btxt { display: none; }
+    #tableBtn .btxt, #labelBtn .btxt, #rankBtn .btxt, #timeBtn .btxt, #affordBtn .btxt, #appBtn .btxt { display: none; }
     .zip-banner { max-width: calc(100% - 24px); white-space: normal; text-align: center; }
     .zip-banner span { display: none; }
     .timebar { left: 10px; right: 10px; transform: none; width: auto; bottom: 150px; }
@@ -412,6 +426,16 @@
     <div class="side-foot"><a href="/markets/" style="display:block;margin-bottom:6px;font-weight:600;color:#126b60">Browse all markets: state, metro and county reports →</a>Created by Chris B. Data: Zillow Research, Realtor.com, U.S. Census Bureau, BLS, IRS, FEMA, EPA, NOAA, U.S. Department of Education, MIT Election Lab, Freddie Mac. Updated twice a month. Personal use; not financial advice.</div>
   </aside>
   <main class="stage">
+    <div class="aff-wrap" id="iosWrap" hidden><div class="afford ios-card" role="dialog" aria-modal="true" aria-label="Install the app">
+      <button type="button" class="aff-close" data-ios-close aria-label="Close">✕</button>
+      <h3>Get the app</h3>
+      <p class="aff-help" style="margin-top:6px">Add Open Housing Atlas to your home screen. It opens full screen, like any app, and it's free.</p>
+      <ol class="ios-steps">
+        <li>Tap the <b>Share</b> button <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M6 11v9h12v-9"/></svg> at the bottom (or top) of Safari.</li>
+        <li>Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+      </ol>
+      <div class="aff-actions"><button type="button" class="aff-go" data-ios-close>Got it</button></div>
+    </div></div>
     <div class="nudge" id="nudge" role="dialog" aria-label="Support this site" hidden>
       <button type="button" class="n-x" data-nudge-x aria-label="Close">✕</button>
       <b>Finding this useful?</b>
@@ -428,9 +452,10 @@
         <div class="results" id="results"></div>
       </div>
       <div class="seg" id="levels" role="tablist" aria-label="Map level">
-        <button data-level="state" type="button">State</button><button data-level="metro" type="button">Metro</button><button data-level="county" type="button" class="on">County</button><button data-level="zip" type="button">Zip</button>
+        <button data-us type="button" title="The whole United States">US</button><button data-level="state" type="button">State</button><button data-level="metro" type="button">Metro</button><button data-level="county" type="button" class="on">County</button><button data-level="zip" type="button">Zip</button>
       </div>
       <button class="pill-btn" id="tableBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg><span class="btxt">Table</span></button>
+      <button class="pill-btn app-pill" id="appBtn" type="button" hidden title="Install Open Housing Atlas as an app on this device"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7.5v7M9 12l3 3 3-3M10.5 18.5h3"/></svg><span class="btxt">Get the app</span></button>
       <button class="pill-btn afford-pill" id="affordBtn" type="button" title="Enter your income and savings to see where you can afford a home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M12 17v-6M10 12.5c0-.8.9-1.5 2-1.5s2 .6 2 1.4-.9 1.1-2 1.4-2 .7-2 1.5.9 1.4 2 1.4 2-.6 2-1.4"/></svg><span class="btxt">What can I afford?</span></button>
       <button class="pill-btn" id="rankBtn" type="button" title="Ready-made top 25 lists"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21V11M16 21V7M12 21V3M4 21h16"/></svg><span class="btxt">Rankings</span></button>
       <button class="pill-btn" id="timeBtn" type="button" title="Replay home values on the map since 2000"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="btxt">Over time</span></button>
@@ -1088,7 +1113,10 @@ function ensureZips() {
   }
   if (!zipLayer) showZipFocus();
 }
-document.getElementById('levels').addEventListener('click', e => { const b = e.target.closest('[data-level]'); if (b) setLevel(b.dataset.level); });
+document.getElementById('levels').addEventListener('click', e => {
+  if (e.target.closest('[data-us]')) { if (D.us && D.us.US) openDetail('us', 'US'); return; } // the whole country: opens its panel, the map stays as it is
+  const b = e.target.closest('[data-level]'); if (b) setLevel(b.dataset.level);
+});
 
 const tip = document.getElementById('tip');
 function showTip(e, level, id) {
@@ -1138,6 +1166,7 @@ async function init() {
     document.getElementById('loading').textContent = 'Couldn’t load the data. Check your connection and refresh.';
     return;
   }
+  try { D.us = await get('data/us.json'); } catch (e) { D.us = {}; } // the whole country (one place)
   document.getElementById('asof').textContent = `Updated ${D.meta.built.slice(0, 10)}`;
   for (const level of ['state', 'metro', 'county']) for (const p of Object.values(D[level])) for (const k in p.v) HAS.add(k);
   for (const k in D.meta.zipBreaks || {}) HAS.add(k); // data points that only ZIP codes have
@@ -1185,10 +1214,11 @@ async function init() {
 // Links to a place: openhousingatlas.com/#county/06037 (optionally /data-point, e.g. #zip/91326/rent) opens it.
 // Opening a place updates the address bar the same way, so it can be copied and shared.
 async function openFromHash() {
-  const m = decodeURIComponent(location.hash).match(/^#(state|metro|county|zip)\/(\w+)(?:\/(\w+))?/);
+  const m = decodeURIComponent(location.hash).match(/^#(us|state|metro|county|zip)\/(\w+)(?:\/(\w+))?/);
   if (!m) return;
   const [, level, id, metric] = m;
   if (metric && M[metric] && hasData(metric) && metric !== ui.metric) setMetric(metric);
+  if (level === 'us') { if (D.us && D.us.US) openDetail('us', 'US'); return; }
   if (level === 'zip') {
     await loadZipIndex();
     const h = index.find(x => x.level === 'zip' && x.id === id);
@@ -1204,8 +1234,9 @@ addEventListener('hashchange', () => { if (!openPlace || location.hash !== `#${o
 let index = [], zipIndexLoaded = null;
 function buildSearchIndex() {
   index = [];
-  for (const level of ['state', 'metro', 'county']) for (const [id, p] of Object.entries(D[level])) {
-    index.push({ level, id, label: placeName(level, p), key: placeName(level, p).toLowerCase() });
+  for (const level of ['us', 'state', 'metro', 'county']) for (const [id, p] of Object.entries(D[level] || {})) {
+    const label = level === 'us' ? 'United States (whole country)' : placeName(level, p);
+    index.push({ level, id, label, key: (level === 'us' ? 'united states usa us america ' : '') + label.toLowerCase() });
   }
 }
 // The ZIP list (32,000 entries) is fetched the first time you use the search box.
@@ -1218,7 +1249,7 @@ function loadZipIndex() {
   }).catch(() => { zipIndexLoaded = null; });
   return zipIndexLoaded;
 }
-const LEVEL_ORDER = ['state', 'metro', 'county', 'zip'];
+const LEVEL_ORDER = ['us', 'state', 'metro', 'county', 'zip'];
 const searchEl = document.getElementById('placeSearch'), resultsEl = document.getElementById('results');
 let hits = [], sel = 0;
 searchEl.addEventListener('focus', loadZipIndex);
@@ -1247,6 +1278,7 @@ async function pick(h) {
   resultsEl.classList.remove('show');
   searchEl.value = h.label;
   searchEl.blur();
+  if (h.level === 'us') { openDetail('us', 'US'); return; }
   if (h.level === 'county' && ui.level === 'zip') { setZipFocus(h.id); return; }
   if (h.level === 'zip') {
     await loadZipState(h.st);
@@ -1513,7 +1545,7 @@ function renderDrawer() {
   const { level, id } = openPlace, p = D[level][id], v = p.v, k = ui.metric, def = M[k];
   const county = level === 'zip' && D.county[p.k] ? `${D.county[p.k].n}, ${D.county[p.k].s}` : '';
   const metro = (level === 'county' || level === 'zip') && p.m && D.metro[p.m] ? D.metro[p.m].n : '';
-  const kind = level === 'metro' ? 'Metro area' : level === 'county' ? 'County' : level === 'zip' ? 'ZIP code' : 'State';
+  const kind = level === 'metro' ? 'Metro area' : level === 'county' ? 'County' : level === 'zip' ? 'ZIP code' : level === 'us' ? 'The whole country' : 'State';
   syncCmp();
   document.getElementById('dTitle').innerHTML = `${esc(placeName(level, p))}<small>Place report · ${kind}${[county, metro].filter(Boolean).map(x => ` · ${esc(x)}`).join('')}</small>`;
   const series = hist ? seriesFor(k, hist, p) : null;
@@ -1536,7 +1568,7 @@ function renderDrawer() {
       <div class="mnow"><b>${fmtV(k, v[k])}</b><span>${esc(asof)}</span></div></div>
     ${toggles}
     ${refBox}
-    ${skeys.length > 1 ? `<label class="ov-pick"><span>Compare with</span><select id="ovPick" aria-label="Compare with another data point"><option value="">— another data point —</option>${GROUPS.filter(([g, keys]) => keys.some(hasData)).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].filter(x => hasData(x) && x !== k).map(x => `<option value="${x}" ${x === overlayKey ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('')}</select>${overlayKey && overlayKey !== k ? '<button type="button" class="ov-x" data-ov-clear aria-label="Remove the second data point">✕</button>' : ''}</label>` : ''}
+    ${skeys.length > 1 ? `<label class="ov-pick"><span>Compare with</span><select id="ovPick" aria-label="Compare with another data point"><option value="">— another data point —</option>${GROUPS.filter(([g, keys]) => keys.some(hasData)).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].filter(x => hasData(x) && x !== k).map(x => `<option value="${x}" ${x === overlayKey ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('')}</select>${overlayKey && overlayKey !== k ? '<button type="button" class="ov-x" data-ov-clear aria-label="Remove the second data point">✕</button>' : ''}</label>${overlayKey && overlayKey !== k && sameUnit(k, overlayKey) ? `<div class="ax-pick"><span>Second line on</span><div class="seg-sm" role="group" aria-label="Which scale the second line uses">${[['left', 'Left axis', 'Same scale as the first line: shows the real gap between them'], ['right', 'Right axis', 'Its own scale on the right: shows how its ups and downs line up']].map(([a, l, t]) => `<button type="button" class="${overlayAxis === a ? 'on' : ''}" data-axis="${a}" title="${t}">${l}</button>`).join('')}</div></div>` : ''}` : ''}
     ${chart}
     <h4 class="snap-h">At a glance</h4>
     <div class="kpis">${['hv', 'rent', 'school_score', 'dom', 'income', 'growth_score'].map(tile).join('')}</div>
@@ -1573,6 +1605,7 @@ document.getElementById('dBody').addEventListener('click', e => {
   const c = e.target.closest('[data-cmode]'); if (c) { chartMode = c.dataset.cmode; renderDrawer(); return; }
   const r = e.target.closest('[data-range]'); if (r) { chartRange = r.dataset.range; renderDrawer(); return; }
   if (e.target.closest('[data-ov-clear]')) { overlayKey = ''; renderDrawer(); return; }
+  const ax = e.target.closest('[data-axis]'); if (ax) { overlayAxis = ax.dataset.axis; renderDrawer(); return; }
   if (e.target.closest('[data-export]')) exportChart();
 });
 document.getElementById('dBody').addEventListener('change', e => {
@@ -1654,7 +1687,8 @@ const sourceText = (k, keys) => { const s = sourceParts(k, keys); return `${s.na
 const sourceHtml = (k, keys) => { const s = sourceParts(k, keys); return `<a href="${s.url}" target="_blank" rel="noopener">${esc(s.name)}</a>${s.range ? ', ' + esc(s.range) : ''}`; };
 
 // A second data point drawn on the same chart (its own scale on the right), e.g. home value vs purchase applications.
-let overlayKey = '';
+const sameUnit = (a, b) => { const u = f => f && f.startsWith('pct') ? 'pct' : f; return u(M[a].f) === u(M[b].f); };
+let overlayKey = '', overlayAxis = 'left'; // 'left': same scale as the main line (when the units match); 'right': its own scale
 // The second series' value for a point on the main chart: same month; or, when one of them has one value a year,
 // the same year (a monthly series uses its December, or its latest month that year).
 function valueAt(s, k) {
@@ -1691,7 +1725,8 @@ function chartSvg(series, def, s2, def2, ref) {
   const hasR = valsR && valsR.filter(v => v != null).length >= 2;
   // Two data points in the same unit (two prices, two percentages…) share one scale, so the gap between them is real.
   const unit = ff => ff && ff.startsWith('pct') ? 'pct' : ff;
-  const shared = has2 && unit(def2.f) === unit(def.f);
+  // (unless the visitor picked "Right axis": then the second line gets its own scale, to compare ups and downs)
+  const shared = has2 && unit(def2.f) === unit(def.f) && overlayAxis !== 'right';
   // Phones get a smaller drawing so the numbers stay readable once it is fitted to the screen.
   const narrow = innerWidth <= 820;
   const W = narrow ? 400 : 760, H = narrow ? 290 : 380, L0 = narrow ? 50 : 62, R0 = has2 && !shared ? (narrow ? 46 : 62) : (narrow ? 12 : 18), T0 = has2 || hasR ? 40 : 26, B0 = 28;
@@ -1953,6 +1988,23 @@ document.getElementById('affordBox').addEventListener('click', e => {
   if (time.on) stopTime();
   ui.metric = 'afford'; renderGroups(); restyle(); closeSide(); if (openPlace) renderDrawer();
 });
+
+// ---------- install as an app ----------
+// Android and desktop Chrome/Edge offer a one-tap install (the "beforeinstallprompt" event); iPhones and iPads need
+// Safari's Share > Add to Home Screen, so there the button shows those two steps. Hidden once the app is installed.
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+const appBtn = document.getElementById('appBtn');
+const installed = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (!installed()) appBtn.hidden = false; });
+addEventListener('appinstalled', () => { appBtn.hidden = true; installEvt = null; if (window.goatcounter && goatcounter.count) goatcounter.count({ path: 'app-installed', title: 'App installed', event: true }); });
+if (isIOS && !installed()) appBtn.hidden = false;
+appBtn.addEventListener('click', async () => {
+  if (installEvt) { installEvt.prompt(); const r = await installEvt.userChoice; if (r.outcome === 'accepted') appBtn.hidden = true; installEvt = null; return; }
+  if (isIOS) document.getElementById('iosWrap').hidden = false;
+});
+document.getElementById('iosWrap').addEventListener('click', e => { if (e.target.id === 'iosWrap' || e.target.closest('[data-ios-close]')) document.getElementById('iosWrap').hidden = true; });
 
 // ---------- the support note ----------
 // Shown once, after a visitor has looked at 2 places and spent a minute on the map; pointing at the Support button.
