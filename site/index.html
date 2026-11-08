@@ -84,6 +84,7 @@
   .group > button span { display: inline-flex; align-items: center; gap: 8px; }
   .gi { width: 17px; height: 17px; color: var(--accent); flex: none; }
   .group .dot { width: 7px; height: 7px; border-radius: 50%; background: #e76f51; display: inline-block; }
+  .side-x { display: none; margin-left: auto; align-self: flex-start; border: 0; background: var(--panel-2); width: 34px; height: 34px; border-radius: 50%; font-size: 14px; cursor: pointer; align-items: center; justify-content: center; flex: none; }
   .side-foot { padding: 10px 16px 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
   .side-foot a { color: inherit; }
 
@@ -122,6 +123,8 @@
   .legend h3 { margin: 0 0 2px; font: 600 15px var(--serif); }
   .lg-support { position: absolute; right: 0; bottom: calc(100% + 8px); display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px 4px 8px; border-radius: 999px; background: #fbe9e3; border: 1px solid #f6b89b; color: #9c2f1c; font-size: 12px; font-weight: 600; text-decoration: none; box-shadow: var(--shadow); }
   .lg-support:hover { background: #f8dccf; }
+  .lg-support.lg-feedback { bottom: calc(100% + 46px); background: #fff; border-color: #8ccdc0; color: #126b60; }
+  .lg-support.lg-feedback:hover { background: #e6f4f1; }
   .lg-support svg { width: 13px; height: 13px; }
   /* A one-time, closable note asking for support, shown after the visitor has used the map for a while */
   .nudge { position: absolute; right: 14px; z-index: 560; width: 300px; max-width: calc(100% - 28px); background: var(--panel); border: 1px solid #f6b89b; border-radius: 14px; box-shadow: 0 12px 30px rgba(0,0,0,.18); padding: 14px 16px 12px; font-size: 13px; line-height: 1.45; animation: nudgeIn .35s ease-out; }
@@ -395,9 +398,19 @@
     .kpis { grid-template-columns: repeat(2, 1fr) !important; }
     .drawer header h2 { font-size: 20px !important; }
     .mpick select { font-size: 17px; }
-    .drawer { width: 100%; top: 30%; border-right: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; transform: translateY(102%); }
+    /* the place panel covers the whole screen (✕ at the top goes back to the map) */
+    .drawer { width: 100%; top: 0; border-right: 0; border-radius: 0; transform: translateY(102%); padding-top: env(safe-area-inset-top); z-index: 1000; }
     .drawer.open { transform: none; }
-    .drawer header { padding: 12px 16px 10px; }
+    .drawer header { padding: 12px 56px 10px 16px; flex-wrap: wrap; position: relative; }
+    .drawer header h2 { flex-basis: 100%; }
+    .drawer header #dClose { position: absolute; right: 12px; top: 12px; }
+    /* the Data menu: whole screen too, with a slim footer so the list of data points gets the room */
+    .side { width: 100vw; padding-top: env(safe-area-inset-top); }
+    .side-x { display: inline-flex; }
+    .side-support { margin: 0 12px 6px; padding: 6px 10px; gap: 8px; }
+    .side-support small { display: none; }
+    .side-foot { font-size: 0; padding: 6px 16px calc(8px + env(safe-area-inset-bottom)); }
+    .side-foot a { font-size: 13px; margin: 0 !important; }
     .drawer header h2 { font-size: 19px; }
     .table-view { inset: 120px 8px 8px; }
     .leaflet-control-zoom { display: none; }
@@ -425,6 +438,7 @@
     <div class="brand">
       <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#126b60"/><path d="M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z" fill="none" stroke="#e6f4f1" stroke-width="3.5" stroke-linejoin="round"/><path d="M25 15v29M39 20v29" stroke="#8ccdc0" stroke-width="3.5"/></svg>
       <div><h1>Open Housing Atlas</h1><small class="byline">Free US housing data</small><small id="asof">Loading data…</small></div>
+      <button class="side-x" id="sideClose" type="button" aria-label="Close the data menu">✕</button>
     </div>
     <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="dpSearch" type="search" placeholder="Find a data point" aria-label="Find a data point"></label>
@@ -655,6 +669,7 @@ const M = {
   market_heat:   { l: 'Market heat index', f: 'score', src: 'zillow', i: "Zillow's market temperature: about 50 is balanced, higher favours sellers, lower favours buyers." },
   // added: jobs and pay (BLS), and more from the Census survey
   unemployment:  { l: 'Unemployment rate', f: 'pct', src: 'acs', i: 'Share of the labor force without a job and looking for one (Census American Community Survey, 5-year average).' },
+  income_today:  { l: 'Real household income (today’s dollars)', f: 'usd', src: 'income', i: "Median household income restated in today's dollars using consumer price inflation (BLS CPI), so years can be compared fairly: the chart shows whether incomes have really grown, or only kept up with prices. ZIP codes use the Census survey's income." },
   rpp_all:       { l: 'Cost of living (US = 100)', f: 'num1', src: 'bea', i: "How expensive everyday life is compared with the US average (100): 110 means prices are 10% higher. BEA Regional Price Parities, covering goods, rents, utilities and services. Counties and ZIP codes show their metro area's figure (or their state's figure for areas outside metros)." },
   rpp_housing:   { l: 'Housing costs (US = 100)', f: 'num1', src: 'bea', i: "Rents and housing costs compared with the US average (100), from BEA Regional Price Parities. Counties and ZIP codes show their metro area's figure (or their state's outside metros)." },
   income_real:   { l: 'Income adjusted for cost of living', f: 'usd', src: 'bea', i: "Median household income divided by the cost of living, so places can be compared fairly: what the income is worth at average US prices. $90,000 where prices are 20% above average counts as $75,000." },
@@ -704,7 +719,7 @@ const GROUPS = [
   ['Prices and affordability', ['hv', 'hv_long', 'hv_real', 'mtg_long', 'mtg_real', 'hv_yoy', 'hpi_change', 'hv_mom', 'hv_5y', 'fc_1y', 'sale_price', 'sale_price_yoy', 'hv_low', 'hv_high', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'fair_value', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
   ['Market activity', ['market_heat', 'inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'sale_to_list', 'pct_above_list', 'days_to_pending', 'pending_ratio', 'dom', 'dom_yoy', 'cut', 'price_up', 'lp', 'lp_yoy', 'ppsf', 'med_sqft', 'months_supply', 'inv_pct_houses'], 'activity'],
   ['Schools', ['school_score'], 'school'],
-  ['People and income', ['income', 'income_real', 'rpp_all', 'rpp_housing', 'income_growth', 'unemployment', 'jobs', 'job_growth', 'avg_pay', 'pay_growth', 'commute', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'mig_net', 'mig_net_pct', 'mig_in', 'mig_out', 'mig_in_income', 'mig_out_income', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
+  ['People and income', ['income', 'income_today', 'income_real', 'rpp_all', 'rpp_housing', 'income_growth', 'unemployment', 'jobs', 'job_growth', 'avg_pay', 'pay_growth', 'commute', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'mig_net', 'mig_net_pct', 'mig_in', 'mig_out', 'mig_in_income', 'mig_out_income', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
   ['Climate, risk and walkability', ['risk', 'flood_risk', 'flood_zone_pct', 'flood_ins_pct', 'flood_claims', 'flood_claims_rate', 'flood_paid', 'fire_risk', 'hurricane_risk', 'tornado_risk', 'heat_risk', 'quake_risk', 'aqi_bad_days', 'aqi_median', 'noise_db', 'noise_loud', 'walk', 'temp'], 'leaf'],
   ['Who lives here', ['med_age', 'u18_pct', 'a2544_pct', 'a65_pct', 'a75_pct', 'family_hh', 'single_hh', 'homeown', 'mortgaged', 'rent_burden', 'owner_burden', 'seasonal_pct', 'year_built', 'own_2544_pct', 'own_65_pct', 'own_75_pct', 'rent_2544_pct', 'r_rent2544_own65', 'r_rent2544_own75', 'r_u18_65', 'r_u18_75', 'r_2544_65', 'r_2544_75'], 'building'],
   ['Lending', ['apps', 'origs', 'denial', 'avg_rate', 'conv_pct', 'govt_pct', 'fha_pct', 'va_pct', 'usda_pct', 'ltv', 'dti', 'dti43', 'buyer_income', 'loan_amt', 'price_med', 'second_pct', 'investor_pct', 'si_pct'], 'bank'],
@@ -819,6 +834,7 @@ const side = document.getElementById('side'), scrim = document.getElementById('s
 document.getElementById('menuBtn').addEventListener('click', () => { side.classList.add('open'); scrim.classList.add('show'); });
 function closeSide() { side.classList.remove('open'); scrim.classList.remove('show'); }
 scrim.addEventListener('click', closeSide);
+document.getElementById('sideClose').addEventListener('click', closeSide);
 
 // ---------- colour scale ----------
 function quantile(sorted, p) {
@@ -916,11 +932,12 @@ function renderLegend() {
   const meta = D.meta || { months: {} }, yr = meta.years || {};
   const src = sourceLine(ui.metric, meta, yr);
   const support = `<a class="lg-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener" title="This map is free. If it helps you, you can support it on Ko-fi."><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg>Support</a>`;
+  const feedback = `<a class="lg-support lg-feedback" href="mailto:${FEEDBACK_EMAIL}" data-feedback title="Questions, ideas or a mistake you spotted? Email us"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>Feedback</a>`;
   if (ui.level === 'us') { // one place: the national figure instead of a colour scale
     const p = D.us && D.us.US, v = p ? valOf(p, ui.metric) : null;
     document.getElementById('legend').innerHTML = `<h3>${esc(def.l)}</h3><div class="asof">${esc(src)} · the whole country</div>
       <div class="us-val"><span>United States</span><b>${v == null ? 'No national figure' : esc(def.d ? signed(v, def.f) : fmt(v, def.f))}</b></div>
-      <div class="note" style="margin:6px 0 0;font-size:11.5px">Pick State, Metro, County or Zip to compare places.</div>${support}`;
+      <div class="note" style="margin:6px 0 0;font-size:11.5px">Pick State, Metro, County or Zip to compare places.</div>${feedback}${support}`;
     return;
   }
   const noun = { county: 'counties', metro: 'metros', state: 'states', zip: 'ZIP codes' }[ui.level];
@@ -933,8 +950,7 @@ function renderLegend() {
   document.getElementById('legend').innerHTML = `<h3>${esc(def.l)}</h3><div class="asof">${esc(src)} · ${count}</div>
     <div class="bar">${scale.colors.map(c => `<i style="background:${c}"></i>`).join('')}</div>
     ${ticks ? `<div class="ticks"><span>&lt; ${fmt(ticks[0], f, true)}</span><span>${fmt(ticks[1], f, true)}</span><span>&gt; ${fmt(ticks[2], f, true)}</span></div>` : ''}
-    <div class="na"><i></i>No data</div>${sw}
-    <a class="lg-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener" title="This map is free. If it helps you, you can support it on Ko-fi."><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg>Support</a>`;
+    <div class="na"><i></i>No data</div>${sw}${feedback}${support}`;
 }
 document.getElementById('legend').addEventListener('click', e => {
   const b = e.target.closest('[data-mode]');
@@ -1093,7 +1109,7 @@ async function loadZipState(st) {
   zipLoading[st] = (async () => {
     try {
       const [recs, shapes] = await Promise.all([fetch(`data/zip/${st}.json`).then(r => r.json()), fetch(`data/zip/shapes/${st}.json`).then(r => r.json())]);
-      for (const [z, rec] of Object.entries(recs)) { rec.s = st; rec.z = z; rec._id = z; D.zip[z] = rec; }
+      for (const [z, rec] of Object.entries(recs)) { rec.s = st; rec.z = z; rec._id = z; D.zip[z] = rec; if (incomeToday && rec.v.income) rec.v.income_today = Math.round(rec.v.income * incomeToday); }
       if (HAS.has('afford')) computeAfford(Object.values(recs));
       zipFeats[st] = Object.entries(shapes).map(([z, polys]) => ({ type: 'Feature', id: z, properties: {}, geometry: decodeShape(polys) }));
       return true;
@@ -1194,6 +1210,17 @@ async function init() {
     return;
   }
   try { D.us = await get('data/us.json'); } catch (e) { D.us = {}; } // the whole country (one place)
+  // Real household income for the map: the latest income in today's dollars (one inflation factor for everyone,
+  // so ZIP colours reuse the income steps scaled by the same factor)
+  {
+    const L = D.meta.long || {}, y = String((D.meta.years || {}).income || '');
+    incomeToday = L.cpi && L.cpi_now && L.cpi[y] ? L.cpi_now / L.cpi[y] : null;
+    if (incomeToday) {
+      for (const level of ['us', 'state', 'metro', 'county']) for (const p of Object.values(D[level] || {})) if (p.v.income) p.v.income_today = Math.round(p.v.income * incomeToday);
+      const zb = (D.meta.zipBreaks || {}).income;
+      if (zb) D.meta.zipBreaks.income_today = zb.map(b => b * incomeToday);
+    }
+  }
   document.getElementById('asof').textContent = `Updated ${D.meta.built.slice(0, 10)}`;
   for (const level of ['state', 'metro', 'county']) for (const p of Object.values(D[level])) for (const k in p.v) HAS.add(k);
   for (const k in D.meta.zipBreaks || {}) HAS.add(k); // data points that only ZIP codes have
@@ -1549,6 +1576,10 @@ function seriesFor(key, h, p) {
     case 'cut': return h.cut && mapSeries(h.cut, x => x * 100);
     case 'price_up': return h.inc && mapSeries(h.inc, x => x * 100);
     case 'pending_ratio': return h.pend && h.inv && mapSeries(h.pend, (x, k) => h.inv[k] ? x / h.inv[k] * 100 : null);
+    case 'income_today': { // each year's income x (today's prices / that year's prices)
+      const L = D.meta.long || {};
+      return a.income && L.cpi && L.cpi_now ? mapSeries(a.income, (x, y) => L.cpi[y] ? x * L.cpi_now / L.cpi[y] : null) : null;
+    }
     case 'hv_real': case 'mtg_long': case 'mtg_real': {
       // since 1975: FHFA value (scaled to Zillow) x that year's average 30-year rate, and CPI to restate in today's dollars
       const L = D.meta.long || {}, hl = a.hv_long;
@@ -1705,7 +1736,7 @@ const EXTRA_SRC = {
   buy_vs_rent: 'Freddie Mac (mortgage rates)', hv_income: 'U.S. Census Bureau (income)', rent_pct_income: 'U.S. Census Bureau (income)',
   prop_tax: 'Zillow Research (home values)',
   mtg_long: 'Freddie Mac (mortgage rates)', mtg_real: 'Freddie Mac (mortgage rates); U.S. Bureau of Labor Statistics (CPI)',
-  hv_real: 'U.S. Bureau of Labor Statistics (CPI)', inv_pct_houses: 'U.S. Census Bureau (housing units)',
+  hv_real: 'U.S. Bureau of Labor Statistics (CPI)', income_today: 'U.S. Bureau of Labor Statistics (CPI)', inv_pct_houses: 'U.S. Census Bureau (housing units)',
 };
 function sourceParts(k, keys) {
   const [name, url] = SRC[M[k].src] || SRC.zillow;
@@ -2018,6 +2049,20 @@ document.getElementById('affordBox').addEventListener('click', e => {
   ui.metric = 'afford'; renderGroups(); restyle(); closeSide(); if (openPlace) renderDrawer();
 });
 
+// ---------- feedback by email ----------
+// The address forwards to the owner's own inbox (set up at the domain registrar), so their personal address stays private.
+// The email starts with the page the visitor was looking at, so it's clear what the feedback is about.
+const FEEDBACK_EMAIL = 'contact@openhousingatlas.com';
+let incomeToday = null; // inflation factor from the latest income year to today (set once the data loads)
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-feedback]');
+  if (!a) return;
+  const place = openPlace && D[openPlace.level] && D[openPlace.level][openPlace.id] ? placeName(openPlace.level, D[openPlace.level][openPlace.id]) : '';
+  const about = `Page: ${location.href}${place ? `\nPlace: ${place}` : ''}\nData point: ${M[ui.metric] ? M[ui.metric].l : ''}\n\nMy feedback:\n`;
+  a.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent('Open Housing Atlas feedback')}&body=${encodeURIComponent(about)}`;
+  if (window.goatcounter && goatcounter.count) goatcounter.count({ path: 'feedback-click', title: 'Feedback clicked', event: true });
+});
+
 // ---------- install as an app ----------
 // Android and desktop Chrome/Edge offer a one-tap install (the "beforeinstallprompt" event); iPhones and iPads need
 // Safari's Share > Add to Home Screen, so there the button shows those two steps. Hidden once the app is installed.
@@ -2048,7 +2093,7 @@ function placeNudge() {
   const n = document.getElementById('nudge'), lg = document.getElementById('legend');
   if (!lg || !n.offsetParent) return;
   const stage = n.offsetParent.getBoundingClientRect(), r = lg.getBoundingClientRect();
-  n.style.bottom = Math.round(stage.bottom - r.top + 46) + 'px'; // above the Support button that sits on the legend
+  n.style.bottom = Math.round(stage.bottom - r.top + 84) + 'px'; // above the Support and Feedback buttons on the legend
 }
 function maybeNudge() {
   const n = document.getElementById('nudge');
