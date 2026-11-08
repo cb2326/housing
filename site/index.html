@@ -489,6 +489,9 @@ const M = {
   fc_1y:         { l: 'Price forecast (next 12 months)', f: 'pct', d: 1, src: 'forecast', i: "Zillow's forecast for home values 12 months ahead. Zillow publishes it for metros and ZIP codes; counties show their metro's, and states an average of their metros weighted by population. The chart shows Zillow's past forecasts (saved copies go back to 2022)." },
   overvalued:    { l: 'Overvalued %', f: 'pct', d: 1, src: 'fair', i: "How far today's home value sits above (+) or below (−) its fair value. Fair value = local household income × the place's average home-value-to-income ratio over the last 20 years. A rough gauge, not a prediction." },
   hv_long:       { l: 'Home value since 1975 (estimate)', f: 'usd', src: 'fhfa', i: "Estimated typical home value every year back to 1975 (or as far back as FHFA has data): FHFA's House Price Index, which tracks repeat sales of the same homes, scaled so its latest year matches Zillow's typical value. Good for the long view; for recent years, Home value is more exact." },
+  hv_real:       { l: 'Real home value since 1975 (today’s dollars)', f: 'usd', src: 'fhfa', i: "The estimated typical home value each year since 1975, restated in today's dollars using consumer price inflation (BLS CPI). Shows how much homes really cost compared with everything else, without inflation's effect." },
+  mtg_long:      { l: 'Mortgage payment since 1975', f: 'usd', src: 'fhfa', i: "Monthly principal and interest on the typical home each year since 1975: 20% down, a 30-year fixed loan at that year's average rate (Freddie Mac). In the dollars of each year (nominal). Excludes taxes and insurance." },
+  mtg_real:      { l: 'Real mortgage payment since 1975 (today’s dollars)', f: 'usd', src: 'fhfa', i: "The same monthly payment (typical home, 20% down, that year's average 30-year rate) restated in today's dollars using consumer price inflation (BLS CPI), so you can compare what buyers really paid each year." },
   hpi_change:    { l: 'Price change by year (since 1975)', f: 'pct', d: 1, src: 'fhfa', i: "How much home prices rose or fell each year, back to 1975 (FHFA House Price Index, based on repeat sales of the same homes)." },
   fair_value:    { l: 'Fair home value', f: 'usd', src: 'fair', i: "What the typical home would cost if prices were at their usual multiple of local income: household income × the place's average home-value-to-income ratio over the last 20 years. ZIP codes use their own income since 2020 and their county's (scaled) before that." },
   from_2022_peak:{ l: 'Change since the 2022 peak', f: 'pct', d: 1, src: 'zillow', i: "Today's home value compared with its highest month in 2022." },
@@ -666,7 +669,7 @@ const M = {
 // Sections in the sidebar (a data point may sit in more than one). START_HERE: the quick buttons at the top.
 const START_HERE = [['afford', 'What can I afford?'], ['hv', 'Home value'], ['hv_yoy', 'Price change'], ['school_score', 'Schools'], ['rent', 'Rent'], ['risk', 'Hazard risk'], ['walk', 'Walkability'], ['fc_1y', 'Forecast'], ['growth_score', 'Growth outlook']];
 const GROUPS = [
-  ['Prices and affordability', ['hv', 'hv_long', 'hv_yoy', 'hpi_change', 'hv_mom', 'hv_5y', 'fc_1y', 'sale_price', 'sale_price_yoy', 'hv_low', 'hv_high', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'fair_value', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
+  ['Prices and affordability', ['hv', 'hv_long', 'hv_real', 'mtg_long', 'mtg_real', 'hv_yoy', 'hpi_change', 'hv_mom', 'hv_5y', 'fc_1y', 'sale_price', 'sale_price_yoy', 'hv_low', 'hv_high', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'fair_value', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
   ['Market activity', ['market_heat', 'inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'sale_to_list', 'pct_above_list', 'days_to_pending', 'pending_ratio', 'dom', 'dom_yoy', 'cut', 'price_up', 'lp', 'lp_yoy', 'ppsf', 'med_sqft', 'months_supply', 'inv_pct_houses'], 'activity'],
   ['Schools', ['school_score'], 'school'],
   ['People and income', ['income', 'income_real', 'rpp_all', 'rpp_housing', 'income_growth', 'unemployment', 'jobs', 'job_growth', 'avg_pay', 'pay_growth', 'commute', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'mig_net', 'mig_net_pct', 'mig_in', 'mig_out', 'mig_in_income', 'mig_out_income', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
@@ -1485,6 +1488,14 @@ function seriesFor(key, h, p) {
     case 'cut': return h.cut && mapSeries(h.cut, x => x * 100);
     case 'price_up': return h.inc && mapSeries(h.inc, x => x * 100);
     case 'pending_ratio': return h.pend && h.inv && mapSeries(h.pend, (x, k) => h.inv[k] ? x / h.inv[k] * 100 : null);
+    case 'hv_real': case 'mtg_long': case 'mtg_real': {
+      // since 1975: FHFA value (scaled to Zillow) x that year's average 30-year rate, and CPI to restate in today's dollars
+      const L = D.meta.long || {}, hl = a.hv_long;
+      if (!hl || !L.rate || !L.cpi) return null;
+      const real = y => L.cpi[y] && L.cpi_now ? L.cpi_now / L.cpi[y] : null;
+      if (key === 'hv_real') return mapSeries(hl, (x, y) => real(y) && x * real(y));
+      return mapSeries(hl, (x, y) => { if (!L.rate[y]) return null; const p = pmt(x, L.rate[y]); return key === 'mtg_long' ? p : real(y) && p * real(y); });
+    }
     case 'ppsf': return h.ppsf;
     case 'med_sqft': return h.sqft;
     case 'lp': return h.lp;
@@ -1630,7 +1641,9 @@ function releaseText(k) {
 const EXTRA_SRC = {
   mtg_pmt: 'Freddie Mac (mortgage rates)', mtg_pct_income: 'Freddie Mac, U.S. Census Bureau', salary_needed: 'Freddie Mac (mortgage rates)',
   buy_vs_rent: 'Freddie Mac (mortgage rates)', hv_income: 'U.S. Census Bureau (income)', rent_pct_income: 'U.S. Census Bureau (income)',
-  prop_tax: 'Zillow Research (home values)', inv_pct_houses: 'U.S. Census Bureau (housing units)',
+  prop_tax: 'Zillow Research (home values)',
+  mtg_long: 'Freddie Mac (mortgage rates)', mtg_real: 'Freddie Mac (mortgage rates); U.S. Bureau of Labor Statistics (CPI)',
+  hv_real: 'U.S. Bureau of Labor Statistics (CPI)', inv_pct_houses: 'U.S. Census Bureau (housing units)',
 };
 function sourceParts(k, keys) {
   const [name, url] = SRC[M[k].src] || SRC.zillow;
