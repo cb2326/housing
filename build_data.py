@@ -219,6 +219,126 @@ def realtor(level):
     return out
 
 
+# ---------- Redfin: single-family homes for sale (monthly since 2012) ----------
+# Redfin's Data Center "property types" files: one row per place, month and property type. "INVENTORY" = active
+# listings on the last day of the month. Only the "Single Family Residential" rows are kept. The ZIP file is about
+# 2.7 GB, so files are streamed line by line and never saved. ZIP codes come as rolling 3-month periods (the month
+# shown is the last month of the period).
+REDFIN_PT = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_data_center/property_types/monthly"
+REDFIN_FROM = "2012-01"
+
+
+def redfin_sfr(name, key_of, packed=False):
+    """{place id: {"YYYY-MM": single-family homes for sale}} from one Redfin file, or {} if it can't be read.
+    key_of(row, col) returns the place id for a row (or None to skip it). Where a place has both seasonally adjusted
+    and unadjusted rows, the unadjusted ones are used (Redfin adjusts some places and not others)."""
+    from array import array
+    lo = int(REDFIN_FROM[:4]) * 12 + int(REDFIN_FROM[5:]) - 1
+    size = (THIS_YEAR + 1) * 12 - lo + 1
+    tmp = {}  # pid -> {"false"/"true": array of months}
+    try:
+        req = urllib.request.Request(f"{REDFIN_PT}/{name}", headers=PLAIN)
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            text = io.TextIOWrapper(resp, encoding="utf-8", errors="replace", newline="")
+            header = next(text)
+            lines = (ln for ln in text if '"Single Family Residential"' in ln)
+            r = csv.reader([header])
+            head = next(r)
+            col = {h: i for i, h in enumerate(head)}
+            ci, ce, csa = col["INVENTORY"], col["PERIOD END"], col["IS SEASONALLY ADJUSTED"]
+            for row in csv.reader(lines):
+                if len(row) < len(head) - 1:
+                    continue
+                v = num(row[ci])
+                pid = key_of(row, col) if v is not None else None
+                if not pid:
+                    continue
+                end = row[ce]
+                m = int(end[:4]) * 12 + int(end[5:7]) - 1 - lo
+                if not 0 <= m < size:
+                    continue
+                flags = tmp.setdefault(pid, {})
+                a = flags.get(row[csa])
+                if a is None:
+                    a = flags[row[csa]] = array("f", [float("nan")] * size)
+                a[m] = v
+    except Exception as e:
+        print(f"  (Redfin {name} not available: {e})")
+        return {}
+    out = {}
+    for pid, flags in tmp.items():
+        counts = {f: sum(1 for x in a if x == x) for f, a in flags.items()}
+        best = "false" if counts.get("false", 0) >= counts.get("true", 0) else "true"
+        a = flags[best]
+        if packed:  # ZIP codes: kept as compact arrays, the way the other ZIP data is (see to_dict)
+            out[pid] = (lo - MONTH0, a)
+            continue
+        series = {f"{(lo + i) // 12:04d}-{(lo + i) % 12 + 1:02d}": round(x) for i, x in enumerate(a) if x == x}
+        if series:
+            out[pid] = series
+    return out
+
+
+def redfin_all(metro_names, pop_names, county_to_cbsa):
+    """Single-family homes for sale for the whole country, states, metros and counties."""
+    norm = lambda s: re.sub(r"[^a-z0-9]", "", s.lower().replace("saint ", "st ").replace("ñ", "n"))
+    name_to_state = {name.lower(): fips for fips, (abbr, name) in STATES.items()}
+    # Names differ a little: Redfin writes "Alexandria, VA" and "Baltimore City County, MD" where the Census writes
+    # "Alexandria city" and "Baltimore city"; "&" vs "and"; Alaska's boroughs. A second, looser key without words like
+    # county/city/borough is used when it points to a single county in that state.
+    loose = lambda s: re.sub(r"(cityandborough|county|city|borough|municipality|parish|censusarea)", "", norm(s.replace("&", "and")))
+    county_key, loose_key = {}, {}
+    for fips, cname in pop_names.items():
+        if len(fips) == 5 and fips[:2] in STATES:
+            st = STATES[fips[:2]][0]
+            county_key[(norm(cname), st)] = fips
+            lk = (loose(cname), st)
+            loose_key[lk] = fips if lk not in loose_key else None   # None = more than one match: don't guess
+
+    def county_of(row, col):
+        name, _, st = row[col["REGION NAME"]].rpartition(", ")
+        st = st.strip().upper()
+        for cand in (name, name.replace(" City County", " city"), name + " city"):
+            if (norm(cand), st) in county_key:
+                return county_key[(norm(cand), st)]
+        return loose_key.get((loose(name), st))
+
+    county = redfin_sfr("all_counties.csv", county_of)
+    # Redfin's metro "REGION ID" is the Census CBSA code. Some metros aren't in Redfin's file under today's Census
+    # definitions (the largest ones come split into "divisions", and 2023 redrew several); those are the sum of their
+    # counties, for the months every county has (each listing is in exactly one county).
+    metro = redfin_sfr("all_metros.csv", lambda row, col: row[col["REGION ID"]] if row[col["REGION ID"]] in metro_names else None)
+    members = {}
+    for fips, cbsa in county_to_cbsa.items():
+        members.setdefault(cbsa, []).append(fips)
+    summed = 0
+    for cbsa in metro_names:
+        parts = [county.get(f) for f in members.get(cbsa, [])]
+        if cbsa in metro or not parts or any(p is None for p in parts):
+            continue
+        months = set.intersection(*(set(p) for p in parts))
+        if months:
+            metro[cbsa] = {m: sum(p[m] for p in parts) for m in sorted(months)}
+            summed += 1
+    print(f"  ({summed} metros added up from their counties)")
+    out = {
+        "us": redfin_sfr("country.csv", lambda row, col: "US"),
+        "state": redfin_sfr("all_states.csv", lambda row, col: name_to_state.get(row[col["REGION NAME"]].lower())),
+        "metro": metro,
+        "county": county,
+    }
+    print("  Redfin single-family homes for sale: " + ", ".join(f"{len(v)} {k}" for k, v in out.items()))
+    return out
+
+
+def sfr_inv_metrics(s, newest):
+    """Latest single-family homes for sale and its 1-year change (only when the place's data is recent)."""
+    k, v = latest(s)
+    if v is None or (newest and k < months_back(newest, 6)):
+        return {}
+    return {"sfr_inv": rnd(v, 0), "sfr_inv_yoy": rnd(change(s, 12), 1)}
+
+
 # ---------- Census: metros ----------
 def census_metros():
     """County -> metro (CBSA code) list and metro names (Census Population Estimates, metro file)."""
@@ -2223,6 +2343,9 @@ def main():
     except Exception as e:
         print(f"  (Realtor.com national file not available: {e})")
         rt["us"] = {}
+    print("Redfin (single-family homes for sale)")
+    rf = redfin_all(metro_names, pop_names, county_to_cbsa)
+    rf_month = max((max(s) for s in rf["us"].values()), default=None) if rf.get("us") else None
 
     # Zillow names metros like "Los Angeles, CA"; the Census says "Los Angeles-Long Beach-Anaheim, CA".
     # Match on (first city, first state); where the Census renamed a metro, fall back to Zillow's own
@@ -2529,6 +2652,9 @@ def main():
                         srcs(zs, lvl, pid), srcs(zc, lvl, pid), rs, la.get("units"), la.get("prop_tax_rate"), a.get("income"))
         xs = {key: srcs(zx[key], lvl, pid) for key in ZILLOW_EXTRA}
         m.update(extra_metrics(xs))
+        sf = rf[lvl].get(pid)
+        if sf:
+            m.update(sfr_inv_metrics(sf, rf_month))
         m.update(long_values(a, LONG))
         v = {**{k: x for k, x in la.items() if k not in ("prop_tax",)}, **m}
         if not v:
@@ -2548,6 +2674,8 @@ def main():
                     b[k] = trim_series(rr[k], HSTART)
         if fc_series:
             b["fc"] = dict(sorted(fc_series.items()))
+        if sf:
+            b["sfr_inv"] = dict(sorted(sf.items()))
         for key, sx in xs.items():
             if sx:
                 b[key] = trim_series(sx, HSTART)
@@ -2592,7 +2720,7 @@ def main():
     realtor_month = max((max(r["inv"]) for r in rt["state"].values() if r["inv"]), default=None)
     meta = {
         "built": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "months": {"zillow": zillow_month, "realtor": realtor_month, "income": inc_year, "population": pop_year},
+        "months": {"zillow": zillow_month, "realtor": realtor_month, "redfin": rf_month, "income": inc_year, "population": pop_year},
         "years": {"pop": pop_year, "age": age_year, "income": inc_year, "permits": permit_year, "units": unit_year, "temp": temp_year,
                   "votes": vote_year, "acs": acs_year, "hmda": hmda_year_, "schools": max(sscores) if sscores else None,
                   "school_list": sdir_year, "hazards": haz.get("ver"), "walk": 2021, "jobs": max(qcew) if qcew else None,
@@ -3451,6 +3579,14 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
     zcondo, _ = zillow_zip("zhvi/Zip_zhvi_uc_condo_tier_0.33_0.67_sm_sa_month.csv")
     zrent, _ = zillow_zip("zori/Zip_zori_uc_sfrcondomfr_sm_month.csv")
     rtz, rnames = realtor_zip()
+    # Redfin single-family homes for sale by ZIP (rolling 3-month periods; region name = the ZIP code)
+    rfz = redfin_sfr("all_zips.csv", lambda row, col: row[col["REGION NAME"]].strip().zfill(5) if row[col["REGION NAME"]].strip().isdigit() else None, packed=True)
+    rfz_month = None
+    for lo, a in rfz.values():
+        last = max((i for i, x in enumerate(a) if x == x), default=None)
+        if last is not None and (rfz_month is None or im(lo + last) > rfz_month):
+            rfz_month = im(lo + last)
+    print(f"  Redfin single-family homes for sale: {len(rfz)} ZIPs, latest {rfz_month}")
     zc = zcta_counties()
     shapes = read_shapefile(fetch_file("https://www2.census.gov/geo/tiger/GENZ2020/shp/cb_2020_us_zcta520_500k.zip", "zcta_shapes.zip"))
     print(f"  {len(zhv)} Zillow ZIPs, {len(rtz)} Realtor.com ZIPs, {len(shapes)} shapes, ACS years {sorted(acs_zip)}")
@@ -3531,6 +3667,9 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
             continue
         v.update({k: x for k, x in la.items() if k not in ("prop_tax",)})
         v.update(extra_metrics(zx_d))
+        sf_d = to_dict(rfz.get(z))
+        if sf_d:
+            v.update(sfr_inv_metrics(sf_d, rfz_month))
         v.update(long_values(a, long_view_))
         city = (zinfo.get(z) or ("", ""))[0] or (rnames.get(z, "").rsplit(",", 1)[0].title())
         rec = {"c": city, "k": county}
@@ -3550,6 +3689,8 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
             for k in ("inv", "dom", "cut", "lp", "newl", "pend", "ppsf", "inc"):  # all of it (from 2016), so 2017-19 can be the baseline
                 if rt_d.get(k):
                     b[k] = compact(rt_d[k], "2016-01")
+        if sf_d:
+            b["sfr_inv"] = compact(sf_d, REDFIN_FROM)
         fc_s = own_fc if len(own_fc) >= 2 else {**metro_fc, **own_fc}  # metro's past forecasts, ZIP's own for now
         if fc_s:
             b["fc"] = compact(fc_s, "2000-01")
