@@ -3044,7 +3044,7 @@ document.getElementById('dlPdf').addEventListener('click', () => {{
         f.write(hub)
     with open(os.path.join(root, "sitemap.xml"), "w", encoding="utf-8") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')
-        for u in ["/", "/markets/"] + urls:
+        for u in ["/", "/markets/", "/armenia/"] + urls:
             f.write(f"<url><loc>{SITE_URL}{u}</loc><lastmod>{built}</lastmod></url>\n")
         f.write("</urlset>\n")
     with open(os.path.join(root, "robots.txt"), "w", encoding="utf-8") as f:
