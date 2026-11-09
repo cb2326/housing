@@ -231,6 +231,9 @@
   .d-body h3 { font: 600 14px var(--sans); margin: 14px 0 6px; }
   .chart { width: 100%; height: auto; display: block; }
   .chart-tip { font-size: 12px; color: var(--muted); min-height: 18px; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); margin: 0 0 4px; }
+  .chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .chart-legend i { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
   table.zones { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   table.zones td, table.zones th { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: right; }
   table.zones td:first-child, table.zones th:first-child { text-align: left; }
@@ -351,17 +354,19 @@
 // ---------- data points ----------
 // rel: how often the source updates ('month' = Cadastre monthly report, 'year' = Armstat yearly, 'census' = once)
 const METRICS = [
-  { id: 'price', group: 'Prices and affordability', label: 'Apartment price per m²', level: 'district · town · zone', money: true, rel: 'month',
+  { id: 'price', group: 'Prices and affordability', label: 'Apartment price per m²', level: 'Armenia · district · town · zone', money: true, rel: 'month',
     info: 'Average market price per square meter of apartments in apartment buildings, from the Cadastre Committee\'s monthly market report. Shown for Yerevan\'s 12 districts, 45 regional towns, and (with the Zone button) Yerevan\'s official valuation zones (Government decision N 1023-N, 2020). Zone outlines are traced from the official map, so they are approximate (within tens of meters).' },
-  { id: 'typical', group: 'Prices and affordability', label: 'Typical apartment price (60 m²)', level: 'district · town · zone', money: true, rel: 'month',
+  { id: 'typical', group: 'Prices and affordability', label: 'Typical apartment price (60 m²)', level: 'Armenia · district · town · zone', money: true, rel: 'month',
     info: 'What a 60 m² apartment costs at the average price per m², a size typical of Soviet-era two-room flats. Armenia publishes no average house price, so this is the closest full-price figure.' },
-  { id: 'chg12', group: 'Prices and affordability', label: 'Price change (1 year)', level: 'district · town · zone', pct: true, rel: 'month',
-    info: 'Change in the apartment price per m² compared with the same month a year earlier.' },
-  { id: 'chg1', group: 'Prices and affordability', label: 'Price change (1 month)', level: 'district · town · zone', pct: true, rel: 'month',
-    info: 'Change in the apartment price per m² compared with the month before.' },
-  { id: 'mtg_pmt', group: 'Prices and affordability', label: 'Monthly mortgage payment (60 m²)', level: 'district · town · zone', money: true, rel: 'month',
+  { id: 'mtg_pmt', group: 'Prices and affordability', label: 'Monthly mortgage payment (60 m²)', level: 'Armenia · district · town · zone', money: true, rel: 'month',
     info: 'Monthly payment on a 60 m² apartment at the average price, with 20% down and a 20-year loan, at that month\'s average mortgage rate (Central Bank of Armenia). In AMD the loan is in drams at the dram rate; switch to USD to see a US-dollar loan at the dollar mortgage rate, as many diaspora buyers take.' },
-  { id: 'ptoi', group: 'Prices and affordability', label: 'Years of wages for a 60 m² apartment', level: 'district · town · zone', unit: 'yrs', rel: 'month',
+  { id: 'chg12', group: 'Prices and affordability', label: 'Price change (1 year)', level: 'Armenia · district · town · zone', pct: true, rel: 'month',
+    info: 'Change in the apartment price per m² compared with the same month a year earlier (Cadastre). For the whole of Armenia: the Central Bank of Armenia\'s apartment price index, which adjusts for size, floor and location, by quarter.' },
+  { id: 'chg1', group: 'Prices and affordability', label: 'Price change (1 month)', level: 'Armenia · district · town · zone', pct: true, rel: 'month',
+    info: 'Change in the apartment price per m² compared with the month before.' },
+  { id: 'house_chg', group: 'Prices and affordability', label: 'House price change (1 year)', level: 'Armenia', nat: 'rppi_houses', rel: 'quarter',
+    info: 'How much prices of individual (private) houses changed from the same quarter a year earlier, across Armenia (Central Bank of Armenia price index, from sales registered with the Cadastre). The only official house-price measure; the Central Bank calls it experimental, so it may be revised.' },
+  { id: 'ptoi', group: 'Prices and affordability', label: 'Years of wages for a 60 m² apartment', level: 'Armenia · district · town · zone', unit: 'yrs', rel: 'month',
     info: 'Price of a 60 m² apartment divided by a year of the average gross wage in its marz (Armstat). Higher means less affordable.' },
   { id: 'deals', group: 'Market activity', label: 'Property transactions (month)', level: 'district · marz', rel: 'month',
     info: 'All real estate transactions registered with the Cadastre in the month: sales, gifts, mortgages, leases and more.' },
@@ -384,18 +389,6 @@ const METRICS = [
 ];
 // nationwide interest rates (the same everywhere: shown like the US map's "Mortgage rates (nationwide)")
 METRICS.push(
-  { id: 'rppi_chg', group: 'Price index (Central Bank)', label: 'Apartment price index, 1-year change', level: 'district (by Yerevan area)', pct: true, rel: 'quarter',
-    info: 'The Central Bank of Armenia\'s residential property price index: how much apartment prices changed from the same quarter a year earlier, after adjusting for size, floor, zone and other features, from all sales registered with the Cadastre. Published for 5 areas of Yerevan, so neighboring districts share a value: Center = Kentron; North = Arabkir, Davtashen, Kanaker-Zeytun; East = Avan, Nor Nork, Nork-Marash; South = Erebuni, Nubarashen, Shengavit; West = Ajapnyak, Malatia-Sebastia. Its history has no gaps since 2018, including 2020–2024 when the Cadastre\'s district prices are missing.' },
-  { id: 'rppi_level', group: 'Price index (Central Bank)', label: 'Apartment price index (2018 = 100)', level: 'district (by Yerevan area)', unit: 'idx', rel: 'quarter',
-    info: 'The same Central Bank index as a level: 100 is the average of 2018, so 200 means prices have doubled since 2018. Quality-adjusted (size, floor, zone…). Neighboring districts share their Yerevan area\'s value (see the 1-year change for the areas).' },
-  { id: 'rppi_y', group: 'Price index (Central Bank)', label: 'Apartment price index, Yerevan (1-year change)', level: 'nationwide', nat: 'rppi_yerevan', rel: 'quarter',
-    info: 'Central Bank of Armenia index for all apartments in Yerevan: change from the same quarter a year earlier.' },
-  { id: 'rppi_o', group: 'Price index (Central Bank)', label: 'Apartment price index, outside Yerevan (1-year change)', level: 'nationwide', nat: 'rppi_outside', rel: 'quarter',
-    info: 'Central Bank of Armenia index for apartments in all other towns: change from the same quarter a year earlier.' },
-  { id: 'rppi_h', group: 'Price index (Central Bank)', label: 'House price index, Armenia (1-year change)', level: 'nationwide', nat: 'rppi_houses', rel: 'quarter',
-    info: 'Central Bank of Armenia index for individual (private) houses across Armenia: change from the same quarter a year earlier. The only official house-price measure; the Central Bank calls it experimental, so it may be revised.' },
-  { id: 'rppi_a', group: 'Price index (Central Bank)', label: 'Home price index, Armenia (1-year change)', level: 'nationwide', nat: 'rppi_all', rel: 'quarter',
-    info: 'Central Bank of Armenia index for all homes (apartments and houses) across Armenia: change from the same quarter a year earlier.' },
   { id: 'rate_amd', group: 'Mortgage rates (nationwide)', label: 'Mortgage rate in drams (֏)', level: 'nationwide', nat: 'mort_amd', unit: '%', rel: 'month',
     info: 'Average interest rate on new mortgage loans to households in Armenian drams, % a year (Central Bank of Armenia, monthly statistical bulletin).' },
   { id: 'rate_usd', group: 'Mortgage rates (nationwide)', label: 'Mortgage rate in US dollars ($)', level: 'nationwide', nat: 'mort_usd', unit: '%', rel: 'month',
@@ -404,7 +397,7 @@ METRICS.push(
     info: 'The Central Bank publishes no separate euro mortgage rate. This is the closest official figure: the average rate on new household loans of over 5 years in euros (mostly mortgages). Few such loans are made, so it moves around month to month.' },
 );
 // (a group is listed in the sidebar only if it has an icon here, in this order)
-const GROUP_ICONS = { 'Prices and affordability': 'home', 'Price index (Central Bank)': 'trend', 'Mortgage rates (nationwide)': 'percent', 'Economy and lending (nationwide)': 'bank', 'Market activity': 'activity', 'People and income': 'people', 'Housing': 'building' };
+const GROUP_ICONS = { 'Prices and affordability': 'home', 'Mortgage rates (nationwide)': 'percent', 'Economy and lending (nationwide)': 'bank', 'Market activity': 'activity', 'People and income': 'people', 'Housing': 'building' };
 const ICONS = {
   home: 'M3 11 12 4l9 7M5 10v10h14V10M10 20v-5h4v5',
   trend: 'M3 17l6-6 4 4 8-8M15 7h6v6',
@@ -427,6 +420,7 @@ let D = null, AREAS = null, ZONES = null, map, marzLayer, distLayer, townLayer, 
 // A traced zone piece (one zone inside one district): its value for the data point, from the Cadastre's latest
 // apartment price per m² for that zone ("ly" = the same month a year earlier)
 function zoneValue(props, metric = ui.metric) {
+  if (M[metric]?.real) return zoneValue(props, M[metric].real);   // today's money: the latest month is the same
   const d = D.districts[props.district], zs = d?.zones, z = String(props.zone), v = zs?.zones?.[z];
   if (!v) return null;
   const ym = zs.month;
@@ -451,12 +445,66 @@ function levelsFor(metric) {
   if (!m || m.nat) return ['armenia'];                           // nationwide: one number for the whole country
   if (m.level === 'marz') return ['armenia', 'marz'];
   if (metric === 'deals' || metric === 'sales') return ['armenia', 'marz', 'district'];
-  if (metric.startsWith('rppi_')) return ['armenia', 'district'];
   return ['armenia', 'district', 'town', ...(ZONES && ZONE_METRICS.includes(metric) ? ['zone'] : [])];
 }
 // the level picked, or the data point's first level below Armenia when it has no numbers at the picked one
 function curLevel() { const ls = levelsFor(ui.metric); return ls.includes(ui.level) ? ui.level : ls.find(l => l !== 'armenia') || 'armenia'; }
-const ARM = () => (D._arm ||= { en: 'Armenia', hy: 'Հայաստան', ...D.national });   // the whole country, as a place
+const ARM = () => (D._arm ||= { en: 'Armenia', hy: 'Հայաստան', ...D.national, price: armPriceSeries() });   // the whole country, as a place
+// The whole country's apartment price per m², month by month (no official figure exists, so it's calculated):
+// Yerevan = its districts weighted by their number of apartments; each other marz = the average of its towns; then
+// the marzes are weighted by their apartment sales in the latest year (Armstat). A month counts only when Yerevan
+// and marzes making up at least 70% of the sales outside Yerevan have prices.
+function armPriceSeries() {
+  const lastY = o => { const k = lastKey(o); return k ? o[k] : null; };
+  const dw = Object.fromEntries(Object.entries(D.districts).map(([id, d]) => [id, lastY(d.apartments) || 1]));
+  const mw = Object.fromEntries(Object.entries(D.marzes).map(([id, m]) => [id, lastY(m.apartment_sales) || 0]));
+  const townsBy = {};
+  for (const t of Object.values(D.towns)) (townsBy[t.marz] ||= []).push(t);
+  const months = new Set();
+  for (const d of Object.values(D.districts)) Object.keys(d.price || {}).forEach(m => months.add(m));
+  const outW = Object.entries(mw).filter(([id]) => id !== 'yerevan').reduce((a, [, w]) => a + w, 0);
+  const out = {};
+  for (const ym of [...months].sort()) {
+    let s = 0, w = 0, n = 0;
+    for (const [id, d] of Object.entries(D.districts)) if (d.price?.[ym]) { s += d.price[ym] * dw[id]; w += dw[id]; n++; }
+    if (n < 10) continue;
+    const parts = [['yerevan', s / w]];
+    let have = 0;
+    for (const [mid, ts] of Object.entries(townsBy)) {
+      const v = ts.map(t => t.price?.[ym]).filter(x => x);
+      if (v.length && mw[mid]) { parts.push([mid, v.reduce((a, b) => a + b, 0) / v.length]); have += mw[mid]; }
+    }
+    if (!outW || have < outW * .7) continue;
+    const tw = parts.reduce((a, [mid]) => a + mw[mid], 0);
+    out[ym] = Math.round(parts.reduce((a, [mid, v]) => a + v * mw[mid], 0) / tw);
+  }
+  return out;
+}
+// Filling long gaps in a price series (AMD, by month) with the Central Bank index for that area: the index is
+// scaled to the real price on both sides of the gap (the scale moves in a straight line between them), so the
+// estimate always meets the real line. Only gaps longer than 3 months, and only between two real prices.
+// Returns {} or {month: estimate}, including the two real months at each end so the dashed line joins up.
+function rppiMonthly(area) {
+  const q = (D.national.rppi?.index || {})[area] || {}, ks = Object.keys(q).sort(), out = {};
+  for (let i = 0; i < ks.length - 1; i++) {
+    const a = ks[i], b = ks[i + 1], n = (+b.slice(0, 4) * 12 + +b.slice(5)) - (+a.slice(0, 4) * 12 + +a.slice(5));
+    for (let j = 0; j < n; j++) out[addMonths(a, j)] = q[a] + (q[b] - q[a]) * j / n;
+  }
+  if (ks.length) out[ks[ks.length - 1]] = q[ks[ks.length - 1]];
+  return out;
+}
+const RPPI_M = {};
+function gapFill(price, area) {
+  const I = RPPI_M[area] ||= rppiMonthly(area), ks = Object.keys(price || {}).sort(), out = {};
+  for (let i = 0; i < ks.length - 1; i++) {
+    const a = ks[i], b = ks[i + 1], n = (+b.slice(0, 4) * 12 + +b.slice(5)) - (+a.slice(0, 4) * 12 + +a.slice(5));
+    if (n <= 3 || !I[a] || !I[b]) continue;
+    const ra = price[a] / I[a], rb = price[b] / I[b];
+    out[a] = price[a]; out[b] = price[b];
+    for (let j = 1; j < n; j++) { const m = addMonths(a, j); if (I[m]) out[m] = (ra + (rb - ra) * j / n) * I[m]; }
+  }
+  return out;
+}
 const isZoneMode = () => curLevel() === 'zone' && !!zoneLayer;
 function renderLevels() {
   const ls = levelsFor(ui.metric), cur = curLevel();
@@ -515,17 +563,35 @@ const RPPI_AREA = { kentron: 'center', arabkir: 'north', davtashen: 'north', 'ka
   'nork-marash': 'east', erebuni: 'south', nubarashen: 'south', shengavit: 'south', ajapnyak: 'west', 'malatia-sebastia': 'west' };
 const RPPI_AREA_NAME = { center: 'Yerevan-Center', north: 'Yerevan-North', east: 'Yerevan-East', south: 'Yerevan-South', west: 'Yerevan-West', outside: 'Outside Yerevan', yerevan: 'Yerevan' };
 const rppiArea = (kind, id) => kind === 'armenia' ? 'apt' : kind === 'district' ? RPPI_AREA[id] : kind === 'town' ? 'outside' : id === 'yerevan' ? 'yerevan' : 'outside';
-const rppiSeries = (kind, id, metric) => (D.national.rppi?.[metric === 'rppi_level' ? 'index' : 'yoy'] || {})[rppiArea(kind, id)] || {};
-function wageFor(marzId) { return latestYearVal(D.marzes[marzId]?.wage); }
+// "Today's money": earlier prices raised by inflation since then, so years can be compared fairly. Drams use
+// Armenian inflation (Armstat); dollars use US inflation (BLS), what a buyer earning dollars feels.
+const REAL_METRICS = ['price', 'typical', 'mtg_pmt'];
+const realCpi = (cur = ui.cur) => (cur === 'USD' ? D.national.cpi_us : D.national.cpi_am) || {};
+const realAvailable = () => Object.keys(realCpi()).length > 12;
+function deflate(series, cur = ui.cur) {
+  const c = realCpi(cur), ks = Object.keys(c).sort();
+  if (!series || ks.length < 13) return series;
+  const first = ks[0], last = ks[ks.length - 1], out = {};
+  for (const [ym, v] of Object.entries(series)) { const base = c[ym] ?? c[ym < first ? first : last]; out[ym] = v == null ? v : v * c[last] / base; }
+  return out;
+}
+const realOn = metric => ui.real && REAL_METRICS.includes(metric) && realAvailable();
+const realButtons = metric => REAL_METRICS.includes(metric) && realAvailable() ? `<div class="seg-sm" title="Today's money: earlier prices adjusted for inflation">${[['0', 'As sold'], ['1', ui.cur === 'USD' ? 'Today\'s $' : 'Today\'s ֏']].map(([v, l]) => `<button type="button" class="${(ui.real ? '1' : '0') === v ? 'on' : ''}" data-real="${v}">${l}</button>`).join('')}</div>` : '';
+// what the price charts show: both lines (default), only as sold, or only in today's money
+const viewButtons = () => `<div class="seg-sm" title="Show prices as sold, in today's money, or both">${[['nominal', 'As sold'], ['real', ui.cur === 'USD' ? 'Today\'s $' : 'Today\'s ֏'], ['both', 'Both']].map(([v, l]) => `<button type="button" class="${(ui.rview || 'both') === v ? 'on' : ''}" data-rview="${v}">${l}</button>`).join('')}</div>`;
+const realNote = () => `<p class="note" style="margin:2px 0 0">In today's ${ui.cur === 'USD' ? 'dollars: earlier prices raised by US inflation since then (BLS consumer prices), as felt by a buyer earning dollars' : 'drams: earlier prices raised by Armenian inflation since then (Armstat consumer prices)'}.</p>`;
+function wageFor(marzId) { return latestYearVal(marzObj(marzId)?.wage); }
 function valueOf(kind, id, metric = ui.metric) {
+  if (M[metric]?.real) return valueOf(kind, id, M[metric].real);   // today's money: the latest month is the same
   if (M[metric]?.nat) { const s = natSeries(M[metric].nat), k = lastKey(s); return k ? s[k] : null; }   // nationwide: same everywhere
   const p = placeOf(kind, id);
   if (!p) return null;
   const marzId = kind === 'district' ? 'yerevan' : kind === 'town' ? p.marz : id;
+  // the whole country's 1-year change: the Central Bank's quality-adjusted index for all apartments
+  if (kind === 'armenia' && metric === 'chg12') return latestYearVal((D.national.rppi?.yoy || {}).apt);
   switch (metric) {
     case 'price': { const k = lastKey(p.price); return recent(k) ? toCur(p.price[k], k) : null; }
     case 'typical': { const k = lastKey(p.price); return recent(k) ? toCur(p.price[k] * 60, k) : null; }
-    case 'rppi_chg': case 'rppi_level': return latestYearVal(rppiSeries(kind, id, metric));
     case 'house_sales': return latestYearVal(p.house_sales);
     case 'apt_sales': return latestYearVal(p.apartment_sales);
     case 'chg12': return recent(lastKey(p.price)) ? change(p.price, 12) : null;
@@ -715,6 +781,9 @@ function restyle() {
   townLayer.eachLayer(c => {
     const id = c._place;
     const sel = ui.sel && ui.sel.kind === 'town' && ui.sel.id === id;
+    const el = c.getElement && c.getElement();
+    if (el) el.style.pointerEvents = armMode ? 'none' : '';
+    if (armMode) { c.setStyle({ opacity: 0, fillOpacity: 0 }); return; }   // the whole country: no town dots
     if (!townMode) { c.setStyle({ fillColor: '#ffffff', fillOpacity: 1, opacity: 1, color: sel ? '#0b4a43' : '#374151', radius: sel ? 6 : 4, weight: sel ? 2.5 : 1.5 }); return; }
     const v = valueOf('town', id);
     c.setStyle({ fillColor: v == null ? '#e5e7eb' : scale.color(v), fillOpacity: 1, opacity: 1, color: sel ? '#0b4a43' : '#ffffff', radius: sel ? 10 : 7, weight: sel ? 3 : 1.5 });
@@ -830,10 +899,13 @@ function renderLegend() {
   const lv = curLevel();
   if (lv === 'armenia') {   // the whole country: one figure, like "US" on the US map
     const { s } = seriesFor('armenia', 'armenia', ui.metric), k = lastKey(s);
-    const kWhen = k ? (m.yearly ? k.slice(0, 4) : m.rel === 'quarter' ? `Q${Math.ceil(+k.slice(5) / 3)} ${k.slice(0, 4)}` : monthLabel(k)) : '';
+    const quarterly = m.rel === 'quarter' || ui.metric === 'chg12';   // the whole country's 1-year change is the quarterly Central Bank index
+    const kWhen = k ? (m.yearly ? k.slice(0, 4) : quarterly ? `Q${Math.ceil(+k.slice(5) / 3)} ${k.slice(0, 4)}` : monthLabel(k)) : '';
+    const how = ui.metric === 'chg12' || m.rel === 'quarter' ? 'Central Bank of Armenia price index.'
+      : ['price', 'typical', 'mtg_pmt', 'ptoi', 'chg1'].includes(ui.metric) ? 'Calculated from Yerevan\'s districts and 45 towns, weighted by apartment sales.' : '';
     $('#legend').innerHTML = `<h3>${esc(m.label)}${m.money ? ` (${ui.cur})` : ''}</h3><div class="sub">The whole of Armenia${kWhen ? ' · ' + esc(kWhen) : ''}</div>
       <div class="us-val"><span>All of Armenia</span><b>${k ? esc(fmtValue(s[k])) : '–'}</b></div>
-      <div class="note" style="margin-top:6px">${k ? 'Click the map to see its history.' : `Not published for the whole country. Pick ${m.level.includes('marz') ? 'Marz' : 'District or Town'} above.`}</div>${LEGEND_BTNS}`;
+      <div class="note" style="margin-top:6px">${k ? `${how} Click the map to see its history.` : `Not published for the whole country. Pick ${m.level.includes('marz') ? 'Marz' : 'District or Town'} above.`}</div>${LEGEND_BTNS}`;
     return;
   }
   const sub = lv === 'marz' ? `By marz · ${when}` : lv === 'town' ? `45 towns outside Yerevan · ${when}`
@@ -1005,10 +1077,12 @@ const marzObj = mid => mid === 'armenia' ? ARM() : D.marzes[mid];
 
 // The history of one data point for one place. Data published only by marz (wages, poverty…) uses the place's marz.
 function seriesFor(kind, id, metric, zone) {
+  // a "real" data point: the normal history restated in today's money
+  if (M[metric]?.real) { const r = seriesFor(kind, id, M[metric].real, zone); return { ...r, s: deflate(r.s), est: r.est && deflate(r.est), real: true }; }
   if (M[metric]?.nat) return { s: natSeries(M[metric].nat), bars: !!NAT[M[metric].nat]?.bars };   // nationwide data points
   let p = placeOf(kind, id);
   const mid = marzOf(kind, id), m = marzObj(mid);
-  if (metric === 'rppi_chg' || metric === 'rppi_level') return { s: rppiSeries(kind, id, metric), area: kind !== 'armenia' };
+  if (kind === 'armenia' && metric === 'chg12') return { s: (D.national.rppi?.yoy || {}).apt || {}, cba: true };
   // on the Zone map with a zone picked, a district's price charts follow that zone's own prices
   // (or, in Compare, the zone asked for)
   const zz = zone !== undefined ? zone : isZoneMode() ? ui.zone : null;
@@ -1016,13 +1090,16 @@ function seriesFor(kind, id, metric, zone) {
   const byMonth = (src, f) => { const o = {}; for (const [ym, v] of Object.entries(src || {})) { const r = f(ym, v); if (r != null && !isNaN(r)) o[ym] = r; } return o; };
   const change = n => byMonth(p.price, (ym, v) => { const b = p.price?.[addMonths(ym, -n)]; return b ? (toCur(v, ym) / toCur(b, addMonths(ym, -n)) - 1) * 100 : null; });
   const wageIn = ym => { const ys = Object.keys(m.wage || {}).filter(y => y <= ym.slice(0, 4)).sort(); return ys.length ? m.wage[ys[ys.length - 1]] : null; };
+  // long gaps in the price history get a dashed estimate from the Central Bank index for the place's area
+  const gap = kind !== 'marz' && p.price ? gapFill(p.price, rppiArea(kind, id)) : {};
+  const both = f => ({ s: byMonth(p.price, f), est: Object.keys(gap).length ? byMonth(gap, f) : null });
   switch (metric) {
-    case 'price': return { s: seriesIn(p.price) };
-    case 'typical': return { s: byMonth(p.price, (ym, v) => toCur(v * 60, ym)) };
+    case 'price': return both((ym, v) => toCur(v, ym));
+    case 'typical': return both((ym, v) => toCur(v * 60, ym));
     case 'chg12': return { s: change(12) };
     case 'chg1': return { s: change(1) };
-    case 'ptoi': return { s: byMonth(p.price, (ym, v) => { const w = wageIn(ym); return w ? v * 60 / (w * 12) : null; }) };
-    case 'mtg_pmt': return { s: byMonth(p.price, (ym, v) => mtgPayment(v, ym)) };
+    case 'ptoi': return both((ym, v) => { const w = wageIn(ym); return w ? v * 60 / (w * 12) : null; });
+    case 'mtg_pmt': return both((ym, v) => mtgPayment(v, ym));
     case 'rate_amd': case 'rate_usd': case 'rate_eur': return { s: natSeries(M[metric].nat) };
     case 'deals': return { s: kind === 'town' ? {} : (kind === 'district' ? p.deals : m.deals), bars: true };
     case 'sales': return { s: kind === 'town' ? {} : (kind === 'district' ? p.sales : m.sales), bars: true };
@@ -1059,27 +1136,38 @@ function renderDetail() {
   $('#dTitle').textContent = p.en;
   $('#dHy').textContent = p.hy;
   $('#dKind').textContent = kind === 'armenia' ? 'The whole country' : kind === 'district' ? 'Administrative district of Yerevan' : kind === 'town' ? `Town in ${D.marzes[p.marz].en} marz` : id === 'yerevan' ? 'Capital city (counted as its own region)' : 'Marz (region) of Armenia';
-  const { s, bars, marz, area } = seriesFor(kind, id, ui.metric);
+  let { s, bars, marz, area, est } = seriesFor(kind, id, ui.metric);
+  // price, typical price and mortgage payment (and their "real" versions): one chart with both lines, as sold and
+  // in today's money
+  const base = m.real || ui.metric, pair = REAL_METRICS.includes(base) && realAvailable();
+  let extra = null;
+  if (pair) {
+    const n = seriesFor(kind, id, base), view = ui.rview || 'both';
+    s = view === 'real' ? deflate(n.s) : n.s; est = n.est && (view === 'real' ? deflate(n.est) : n.est);
+    if (view === 'both') extra = { s: deflate(n.s), est: n.est && deflate(n.est), mainLabel: 'As sold', label: `In today's ${ui.cur === 'USD' ? 'dollars' : 'drams'}` };
+  }
+  const rf = o => o && rangeFilter(o);
   const keys = Object.keys(s).sort(), last = keys[keys.length - 1];
   const fmt = v => fmtValue(v, ui.metric);
   const when = last ? (m.yearly ? last.slice(0, 4) : monthLabel(last)) : '';
   let why = '';
-  if (area) why = `<p class="note">The Central Bank publishes this index for 5 areas of Yerevan and for the rest of the country, so this is <b>${esc(RPPI_AREA_NAME[rppiArea(kind, id)])}</b>. Quarterly, with no gaps since 2018.</p>`;
-  else if (kind === 'armenia' && !keys.length) why = `<p class="note">${esc(m.label)} is published for ${esc(m.level.replace(/ · /g, ', ').replace('district', 'Yerevan districts').replace('town', 'towns').replace('zone', 'zones'))}, not for the whole country. Pick ${m.level.includes('marz') ? 'Marz' : 'District or Town'} above to see it. For a countrywide price trend, see the <a href="#" data-metric="rppi_chg">Central Bank apartment price index</a>.</p>`;
+  if (kind === 'armenia' && ui.metric === 'chg12') why = `<p class="note">For the whole country this is the Central Bank of Armenia's apartment price index (by quarter), which adjusts for size, floor and location.</p>`;
+  else if (kind === 'armenia' && ['price', 'typical', 'mtg_pmt', 'ptoi', 'chg1'].includes(ui.metric)) why = `<p class="note">No official countrywide apartment price exists, so this is calculated: Yerevan's districts (weighted by their number of apartments) and the towns in each marz, combined by each marz's apartment sales.</p>`;
+  else if (kind === 'armenia' && !keys.length) why = `<p class="note">${esc(m.label)} is published for ${esc(m.level.replace(/ · /g, ', ').replace('district', 'Yerevan districts').replace('town', 'towns').replace('zone', 'zones'))}, not for the whole country. Pick ${m.level.includes('marz') ? 'Marz' : 'District or Town'} above to see it.</p>`;
   else if (marz) why = `<p class="note">Published only by marz, so this is ${esc(D.marzes[mid].en)}${mid === 'yerevan' ? ' as a whole' : ' marz'}.</p>`;
   else if (!keys.length && kind === 'marz' && m.level !== 'marz') why = `<p class="note">${esc(m.label)} is published for Yerevan districts and towns, not for whole marzes. ${mid === 'yerevan' ? 'See the districts below.' : 'See the towns below.'}</p>`;
   else if (!keys.length && kind === 'town' && ['deals', 'sales'].includes(ui.metric)) why = `<p class="note">Transactions are published by marz, not by town. Open ${esc(D.marzes[mid].en)} to see them.</p>`;
   let h = `<div class="metric-head"><label class="dp-switch" title="Switch to another data point"><span>${esc(m.label)}${m.money ? ` (${ui.cur})` : ''}</span><span class="sw">⇅ Switch</span><select id="mPick" aria-label="Switch data point">${metricOptions(ui.metric)}</select></label>
       <div class="mnow"><b>${last ? esc(fmt(s[last])) : '–'}</b><span>${esc(when)}</span></div></div>
-    <div class="chart-ctrl"><span class="note" style="margin:0">${m.yearly ? 'One value per year' : m.rel === 'quarter' ? 'By quarter' : 'By month'}</span>${keys.length > 1 ? rangeButtons() : ''}</div>
-    ${keys.length > 1 ? chart(rangeFilter(s), fmt, !!bars, true) : `<div class="chart-empty">${last ? `<b>${esc(fmt(s[last]))}</b><span>Only one value so far, so there is no history to chart yet.</span>` : `<span>No ${esc(m.label.toLowerCase())} for this place.</span>`}</div>`}
+    <div class="chart-ctrl"><span class="note" style="margin:0">${m.yearly ? 'One value per year' : m.rel === 'quarter' ? 'By quarter' : 'By month'}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${keys.length > 1 ? (pair ? viewButtons() : '') + rangeButtons() : ''}</span></div>
+    ${keys.length > 1 ? chart(rangeFilter(s), fmt, !!bars, true, rf(est), extra && { ...extra, s: rf(extra.s), est: rf(extra.est) }) + (pair && (ui.rview || 'both') !== 'nominal' ? realNote() : '') : `<div class="chart-empty">${last ? `<b>${esc(fmt(s[last]))}</b><span>Only one value so far, so there is no history to chart yet.</span>` : `<span>No ${esc(m.label.toLowerCase())} for this place.</span>`}</div>`}
     ${why}`;
   if (m.money && ui.cur === 'USD' && !m.yearly && last) h += `<p class="note">USD uses the Central Bank's average rate for each month (${usdRate(last)?.toFixed(2)} ֏ per $1 in ${monthLabel(last)}). The dram has moved against the dollar, so changes in USD can differ from changes in drams.</p>`;
   if (kind === 'town' && !m.yearly && !m.nat && !area) h += `<p class="note">Town prices come from fewer sales than Yerevan districts, so month-to-month moves can be noisy.</p>`;
   // At a glance: click a tile to chart that data point (and color the map by it)
-  const tiles = kind === 'armenia' ? ['rppi_chg', 'rppi_h', 'rate_amd', 'rate_usd', 'sales', 'house_sales', 'apt_sales', 'wage', 'poverty', 'population', 'space', 'built']
+  const tiles = kind === 'armenia' ? ['price', 'typical', 'chg12', 'house_chg', 'mtg_pmt', 'ptoi', 'rate_usd', 'sales', 'wage', 'poverty', 'population', 'built']
     : kind === 'marz' ? ['house_sales', 'apt_sales', 'sales', 'deals', 'wage', 'poverty', 'space', 'built']
-    : ['price', 'typical', 'mtg_pmt', 'chg12', 'ptoi', 'wage', 'poverty', kind === 'district' ? 'rppi_chg' : 'house_sales'];
+    : ['price', 'typical', 'mtg_pmt', 'chg12', 'ptoi', 'wage', 'poverty', kind === 'district' ? 'sales' : 'house_sales'];
   h += `<h4 class="snap-h">At a glance</h4><div class="kpis">${tiles.map(t => {
     const r = seriesFor(kind, id, t), k = lastKey(r.s), v = k ? r.s[k] : null;
     return `<button type="button" class="kpi ${t === ui.metric ? 'on' : ''}" data-metric="${t}"><span>${esc(M[t].label)}${r.marz ? ` <small>(${esc(D.marzes[mid].en)})</small>` : ''}</span><b class="${M[t].pct ? chgCls(v) : ''}">${esc(fmtValue(v, t))}</b><small>${k ? esc(M[t].yearly ? k.slice(0, 4) : monthLabel(k)) : ''}</small></button>`;
@@ -1092,7 +1180,10 @@ function renderDetail() {
       const c = v.ly ? (v.price / v.ly - 1) * 100 : null;
       return `<tr data-zone="${z}" class="${z === ui.zone ? 'on' : ''}"><td><span class="zchip">${z}</span> Zone ${z}</td><td>${fmtMoney(toCur(v.price, p.zones.month), ui.cur)}</td><td class="${chgCls(c)}">${fmtPct(c)}</td></tr>`;
     }).join('')}</table>
-    <h4 class="snap-h">${esc(p.en.split(' (')[0])} – Zone ${ui.zone}: price per m² (${ui.cur})</h4>${chart(rangeFilter(seriesIn(p.zone_prices?.[ui.zone])), v => fmtMoney(v, ui.cur), false, true)}
+    <h4 class="snap-h">${esc(p.en.split(' (')[0])} – Zone ${ui.zone}: price per m² (${ui.cur})</h4>${(() => { const zs0 = seriesFor('district', id, 'price', ui.zone), r = realAvailable(), view = r ? (ui.rview || 'both') : 'nominal', f = o => o && rangeFilter(o);
+      const zs = view === 'real' ? { s: deflate(zs0.s), est: zs0.est && deflate(zs0.est) } : zs0;
+      const ex = view === 'both' ? { s: f(deflate(zs.s)), est: f(zs.est && deflate(zs.est)), mainLabel: 'As sold', label: `In today's ${ui.cur === 'USD' ? 'dollars' : 'drams'}` } : null;
+      return chart(f(zs.s), v => fmtMoney(v, ui.cur), false, true, f(zs.est), ex) + (view !== 'nominal' ? realNote() : ''); })()}
     <p class="note">Yerevan is split into valuation zones set by the government in 2020 (decision N 1023-N): zone 1 is the most central, higher numbers are further out. Click a zone to see its history. Pick Zone at the top of the map to see them drawn (outlines traced from the official map, so approximate).</p>`;
   }
   if (kind === 'marz' && id !== 'yerevan') {
@@ -1111,6 +1202,7 @@ function renderDetail() {
   h += sourceNote();
   $('#dBody').innerHTML = h;
   wireCharts();
+  fitCharts(renderDetail);
 }
 // Yerevan's valuation zones across the whole city: the same zone number is a similar location tier in any district
 function zoneOverview() {
@@ -1142,9 +1234,6 @@ const NAT = {
   sales: { label: 'Property sales (month)', bars: true, note: 'All property sales registered with the Cadastre, whole country.' },
   deals: { label: 'Property transactions (month)', bars: true, note: 'All registered transactions (sales, gifts, mortgages, leases…), whole country.' },
   house_sales: { label: 'House sales (year)', bars: true, yearly: true, note: 'Private houses sold in the year, whole country (Armstat).' },
-  rppi_all: { label: 'Home price index (1-year change)', quarterly: true, note: 'Central Bank of Armenia residential property price index, all homes: change from the same quarter a year earlier, adjusted for size, floor, zone and other features.' },
-  rppi_yerevan: { label: 'Apartment price index, Yerevan (1-year change)', quarterly: true, note: 'Central Bank of Armenia index for apartments in Yerevan: change from the same quarter a year earlier.' },
-  rppi_outside: { label: 'Apartment price index, outside Yerevan (1-year change)', quarterly: true, note: 'Central Bank of Armenia index for apartments outside Yerevan: change from the same quarter a year earlier.' },
   rppi_houses: { label: 'House price index (1-year change)', quarterly: true, note: 'Central Bank of Armenia index for individual houses: change from the same quarter a year earlier. Experimental, so it may be revised.' },
 };
 // Every Armenia-overview data point is also in the sidebar ("Economy and lending (nationwide)"); the three
@@ -1178,7 +1267,7 @@ function natSeries(k) {
     case 'sales': return n.sales || {};
     case 'deals': return n.deals || {};
     case 'house_sales': return yearly(n.house_sales);
-    case 'rppi_all': case 'rppi_yerevan': case 'rppi_outside': case 'rppi_houses': return (n.rppi?.yoy || {})[k.slice(5)] || {};
+    case 'rppi_houses': return (n.rppi?.yoy || {})[k.slice(5)] || {};
   }
   return {};
 }
@@ -1211,6 +1300,7 @@ function renderNational() {
   h += sourceNote();
   $('#dBody').innerHTML = h;
   wireCharts();
+  fitCharts(renderDetail);
 }
 function sourceNote() {
   const gaps = D.months_unreadable?.length ? ` Some monthly reports could not be read automatically (${D.months_unreadable.length} months), so some stretches of the price charts are gaps.` : '';
@@ -1231,6 +1321,8 @@ document.addEventListener('click', e => {
 $('#dBody').addEventListener('click', e => {
   const mt = e.target.closest('[data-metric]'); if (mt) { setMetric(mt.dataset.metric); return; }
   const nt = e.target.closest('[data-nat]'); if (nt) { ui.nat = nt.dataset.nat; renderDetail(); return; }
+  const rl = e.target.closest('[data-real]'); if (rl) { ui.real = rl.dataset.real === '1'; saveState(); renderDetail(); return; }
+  const rv = e.target.closest('[data-rview]'); if (rv) { ui.rview = rv.dataset.rview; saveState(); renderDetail(); return; }
   const rg = e.target.closest('[data-range]'); if (rg) { ui.range = rg.dataset.range; renderDetail(); return; }
   const zr = e.target.closest('[data-zone]'); if (zr) { ui.zone = zr.dataset.zone; renderDetail(); return; }
   const t = e.target.closest('[data-town]'), d = e.target.closest('[data-dist]');
@@ -1252,16 +1344,22 @@ function shortNum(text, v) {
 }
 let chartN = 0;
 const CHARTS = {};
-function chart(series, fmt, bars = false, big = false) {
+function chart(series, fmt, bars = false, big = false, est = null, extra = null) {
   const pts = Object.entries(series || {}).filter(([, v]) => v != null && !isNaN(v)).sort();
+  // estimates for gaps (dashed): only the months the real series doesn't have, plus the real months they join
+  const ePts = Object.entries(est || {}).filter(([, v]) => v != null && !isNaN(v)).sort();
   if (pts.length < 2) return '<p class="note">Not enough history yet.</p>';
+  // a second line on the same chart (the same prices in today's money): extra = { s, est, label, mainLabel }
+  const okPts = o => Object.entries(o || {}).filter(([, v]) => v != null && !isNaN(v)).sort();
+  const xS = extra ? okPts(extra.s) : [], xE = extra ? okPts(extra.est) : [];
   const id = 'ch' + (++chartN);
   // drawn at the panel's real width (not stretched), so the text stays the size it says on every screen
   const phone = innerWidth <= 760, pw = ($('#dBody')?.clientWidth || 0) - (phone ? 28 : 36);
   const W = Math.max(260, Math.round(pw > 0 ? pw : (big ? 640 : 340))), H = big ? (phone ? 180 : 250) : 160, L0 = big ? 62 : 6, R0 = 10, T0 = 14, B0 = 26;
   const toIdx = ym => +ym.slice(0, 4) * 12 + +ym.slice(5, 7) - 1;
-  const x0 = toIdx(pts[0][0]), x1 = toIdx(pts[pts.length - 1][0]);
-  const vals = pts.map(p => p[1]);
+  const allPts = ePts.length || xS.length ? [...pts, ...ePts, ...xS, ...xE].sort() : pts;
+  const x0 = toIdx(allPts[0][0]), x1 = toIdx(allPts[allPts.length - 1][0]);
+  const vals = allPts.map(p => p[1]);
   let lo = Math.min(...vals), hi = Math.max(...vals);
   if (bars) lo = Math.min(0, lo);
   const pad = (hi - lo) * .08 || Math.abs(hi) * .05 || 1; if (!bars) lo -= pad; hi += pad;
@@ -1281,6 +1379,18 @@ function chart(series, fmt, bars = false, big = false) {
     const lone = pts.filter(([ym], i) => !(i > 0 && toIdx(ym) - toIdx(pts[i - 1][0]) <= gap) && !(i < pts.length - 1 && toIdx(pts[i + 1][0]) - toIdx(ym) <= gap));
     body = `<path d="${d}" fill="none" stroke="#126b60" stroke-width="${big ? 2.4 : 2}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` +
       lone.map(([ym, v]) => `<circle cx="${X(ym).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2.8" fill="#126b60"/>`).join('');
+    if (ePts.length) {
+      let e = '', pe = null;
+      for (const [ym, v] of ePts) { e += (pe != null && toIdx(ym) - pe <= 1 ? 'L' : 'M') + X(ym).toFixed(1) + ' ' + Y(v).toFixed(1); pe = toIdx(ym); }
+      body = `<path d="${e}" fill="none" stroke="#126b60" stroke-width="${big ? 2 : 1.6}" stroke-dasharray="5 4" opacity=".8"/>` + body;
+    }
+    if (xS.length) {   // the today's-money line, in orange, with its own dashed estimate
+      let d2 = '', p2 = null, e2 = '', q2 = null;
+      for (const [ym, v] of xS) { d2 += (p2 != null && toIdx(ym) - p2 <= gap ? 'L' : 'M') + X(ym).toFixed(1) + ' ' + Y(v).toFixed(1); p2 = toIdx(ym); }
+      for (const [ym, v] of xE) { e2 += (q2 != null && toIdx(ym) - q2 <= 1 ? 'L' : 'M') + X(ym).toFixed(1) + ' ' + Y(v).toFixed(1); q2 = toIdx(ym); }
+      body += (e2 ? `<path d="${e2}" fill="none" stroke="#e76f51" stroke-width="${big ? 2 : 1.6}" stroke-dasharray="5 4" opacity=".8"/>` : '') +
+        `<path d="${d2}" fill="none" stroke="#e76f51" stroke-width="${big ? 2.4 : 2}" stroke-linejoin="round"/>`;
+    }
     if (lo < 0 && hi > 0) body = `<line x1="${L0}" x2="${W - R0}" y1="${Y(0)}" y2="${Y(0)}" stroke="#9ca3af"/>` + body;
   }
   // gridlines and labels: 4 levels on the left, years along the bottom
@@ -1298,10 +1408,23 @@ function chart(series, fmt, bars = false, big = false) {
       <text x="${L0 + 2}" y="${T0 + 2}" font-size="12" fill="#4b5563">${esc(fmt(hi))}</text>`;
   }
   const yearlyPts = pts.every(([k]) => k.endsWith('-12'));
-  CHARTS[id] = { pts, fmt, X, Y, W, yearlyPts };
+  const real = new Set(pts.map(p => p[0]));
+  const hoverPts = ePts.length ? [...pts, ...ePts.filter(p => !real.has(p[0])).map(p => [p[0], p[1], 'est'])].sort() : pts;
+  const xmap = xS.length ? Object.fromEntries([...xE, ...xS]) : null;
+  CHARTS[id] = { pts: hoverPts, fmt, X, Y, W, yearlyPts, xmap, xlabel: extra?.label, mlabel: extra?.mainLabel };
+  const legend = xS.length ? `<div class="chart-legend"><span><i style="background:#126b60"></i>${esc(extra.mainLabel)}</span><span><i style="background:#e76f51"></i>${esc(extra.label)}</span></div>` : '';
   const label = ym => yearlyPts ? ym.slice(0, 4) : monthLabel(ym);
-  return `<svg class="chart${big ? ' big' : ''}" id="${id}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Chart">${axis}${body}<line class="cur" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="#9ca3af" stroke-dasharray="2 2" visibility="hidden"/><circle class="dot" r="4" fill="#126b60" stroke="#fff" stroke-width="1.5" visibility="hidden"/></svg>
-    <div class="chart-tip" id="${id}t">Latest: <b>${esc(label(pts[pts.length - 1][0]))}</b> · ${esc(fmt(pts[pts.length - 1][1]))} <span style="opacity:.7">· move over the chart to read any point</span></div>`;
+  return legend + `<svg class="chart${big ? ' big' : ''}" id="${id}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Chart">${axis}${body}<line class="cur" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="#9ca3af" stroke-dasharray="2 2" visibility="hidden"/><circle class="dot" r="4" fill="#126b60" stroke="#fff" stroke-width="1.5" visibility="hidden"/><circle class="dot2" r="4" fill="#e76f51" stroke="#fff" stroke-width="1.5" visibility="hidden"/></svg>
+    <div class="chart-tip" id="${id}t">Latest: <b>${esc(label(pts[pts.length - 1][0]))}</b> · ${esc(fmt(pts[pts.length - 1][1]))}${xS.length ? ' (the two lines meet today)' : ''} <span style="opacity:.7">· move over the chart to read any point</span></div>${ePts.length ? '<p class="note" style="margin:2px 0 0">Dashed line: estimated from the Central Bank of Armenia price index where the Cadastre\'s monthly reports are missing. It joins the real prices on both sides.</p>' : ''}`;
+}
+// Charts are drawn at the panel's width; if the panel wasn't laid out yet (it was just opening), draw once more
+// at its real width so nothing gets squashed
+let refitting = false;
+function fitCharts(redraw) {
+  const sv = $('#dBody svg.chart');
+  if (refitting || !sv) return;
+  const real = sv.getBoundingClientRect().width;
+  if (real > 0 && Math.abs(real - +sv.getAttribute('width')) > 12) { refitting = true; try { redraw(); } finally { refitting = false; } }
 }
 function wireCharts() {
   for (const [id, c] of Object.entries(CHARTS)) {
@@ -1316,7 +1439,9 @@ function wireCharts() {
       const cur = svg.querySelector('.cur'), dot = svg.querySelector('.dot');
       cur.setAttribute('x1', c.X(best[0])); cur.setAttribute('x2', c.X(best[0])); cur.setAttribute('visibility', 'visible');
       dot.setAttribute('cx', c.X(best[0])); dot.setAttribute('cy', c.Y(best[1])); dot.setAttribute('visibility', 'visible');
-      tip.innerHTML = `<b>${esc(c.yearlyPts ? best[0].slice(0, 4) : monthLabel(best[0]))}</b> · ${esc(c.fmt(best[1]))}`;
+      const xv = c.xmap ? c.xmap[best[0]] : null, dot2 = svg.querySelector('.dot2');
+      if (dot2) { if (xv != null) { dot2.setAttribute('cx', c.X(best[0])); dot2.setAttribute('cy', c.Y(xv)); dot2.setAttribute('visibility', 'visible'); } else dot2.setAttribute('visibility', 'hidden'); }
+      tip.innerHTML = `<b>${esc(c.yearlyPts ? best[0].slice(0, 4) : monthLabel(best[0]))}</b> · ${c.xmap ? esc(c.mlabel) + ': ' : ''}${esc(c.fmt(best[1]))}${xv != null ? ' · <span style="color:#c2410c">' + esc(c.xlabel) + ': ' + esc(c.fmt(xv)) + '</span>' + (Math.abs(xv - best[1]) > Math.abs(best[1]) * .001 ? ' · <b>difference: ' + (xv > best[1] ? '+' : '−') + esc(c.fmt(Math.abs(xv - best[1]))) + ' (' + (xv > best[1] ? '+' : '−') + Math.abs((xv / best[1] - 1) * 100).toFixed(0) + '%)</b>' : '') : ''}${best[2] === 'est' ? ' <span style="opacity:.75">(estimate)</span>' : ''}`;
     };
     svg.addEventListener('mousemove', show); svg.addEventListener('touchmove', show, { passive: true });
     delete CHARTS[id];
@@ -1374,10 +1499,12 @@ function renderCompare() {
   const k = cmpMetric, m = M[k], fmt = v => fmtValue(v, k);
   const toIdx = ym => +ym.slice(0, 4) * 12 + +ym.slice(5, 7) - 1;
   const lines = cmpList.map((p, i) => {
-    const s = cmpSeries(p, k).s || {};
-    return { name: cmpName(p), color: CMP_COLORS[i], pts: Object.entries(s).filter(([, v]) => v != null && !isNaN(v)).sort().map(([ym, v]) => [toIdx(ym), v, ym]) };
+    const r = cmpSeries(p, k), rr = realOn(k), s = (rr ? deflate(r.s) : r.s) || {};
+    if (rr && r.est) r.est = deflate(r.est);
+    const toPts = o => Object.entries(o || {}).filter(([, v]) => v != null && !isNaN(v)).sort().map(([ym, v]) => [toIdx(ym), v, ym]);
+    return { name: cmpName(p), color: CMP_COLORS[i], pts: toPts(s), est: toPts(r.est) };
   });
-  const all = lines.flatMap(l => l.pts);
+  const all = lines.flatMap(l => [...l.pts, ...l.est]);
   let chartH = '<p class="note">No history for this data point in these places.</p>', hv = null;
   if (all.length > 1) {
     const W = Math.max(320, Math.round(body.clientWidth - 32)), H = innerWidth <= 760 ? 260 : 340, L0 = 70, R0 = 18, T0 = 16, B0 = 30;
@@ -1397,14 +1524,17 @@ function renderCompare() {
     chartH = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="cmp-chart" role="img" aria-label="${esc(m.label)} compared">
       ${ticks.map(t => `<line x1="${L0}" x2="${W - R0}" y1="${Y(t).toFixed(1)}" y2="${Y(t).toFixed(1)}" stroke="${Math.abs(t) < step / 1e6 ? '#9ca3af' : '#e5e7eb'}"/><text x="${L0 - 8}" y="${(Y(t) + 4).toFixed(1)}" text-anchor="end" font-size="12" fill="#4b5563">${esc(shortNum(fmt(t), t))}</text>`).join('')}
       ${Array.from({ length: y1 - y0 + 1 }, (_, i) => y0 + i).filter((yy, i) => i % every === 0).map(yy => `<text x="${X(Math.max(x0, yy * 12)).toFixed(1)}" y="${H - 9}" text-anchor="middle" font-size="12" fill="#4b5563">${yy}</text>`).join('')}
+      ${lines.map(l => l.est.length ? `<path d="${l.est.map((p, i) => `${i && p[0] - l.est[i - 1][0] <= 1 ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('')}" fill="none" stroke="${l.color}" stroke-width="2" stroke-dasharray="5 4" opacity=".8"/>` : '').join('')}
       ${lines.map(l => l.pts.length ? `<path d="${path(l)}" fill="none" stroke="${l.color}" stroke-width="2.6" stroke-linejoin="round"/>${l.pts.length < 40 ? l.pts.map(p => `<circle cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="3" fill="${l.color}"/>`).join('') : ''}` : '').join('')}
       <line class="xh" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="#6b7280" stroke-dasharray="4 4" visibility="hidden"/><g class="xd"></g>
       <rect x="${L0}" y="${T0}" width="${W - L0 - R0}" height="${H - T0 - B0}" fill="transparent"/></svg>`;
   }
-  const rows = ['price', 'chg12', 'typical', 'mtg_pmt', 'ptoi', 'rppi_chg', 'sales', 'wage', 'poverty'];
+  const rows = ['price', 'chg12', 'typical', 'mtg_pmt', 'ptoi', 'sales', 'wage', 'poverty'];
   body.innerHTML = `<div class="cmp-legend">${cmpList.map((p, i) => `<span class="cmp-chip" style="--c:${CMP_COLORS[i]}"><i></i>${esc(cmpName(p))}<button type="button" data-cmp-rm="${i}" aria-label="Remove">✕</button></span>`).join('')}</div>
-    <div class="cmp-wrap">${chartH}<div class="cmp-tip"></div></div>
+    ${realButtons(k) ? `<div style="display:flex;justify-content:flex-end;margin-bottom:6px">${realButtons(k)}</div>` : ''}
+    <div class="cmp-wrap">${chartH}<div class="cmp-tip"></div></div>${realOn(k) ? realNote() : ''}
     ${m.money && ui.cur === 'USD' ? '<p class="note">In US dollars at each month\'s Central Bank rate.</p>' : ''}
+    ${lines.some(l => l.est.length) ? '<p class="note">Dashed lines: estimated from the Central Bank of Armenia price index where the Cadastre\'s monthly reports are missing.</p>' : ''}
     <table class="cmp-table"><thead><tr><th>Latest</th>${cmpList.map((p, i) => `<th style="color:${CMP_COLORS[i]}">${esc(cmpName(p))}</th>`).join('')}</tr></thead>
     <tbody>${rows.map(r => `<tr><td>${esc(M[r].label)}${M[r].money ? ` (${ui.cur})` : ''}</td>${cmpList.map(p => `<td>${esc(fmtValue(cmpValue(p, r), r))}</td>`).join('')}</tr>`).join('')}</tbody></table>
     <p class="note">Data published only by marz (wages, poverty) shows the place's marz; Yerevan districts and zones show Yerevan. The price index is published for 5 areas of Yerevan and for the rest of the country.</p>`;
@@ -1431,7 +1561,10 @@ function renderCompare() {
   svg.addEventListener('mousemove', move); svg.addEventListener('touchmove', move, { passive: true });
   svg.addEventListener('mouseleave', () => { tipEl.style.display = 'none'; xh.setAttribute('visibility', 'hidden'); xd.innerHTML = ''; });
 }
-$('#cmpBody').addEventListener('click', e => { const b = e.target.closest('[data-cmp-rm]'); if (b) { cmpList.splice(+b.dataset.cmpRm, 1); saveCmp(); renderCompare(); } });
+$('#cmpBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-cmp-rm]'); if (b) { cmpList.splice(+b.dataset.cmpRm, 1); saveCmp(); renderCompare(); return; }
+  const rl = e.target.closest('[data-real]'); if (rl) { ui.real = rl.dataset.real === '1'; saveState(); renderCompare(); refreshDetail(); }
+});
 // type to add a place (Armenia, marzes, districts, towns and Yerevan's zones)
 function cmpCandidates() {
   const out = [{ kind: 'armenia', id: 'armenia', en: 'Armenia', hy: 'Հայաստան', sub: 'Whole country' }, ...allPlaces()];
@@ -1464,7 +1597,7 @@ function addCmpHit(h) {
 
 // ---------- remembered view (this browser only) ----------
 function saveState() {
-  try { localStorage.setItem('oha-armenia', JSON.stringify({ metric: ui.metric, cur: ui.cur, open: [...ui.open], level: ui.level })); } catch (e) { }
+  try { localStorage.setItem('oha-armenia', JSON.stringify({ metric: ui.metric, cur: ui.cur, open: [...ui.open], level: ui.level, real: !!ui.real, rview: ui.rview || 'both' })); } catch (e) { }
   const q = new URLSearchParams();
   if (ui.metric !== 'price') q.set('m', ui.metric);
   if (levelsFor(ui.metric).length > 1 && curLevel() !== levelsFor(ui.metric)[0]) q.set('l', curLevel());
@@ -1474,7 +1607,7 @@ function saveState() {
 }
 function loadState() {
   const LV = ['armenia', 'marz', 'district', 'town', 'zone'];
-  try { const s = JSON.parse(localStorage.getItem('oha-armenia') || '{}'); if (M[s.metric]) ui.metric = s.metric; if (s.metric === 'zone_price') { ui.metric = 'price'; ui.level = 'zone'; } if (LV.includes(s.level)) ui.level = s.level; if (s.cur === 'USD') ui.cur = 'USD'; if (Array.isArray(s.open)) ui.open = new Set(s.open); } catch (e) { }
+  try { const s = JSON.parse(localStorage.getItem('oha-armenia') || '{}'); if (M[s.metric]) ui.metric = s.metric; if (s.metric === 'zone_price') { ui.metric = 'price'; ui.level = 'zone'; } if (LV.includes(s.level)) ui.level = s.level; if (s.cur === 'USD') ui.cur = 'USD'; if (s.real) ui.real = true; if (['both', 'nominal', 'real'].includes(s.rview)) ui.rview = s.rview; if (Array.isArray(s.open)) ui.open = new Set(s.open); } catch (e) { }
   const q = new URLSearchParams(location.search);
   if (M[q.get('m')]) ui.metric = q.get('m');
   if (q.get('m') === 'zone_price') { ui.metric = 'price'; ui.level = 'zone'; }   // old links to the zone map
