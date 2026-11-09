@@ -147,9 +147,12 @@
   .legend .na i.nos { background: repeating-linear-gradient(45deg, #e5e7eb 0 3px, #fff 3px 6px); border: 1px solid #d1d5db; }
   /* calmer, grey basemap under the zone colors */
   #map.zone-mode .leaflet-tile-pane { filter: grayscale(1) contrast(.9) brightness(1.06); opacity: .7; }
-  .plabel.zl .in { font-size: 12px; }
-  .plabel.zl .in b { font-size: 10px; font-weight: 600; color: #374151; }
-  .plabel.dl .in { font: 700 11px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: #1f2937; }
+  /* zone labels: dark text on a white tag, readable on any color */
+  .plabel.zl .in { font-size: 14px; line-height: 1.15; color: #111827; text-shadow: none; background: rgba(255,255,255,.92); border-radius: 7px; padding: 3px 7px 4px; box-shadow: 0 1px 4px rgba(0,0,0,.22); }
+  .plabel.zl .in b { font-size: 11.5px; font-weight: 600; color: #374151; }
+  .plabel.zl .in span { font-weight: 800; }
+  .plabel.dl .in { font: 800 12.5px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: #111827; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff, 0 0 1px #fff; }
+  @media (max-width: 760px) { .plabel.zl .in { font-size: 13px; } .plabel.zl .in b { font-size: 10.5px; } .plabel.dl .in { font-size: 11px; } }
 
   /* detail panel: like the US map, it opens on the left next to the data points and the map moves to its right */
   .stage { --pw: min(680px, 58%); }
@@ -618,7 +621,8 @@ function restyle() {
   distLayer.setStyle(f => {
     const id = f.properties.id, sel = ui.sel && ui.sel.kind === 'district' && ui.sel.id === id;
     if (marzMode) return { fillOpacity: 0, opacity: 0, interactive: false };
-    if (zoneMode) return { fillOpacity: 0, color: sel ? '#111827' : '#374151', weight: sel ? 3 : 1.3, opacity: sel ? 1 : .85, dashArray: null };   // district outlines over the zones
+    // district outlines over the zones: thin and grey, so a selected zone's own outline is the one that stands out
+    if (zoneMode) return { fillOpacity: 0, color: '#4b5563', weight: 1.2, opacity: .7, dashArray: null };
     if (townMode) return { fillColor: '#ffffff', fillOpacity: .3, color: sel ? '#0b4a43' : '#9ca3af', weight: sel ? 3 : 1, opacity: 1 };   // Yerevan in grey: towns are the colored ones
     const v = valueOf('district', id);
     return { fillColor: v == null ? '#e5e7eb' : scale.color(v), fillOpacity: .82, color: sel ? '#0b4a43' : '#ffffff', weight: sel ? 3 : 1, opacity: 1 };
@@ -629,6 +633,8 @@ function restyle() {
     if (!zoneMode) ui.zband = null;
     distHalo.setStyle({ opacity: zoneMode ? .9 : 0, color: '#ffffff', weight: 4.5, fill: false });
     zoneLayer.setStyle(zoneStyle);
+    // the selected zone's pieces on top, so their outline isn't hidden under neighbors or district lines
+    if (zoneMode && ui.zone && ui.sel?.kind === 'district') zoneLayer.eachLayer(l => { const p = l.feature.properties; if (p.district === ui.sel.id && String(p.zone) === ui.zone) l.bringToFront(); });
     zoneLayer.eachLayer(l => { const el = l.getElement && l.getElement(); if (el) el.style.pointerEvents = zoneMode ? '' : 'none'; });
   }
   townLayer.eachLayer(c => {
@@ -647,7 +653,7 @@ function zoneStyle(f) {
   const v = zoneValue(f.properties), sel = ui.sel && ui.sel.kind === 'district' && ui.sel.id === f.properties.district && ui.zone === String(f.properties.zone);
   const off = ui.zband != null && !!scale.bandOf && (v == null || scale.bandOf(v) !== ui.zband);
   if (v == null) return { fillColor: '#9ca3af', fillOpacity: off ? .04 : .12, color: '#ffffff', weight: .5, opacity: .6 };
-  return { fillColor: scale.color(v), fillOpacity: off ? .1 : .9, color: sel ? '#111827' : 'rgba(255,255,255,.8)', weight: sel ? 2.5 : .5, opacity: 1 };
+  return { fillColor: scale.color(v), fillOpacity: off ? .1 : .9, color: sel ? '#111827' : 'rgba(255,255,255,.8)', weight: sel ? 3.5 : .5, opacity: 1 };
 }
 // Name and value written on the map, like the US map: the biggest areas first, and a label is skipped when it
 // doesn't fit inside its area or would overlap one already placed. Towns get theirs beside the dot.
@@ -686,8 +692,8 @@ function updateLabels() {
       const b = l._bb || (l._bb = l.getBounds());
       if (!view.intersects(b)) return;
       const name = placeName('district', l.feature.properties.id).split(' (')[0];
-      const pt = map.latLngToContainerPoint(b.getCenter()), tw = name.length * 8 + 8;
-      const box = [pt.x - tw / 2, pt.y - 8, pt.x + tw / 2, pt.y + 8];
+      const pt = map.latLngToContainerPoint(b.getCenter()), tw = name.length * 10 + 8;
+      const box = [pt.x - tw / 2, pt.y - 9, pt.x + tw / 2, pt.y + 9];
       if (!fits(box)) return;
       placed.push(box);
       L.marker(b.getCenter(), { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: 'plabel dl', iconSize: [0, 0], html: `<div class="in">${esc(name)}</div>` }) }).addTo(labelLayer);
@@ -710,8 +716,8 @@ function updateLabels() {
     if (c.kind === 'zone' && zv == null) continue;
     const name = c.kind === 'zone' ? zoneName(c.props) : placeName(c.kind, c.id).split(' (')[0];
     const val = labelValue(c.kind === 'zone' ? zv : valueOf(c.kind, c.id));
-    const tw = Math.max(name.length * (c.kind === 'zone' ? 5.6 : 6.4), val.length * 6.8) + 6, th = 28;
-    if (tw > c.w * 1.15 || th > c.h * 1.2) continue;
+    const zl = c.kind === 'zone', tw = Math.max(name.length * (zl ? 6.4 : 6.4), val.length * (zl ? 8.6 : 6.8)) + (zl ? 18 : 6), th = zl ? 38 : 28;
+    if (tw > c.w * (zl ? 1.35 : 1.15) || th > c.h * (zl ? 1.35 : 1.2)) continue;
     const box = [c.pt.x - tw / 2, c.pt.y - th / 2, c.pt.x + tw / 2, c.pt.y + th / 2];
     if (!fits(box)) continue;
     placed.push(box);
