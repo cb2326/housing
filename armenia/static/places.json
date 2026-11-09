@@ -1,0 +1,551 @@
+{
+ "districts": [
+  {
+   "id": "ajapnyak",
+   "hy": "Աջափնյակ",
+   "en": "Ajapnyak",
+   "osm_id": 13404299
+  },
+  {
+   "id": "avan",
+   "hy": "Ավան",
+   "en": "Avan",
+   "osm_id": 13404250
+  },
+  {
+   "id": "arabkir",
+   "hy": "Արաբկիր",
+   "en": "Arabkir",
+   "osm_id": 13404297
+  },
+  {
+   "id": "davtashen",
+   "hy": "Դավթաշեն",
+   "en": "Davtashen",
+   "osm_id": 13404298
+  },
+  {
+   "id": "erebuni",
+   "hy": "Էրեբունի",
+   "en": "Erebuni",
+   "osm_id": 13404216
+  },
+  {
+   "id": "kentron",
+   "hy": "Կենտրոն",
+   "en": "Kentron",
+   "osm_id": 13404218
+  },
+  {
+   "id": "malatia-sebastia",
+   "hy": "Մալաթիա-Սեբաստիա",
+   "en": "Malatia-Sebastia",
+   "osm_id": 13404219
+  },
+  {
+   "id": "nor-nork",
+   "hy": "Նոր Նորք",
+   "en": "Nor Nork",
+   "osm_id": 13404220
+  },
+  {
+   "id": "nork-marash",
+   "hy": "Նորք-Մարաշ",
+   "en": "Nork-Marash",
+   "osm_id": 13404217
+  },
+  {
+   "id": "nubarashen",
+   "hy": "Նուբարաշեն",
+   "en": "Nubarashen",
+   "osm_id": 13404214
+  },
+  {
+   "id": "shengavit",
+   "hy": "Շենգավիթ",
+   "en": "Shengavit",
+   "osm_id": 13404215
+  },
+  {
+   "id": "kanaker-zeytun",
+   "hy": "Քանաքեռ-Զեյթուն",
+   "en": "Kanaker-Zeytun",
+   "osm_id": 13404296
+  }
+ ],
+ "marzes": [
+  {
+   "id": "yerevan",
+   "hy": "Երևան",
+   "en": "Yerevan",
+   "osm_id": 364087
+  },
+  {
+   "id": "aragatsotn",
+   "hy": "Արագածոտն",
+   "en": "Aragatsotn",
+   "osm_id": 3917110
+  },
+  {
+   "id": "ararat",
+   "hy": "Արարատ",
+   "en": "Ararat",
+   "osm_id": 364083
+  },
+  {
+   "id": "armavir",
+   "hy": "Արմավիր",
+   "en": "Armavir",
+   "osm_id": 364086
+  },
+  {
+   "id": "gegharkunik",
+   "hy": "Գեղարքունիք",
+   "en": "Gegharkunik",
+   "osm_id": 364080
+  },
+  {
+   "id": "lori",
+   "hy": "Լոռի",
+   "en": "Lori",
+   "osm_id": 364078
+  },
+  {
+   "id": "kotayk",
+   "hy": "Կոտայք",
+   "en": "Kotayk",
+   "osm_id": 364084
+  },
+  {
+   "id": "shirak",
+   "hy": "Շիրակ",
+   "en": "Shirak",
+   "osm_id": 364077
+  },
+  {
+   "id": "syunik",
+   "hy": "Սյունիք",
+   "en": "Syunik",
+   "osm_id": 364082
+  },
+  {
+   "id": "vayots-dzor",
+   "hy": "Վայոց ձոր",
+   "en": "Vayots Dzor",
+   "osm_id": 364081
+  },
+  {
+   "id": "tavush",
+   "hy": "Տավուշ",
+   "en": "Tavush",
+   "osm_id": 364079
+  }
+ ],
+ "towns": [
+  {
+   "id": "ashtarak",
+   "hy": "Աշտարակ",
+   "en": "Ashtarak",
+   "marz": "aragatsotn",
+   "lat": 40.28868,
+   "lon": 44.36131,
+   "osm_place": "town"
+  },
+  {
+   "id": "aparan",
+   "hy": "Ապարան",
+   "en": "Aparan",
+   "marz": "aragatsotn",
+   "lat": 40.59084,
+   "lon": 44.35708,
+   "osm_place": "town"
+  },
+  {
+   "id": "talin",
+   "hy": "Թալին",
+   "en": "Talin",
+   "marz": "aragatsotn",
+   "lat": 40.38371,
+   "lon": 43.8736,
+   "osm_place": "town"
+  },
+  {
+   "id": "artashat",
+   "hy": "Արտաշատ",
+   "en": "Artashat",
+   "marz": "ararat",
+   "lat": 39.95666,
+   "lon": 44.5471,
+   "osm_place": "town"
+  },
+  {
+   "id": "masis",
+   "hy": "Մասիս",
+   "en": "Masis",
+   "marz": "ararat",
+   "lat": 40.06173,
+   "lon": 44.44279,
+   "osm_place": "town"
+  },
+  {
+   "id": "vedi",
+   "hy": "Վեդի",
+   "en": "Vedi",
+   "marz": "ararat",
+   "lat": 39.91385,
+   "lon": 44.7225,
+   "osm_place": "town"
+  },
+  {
+   "id": "ararat",
+   "hy": "Արարատ",
+   "en": "Ararat",
+   "marz": "ararat",
+   "lat": 39.85533,
+   "lon": 44.69438,
+   "osm_place": "town"
+  },
+  {
+   "id": "vagharshapat",
+   "hy": "Վաղարշապատ",
+   "en": "Vagharshapat (Etchmiadzin)",
+   "marz": "armavir",
+   "lat": 40.16278,
+   "lon": 44.29317,
+   "osm_place": "town"
+  },
+  {
+   "id": "armavir",
+   "hy": "Արմավիր",
+   "en": "Armavir",
+   "marz": "armavir",
+   "lat": 40.15555,
+   "lon": 44.03876,
+   "osm_place": "town"
+  },
+  {
+   "id": "metsamor",
+   "hy": "Մեծամոր",
+   "en": "Metsamor",
+   "marz": "armavir",
+   "lat": 40.14436,
+   "lon": 44.11921,
+   "osm_place": "town"
+  },
+  {
+   "id": "sevan",
+   "hy": "Սևան",
+   "en": "Sevan",
+   "marz": "gegharkunik",
+   "lat": 40.54852,
+   "lon": 44.95724,
+   "osm_place": "town"
+  },
+  {
+   "id": "gavar",
+   "hy": "Գավառ",
+   "en": "Gavar",
+   "marz": "gegharkunik",
+   "lat": 40.3514,
+   "lon": 45.12732,
+   "osm_place": "town"
+  },
+  {
+   "id": "martuni",
+   "hy": "Մարտունի",
+   "en": "Martuni",
+   "marz": "gegharkunik",
+   "lat": 40.13905,
+   "lon": 45.30547,
+   "osm_place": "town"
+  },
+  {
+   "id": "vardenis",
+   "hy": "Վարդենիս",
+   "en": "Vardenis",
+   "marz": "gegharkunik",
+   "lat": 40.18457,
+   "lon": 45.72698,
+   "osm_place": "town"
+  },
+  {
+   "id": "chambarak",
+   "hy": "Ճամբարակ",
+   "en": "Chambarak",
+   "marz": "gegharkunik",
+   "lat": 40.5973,
+   "lon": 45.35495,
+   "osm_place": "town"
+  },
+  {
+   "id": "vanadzor",
+   "hy": "Վանաձոր",
+   "en": "Vanadzor",
+   "marz": "lori",
+   "lat": 40.81124,
+   "lon": 44.48518,
+   "osm_place": "city"
+  },
+  {
+   "id": "stepanavan",
+   "hy": "Ստեփանավան",
+   "en": "Stepanavan",
+   "marz": "lori",
+   "lat": 41.0112,
+   "lon": 44.38451,
+   "osm_place": "town"
+  },
+  {
+   "id": "spitak",
+   "hy": "Սպիտակ",
+   "en": "Spitak",
+   "marz": "lori",
+   "lat": 40.83434,
+   "lon": 44.26477,
+   "osm_place": "town"
+  },
+  {
+   "id": "alaverdi",
+   "hy": "Ալավերդի",
+   "en": "Alaverdi",
+   "marz": "lori",
+   "lat": 41.09814,
+   "lon": 44.64609,
+   "osm_place": "town"
+  },
+  {
+   "id": "tashir",
+   "hy": "Տաշիր",
+   "en": "Tashir",
+   "marz": "lori",
+   "lat": 41.12136,
+   "lon": 44.28417,
+   "osm_place": "town"
+  },
+  {
+   "id": "tumanyan",
+   "hy": "Թումանյան",
+   "en": "Tumanyan",
+   "marz": "lori",
+   "lat": 41.00165,
+   "lon": 44.65087,
+   "osm_place": "town"
+  },
+  {
+   "id": "akhtala",
+   "hy": "Ախթալա",
+   "en": "Akhtala",
+   "marz": "lori",
+   "lat": 41.14816,
+   "lon": 44.7698,
+   "osm_place": "town"
+  },
+  {
+   "id": "abovyan",
+   "hy": "Աբովյան",
+   "en": "Abovyan",
+   "marz": "kotayk",
+   "lat": 40.27148,
+   "lon": 44.6334,
+   "osm_place": "town"
+  },
+  {
+   "id": "nor-hachn",
+   "hy": "Նոր Հաճն",
+   "en": "Nor Hachn",
+   "marz": "kotayk",
+   "lat": 40.30069,
+   "lon": 44.58035,
+   "osm_place": "town"
+  },
+  {
+   "id": "byureghavan",
+   "hy": "Բյուրեղավան",
+   "en": "Byureghavan",
+   "marz": "kotayk",
+   "lat": 40.31279,
+   "lon": 44.59777,
+   "osm_place": "town"
+  },
+  {
+   "id": "yeghvard",
+   "hy": "Եղվարդ",
+   "en": "Yeghvard",
+   "marz": "kotayk",
+   "lat": 40.3214,
+   "lon": 44.48139,
+   "osm_place": "town"
+  },
+  {
+   "id": "hrazdan",
+   "hy": "Հրազդան",
+   "en": "Hrazdan",
+   "marz": "kotayk",
+   "lat": 40.51969,
+   "lon": 44.75007,
+   "osm_place": "town"
+  },
+  {
+   "id": "tsaghkadzor",
+   "hy": "Ծաղկաձոր",
+   "en": "Tsaghkadzor",
+   "marz": "kotayk",
+   "lat": 40.5326,
+   "lon": 44.7203,
+   "osm_place": "town"
+  },
+  {
+   "id": "charentsavan",
+   "hy": "Չարենցավան",
+   "en": "Charentsavan",
+   "marz": "kotayk",
+   "lat": 40.40299,
+   "lon": 44.64693,
+   "osm_place": "town"
+  },
+  {
+   "id": "gyumri",
+   "hy": "Գյումրի",
+   "en": "Gyumri",
+   "marz": "shirak",
+   "lat": 40.78521,
+   "lon": 43.84161,
+   "osm_place": "city"
+  },
+  {
+   "id": "artik",
+   "hy": "Արթիկ",
+   "en": "Artik",
+   "marz": "shirak",
+   "lat": 40.61984,
+   "lon": 43.97079,
+   "osm_place": "town"
+  },
+  {
+   "id": "maralik",
+   "hy": "Մարալիկ",
+   "en": "Maralik",
+   "marz": "shirak",
+   "lat": 40.57965,
+   "lon": 43.86976,
+   "osm_place": "town"
+  },
+  {
+   "id": "goris",
+   "hy": "Գորիս",
+   "en": "Goris",
+   "marz": "syunik",
+   "lat": 39.50524,
+   "lon": 46.34423,
+   "osm_place": "town"
+  },
+  {
+   "id": "kapan",
+   "hy": "Կապան",
+   "en": "Kapan",
+   "marz": "syunik",
+   "lat": 39.20757,
+   "lon": 46.40493,
+   "osm_place": "town"
+  },
+  {
+   "id": "sisian",
+   "hy": "Սիսիան",
+   "en": "Sisian",
+   "marz": "syunik",
+   "lat": 39.52354,
+   "lon": 46.02358,
+   "osm_place": "town"
+  },
+  {
+   "id": "meghri",
+   "hy": "Մեղրի",
+   "en": "Meghri",
+   "marz": "syunik",
+   "lat": 38.9013,
+   "lon": 46.24591,
+   "osm_place": "town"
+  },
+  {
+   "id": "kajaran",
+   "hy": "Քաջարան",
+   "en": "Kajaran",
+   "marz": "syunik",
+   "lat": 39.15101,
+   "lon": 46.1554,
+   "osm_place": "town"
+  },
+  {
+   "id": "vayk",
+   "hy": "Վայք",
+   "en": "Vayk",
+   "marz": "vayots-dzor",
+   "lat": 39.69545,
+   "lon": 45.45512,
+   "osm_place": "town"
+  },
+  {
+   "id": "yeghegnadzor",
+   "hy": "Եղեգնաձոր",
+   "en": "Yeghegnadzor",
+   "marz": "vayots-dzor",
+   "lat": 39.7601,
+   "lon": 45.33023,
+   "osm_place": "town"
+  },
+  {
+   "id": "jermuk",
+   "hy": "Ջերմուկ",
+   "en": "Jermuk",
+   "marz": "vayots-dzor",
+   "lat": 39.83882,
+   "lon": 45.67126,
+   "osm_place": "town"
+  },
+  {
+   "id": "dilijan",
+   "hy": "Դիլիջան",
+   "en": "Dilijan",
+   "marz": "tavush",
+   "lat": 40.74171,
+   "lon": 44.87222,
+   "osm_place": "town"
+  },
+  {
+   "id": "ijevan",
+   "hy": "Իջևան",
+   "en": "Ijevan",
+   "marz": "tavush",
+   "lat": 40.87799,
+   "lon": 45.14375,
+   "osm_place": "town"
+  },
+  {
+   "id": "berd",
+   "hy": "Բերդ",
+   "en": "Berd",
+   "marz": "tavush",
+   "lat": 40.88378,
+   "lon": 45.39233,
+   "osm_place": "town"
+  },
+  {
+   "id": "noyemberyan",
+   "hy": "Նոյեմբերյան",
+   "en": "Noyemberyan",
+   "marz": "tavush",
+   "lat": 41.17196,
+   "lon": 44.99651,
+   "osm_place": "town"
+  },
+  {
+   "id": "ayrum",
+   "hy": "Այրում",
+   "en": "Ayrum",
+   "marz": "tavush",
+   "lat": 41.1881,
+   "lon": 44.90205,
+   "osm_place": "town"
+  }
+ ]
+}
