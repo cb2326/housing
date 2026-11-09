@@ -2651,7 +2651,7 @@ PAGE_SECTIONS = [
     ("Rent and investing", [("rent", "Typical rent", "usd"), ("rent_sfr", "Typical rent for houses", "usd"), ("price_rent", "Price-to-rent ratio", "x"),
                             ("fmr_2br", "HUD Fair Market Rent, 2 bedrooms", "usd"), ("gross_yield", "Gross rental yield", "pct2"), ("cap_rate", "Cap rate (estimate)", "pct2")]),
     ("Market activity", [("inv_yoy", "Listings vs a year ago", "spct"), ("dom", "Days on market", "num"), ("cut", "Listings with a price cut", "pct"),
-                         ("inv", "Homes for sale", "num"), ("pending_ratio", "Pending sales per 100 listings", "num"), ("ppsf", "Asking price per sq ft", "usd")]),
+                         ("inv", "Homes for sale / inventory", "num"), ("pending_ratio", "Pending sales per 100 listings", "num"), ("ppsf", "Asking price per sq ft", "usd")]),
     ("People and jobs", [("income", "Median household income", "usd"), ("pop_growth", "Population change (1 year)", "spct"), ("unemployment", "Unemployment rate", "pct"),
                          ("pop", "Population", "num"), ("income_real", "Income adjusted for cost of living", "usd"),
                          ("mig_net", "Net moves in (IRS)", "snum"), ("rpp_all", "Cost of living (US = 100)", "n1")]),
