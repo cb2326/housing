@@ -105,10 +105,19 @@
 
   .legend { position: absolute; right: 14px; bottom: 22px; z-index: 500; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 9px; box-shadow: var(--shadow); width: 300px; max-width: calc(100% - 28px); }
   .legend h3 { margin: 0 0 2px; font: 600 15px var(--display); }
+  /* Support (Ko-fi) and Feedback buttons sitting just above the legend, as on the US map */
+  .lg-support { position: absolute; right: 0; bottom: calc(100% + 8px); display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px 4px 8px; border-radius: 999px; background: #fbe9e3; border: 1px solid #f6b89b; color: #9c2f1c; font-size: 12px; font-weight: 600; text-decoration: none; box-shadow: var(--shadow); }
+  .lg-support:hover { background: #f8dccf; }
+  .lg-support.lg-feedback { bottom: calc(100% + 46px); background: #fff; border-color: #8ccdc0; color: #126b60; }
+  .lg-support.lg-feedback:hover { background: #e6f4f1; }
+  .lg-support svg { width: 13px; height: 13px; }
   .legend .sub { color: var(--muted); font-size: 12px; margin-bottom: 7px; }
   .legend .bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; }
   .legend .bar i { flex: 1; }
   .legend .ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .us-val { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 6px; padding: 8px 10px; background: var(--panel-2); border-radius: 10px; }
+  .us-val span { font-size: 13px; color: var(--muted); }
+  .us-val b { font-size: 20px; font-family: var(--display); color: #06463f; }
   .legend .na { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 5px; }
   .legend .na i { width: 12px; height: 12px; border-radius: 3px; background: var(--na); display: inline-block; }
 
@@ -191,8 +200,30 @@
     .legend { left: 10px; right: 10px; bottom: 14px; width: auto; max-width: none; }
     .detail { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-width: none; height: 70dvh; border-radius: 16px 16px 0 0; border-right: 0; transform: translateY(102%); }
     .detail.show { transform: none; }
-    .d-head h2 { font-size: 21px; }
-    .chart.big { height: 200px; }
+    /* phone-sized details sheet: handle bar, compact header, value under the name, two columns of tiles */
+    .detail { height: 82dvh; box-shadow: 0 -8px 30px rgba(0,0,0,.18); }
+    .detail::before { content: ''; position: absolute; top: 7px; left: 50%; width: 42px; height: 4px; border-radius: 2px; background: #d1d5db; transform: translateX(-50%); z-index: 2; }
+    .d-head { padding: 18px 56px 10px 16px; }
+    .d-head h2 { font-size: 20px; padding-right: 0; }
+    .d-head .hy { font-size: 13.5px; }
+    .d-head .kind { font-size: 11.5px; }
+    .d-x { top: 14px; right: 12px; width: 36px; height: 36px; font-size: 15px; }
+    .d-body { padding: 10px 14px calc(28px + env(safe-area-inset-bottom)); }
+    .metric-head { flex-direction: column; align-items: stretch; gap: 2px; margin-bottom: 4px; }
+    .dp-switch { font-size: 15px; padding: 4px 0; justify-content: space-between; }
+    .mnow { text-align: left; display: flex; align-items: baseline; gap: 8px; }
+    .mnow b { font-size: 22px; }
+    .chart-ctrl .note { display: none; }
+    .chart.big { height: 180px; }
+    .chart-tip { font-size: 11.5px; }
+    .kpis { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .kpi { padding: 8px 10px; }
+    .kpi b { font-size: 16px; }
+    .kpi span { font-size: 11.5px; }
+    .snap-h { margin: 14px 0 6px; font-size: 14px; }
+    table.zones { font-size: 12px; }
+    .stage.sheet-open .legend { display: none; }
+    .leaflet-bottom.leaflet-left { bottom: 150px; }   /* zoom buttons above the legend */
   }
 </style>
 </head>
@@ -248,12 +279,16 @@
 const METRICS = [
   { id: 'price', group: 'Prices and affordability', label: 'Apartment price per m²', level: 'district · town', money: true, rel: 'month',
     info: 'Average market price per square meter of apartments in apartment buildings, from the Cadastre Committee\'s monthly market report. Shown for Yerevan\'s 12 districts and 45 regional towns.' },
+  { id: 'zone_price', group: 'Prices and affordability', label: 'Apartment price by zone (Yerevan)', level: 'zone · town', money: true, rel: 'month',
+    info: 'Yerevan split into its 12 official valuation zones (Government decision N 1023-N, 2020), each piece colored by the Cadastre\'s average apartment price per m² for that zone in that district. Zone outlines are traced from the official map, so they are approximate (within tens of meters). Zone 12, the outskirts, has no apartment price.' },
   { id: 'typical', group: 'Prices and affordability', label: 'Typical apartment price (60 m²)', level: 'district · town', money: true, rel: 'month',
     info: 'What a 60 m² apartment costs at the average price per m², a size typical of Soviet-era two-room flats. Armenia publishes no average house price, so this is the closest full-price figure.' },
   { id: 'chg12', group: 'Prices and affordability', label: 'Price change (1 year)', level: 'district · town', pct: true, rel: 'month',
     info: 'Change in the apartment price per m² compared with the same month a year earlier.' },
   { id: 'chg1', group: 'Prices and affordability', label: 'Price change (1 month)', level: 'district · town', pct: true, rel: 'month',
     info: 'Change in the apartment price per m² compared with the month before.' },
+  { id: 'mtg_pmt', group: 'Prices and affordability', label: 'Monthly mortgage payment (60 m²)', level: 'district · town', money: true, rel: 'month',
+    info: 'Monthly payment on a 60 m² apartment at the average price, with 20% down and a 20-year loan, at that month\'s average mortgage rate (Central Bank of Armenia). In AMD the loan is in drams at the dram rate; switch to USD to see a US-dollar loan at the dollar mortgage rate, as many diaspora buyers take.' },
   { id: 'ptoi', group: 'Prices and affordability', label: 'Years of wages for a 60 m² apartment', level: 'district · town', unit: 'yrs', rel: 'month',
     info: 'Price of a 60 m² apartment divided by a year of the average gross wage in its marz (Armstat). Higher means less affordable.' },
   { id: 'deals', group: 'Market activity', label: 'Property transactions (month)', level: 'district · marz', rel: 'month',
@@ -275,12 +310,23 @@ const METRICS = [
   { id: 'built', group: 'Housing', label: 'New housing built (m² per 1,000 people)', level: 'marz', yearly: true, rel: 'year',
     info: 'Floor area of new homes put into use in the latest year, per 1,000 residents (Armstat).' },
 ];
-const GROUP_ICONS = { 'Prices and affordability': 'home', 'Market activity': 'activity', 'People and income': 'people', 'Housing': 'building' };
+// nationwide interest rates (the same everywhere: shown like the US map's "Mortgage rates (nationwide)")
+METRICS.push(
+  { id: 'rate_amd', group: 'Mortgage rates (nationwide)', label: 'Mortgage rate in drams (֏)', level: 'nationwide', nat: 'mort_amd', unit: '%', rel: 'month',
+    info: 'Average interest rate on new mortgage loans to households in Armenian drams, % a year (Central Bank of Armenia, monthly statistical bulletin).' },
+  { id: 'rate_usd', group: 'Mortgage rates (nationwide)', label: 'Mortgage rate in US dollars ($)', level: 'nationwide', nat: 'mort_usd', unit: '%', rel: 'month',
+    info: 'Average interest rate on new mortgage loans to households in US dollars, % a year (Central Bank of Armenia). Useful for diaspora buyers who earn and borrow in dollars.' },
+  { id: 'rate_eur', group: 'Mortgage rates (nationwide)', label: 'Long-term loan rate in euros (€)', level: 'nationwide', nat: 'loan_eur', unit: '%', rel: 'month',
+    info: 'The Central Bank publishes no separate euro mortgage rate. This is the closest official figure: the average rate on new household loans of over 5 years in euros (mostly mortgages). Few such loans are made, so it moves around month to month.' },
+);
+const GROUP_ICONS = { 'Prices and affordability': 'home', 'Mortgage rates (nationwide)': 'percent', 'Economy and lending (nationwide)': 'bank', 'Market activity': 'activity', 'People and income': 'people', 'Housing': 'building' };
 const ICONS = {
   home: 'M3 11 12 4l9 7M5 10v10h14V10M10 20v-5h4v5',
   activity: 'M3 12h4l3 7 4-14 3 7h4',
   people: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6',
   building: 'M4 21V8l8-5 8 5v13M9 21v-6h6v6M3 21h18',
+  percent: 'M19 5 5 19M7.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM16.5 18a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z',
+  bank: 'M3 10h18L12 4zM5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18',
 };
 const icon = name => `<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
 const M = Object.fromEntries(METRICS.map(m => [m.id, m]));
@@ -289,8 +335,15 @@ const PALETTE = ['#e6f4f1', '#bfe3dc', '#8ccdc0', '#56b0a0', '#2b8f80', '#126b60
 const DIVERGE = ['#0b5d5a', '#2a9d8f', '#8fd3c7', '#f4efe6', '#f6b89b', '#e76f51', '#9c2f1c'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const ui = { metric: 'price', cur: 'AMD', sel: null, open: new Set(['Prices and affordability']), range: 'all', nat: 'mortgage' };
-let D = null, AREAS = null, map, marzLayer, distLayer, townLayer, labelLayer;
+const ui = { metric: 'price', cur: 'AMD', sel: null, open: new Set(['Prices and affordability']), range: 'all', nat: 'mort_amd' };
+let D = null, AREAS = null, ZONES = null, map, marzLayer, distLayer, townLayer, labelLayer, zoneLayer;
+// A traced zone piece (one zone inside one district): its latest apartment price per m² from the Cadastre report
+function zonePrice(props) {
+  const zs = D.districts[props.district]?.zones;
+  const v = zs?.zones?.[String(props.zone)];
+  return v ? toCur(v.price, zs.month) : null;
+}
+const isZoneMode = () => ui.metric === 'zone_price' && !!zoneLayer;
 
 // ---------- helpers ----------
 const $ = s => document.querySelector(s);
@@ -324,17 +377,21 @@ const latestYearVal = o => { const k = lastKey(o); return k ? o[k] : null; };
 const recent = ym => !!ym && ym >= addMonths(D.latest_month, -2);
 function wageFor(marzId) { return latestYearVal(D.marzes[marzId]?.wage); }
 function valueOf(kind, id, metric = ui.metric) {
+  if (M[metric]?.nat) { const s = natSeries(M[metric].nat), k = lastKey(s); return k ? s[k] : null; }   // nationwide: same everywhere
   const p = kind === 'district' ? D.districts[id] : kind === 'town' ? D.towns[id] : D.marzes[id];
   if (!p) return null;
   const marzId = kind === 'district' ? 'yerevan' : kind === 'town' ? p.marz : id;
   switch (metric) {
     case 'price': { const k = lastKey(p.price); return recent(k) ? toCur(p.price[k], k) : null; }
     case 'typical': { const k = lastKey(p.price); return recent(k) ? toCur(p.price[k] * 60, k) : null; }
+    case 'zone_price': { if (kind === 'marz') return null; const k = lastKey(p.price); return recent(k) ? toCur(p.price[k], k) : null; }
     case 'house_sales': return latestYearVal(p.house_sales);
     case 'apt_sales': return latestYearVal(p.apartment_sales);
     case 'chg12': return recent(lastKey(p.price)) ? change(p.price, 12) : null;
     case 'chg1': return recent(lastKey(p.price)) ? change(p.price, 1) : null;
     case 'ptoi': { const k = lastKey(p.price), w = wageFor(marzId); return k && w ? (p.price[k] * 60) / (w * 12) : null; }
+    case 'mtg_pmt': { const k = lastKey(p.price); return recent(k) ? mtgPayment(p.price[k], k) : null; }
+    case 'rate_amd': case 'rate_usd': case 'rate_eur': { const s = natSeries(M[metric].nat), k = lastKey(s); return k ? s[k] : null; }
     case 'deals': return p.deals ? p.deals[D.deals_month] ?? null : null;
     case 'sales': return p.sales ? p.sales[D.deals_month] ?? null : null;
     case 'wage': { const w = latestYearVal(p.wage); return w == null ? null : ui.cur === 'USD' ? w / usdRate(lastKey(p.wage) + '-12') : w; }
@@ -348,6 +405,7 @@ function valueOf(kind, id, metric = ui.metric) {
 function fmtValue(v, metric = ui.metric) {
   const m = M[metric];
   if (v == null || isNaN(v)) return '–';
+  if (m.nat) return natFmt(m.nat, v);
   if (m.pct) return fmtPct(v);
   if (m.money) return fmtMoney(v, ui.cur);
   if (m.unit === '%') return v.toFixed(1) + '%';
@@ -373,7 +431,21 @@ function makeScale(values, metric) {
   const color = x => { let i = 0; while (i < breaks.length && x > breaks[i]) i++; return PALETTE[i]; };
   return { color, pal: PALETTE, ticks: [fmtValue(v[0], metric), fmtValue(q(.5), metric), fmtValue(v[v.length - 1], metric)] };
 }
-const isMarzMetric = metric => M[metric].level === 'marz';
+const isMarzMetric = metric => M[metric].level === 'marz' || M[metric].level === 'nationwide';
+// Monthly payment on a 60 m² apartment, 20% down, 20 years, at that month's mortgage rate. In USD: a dollar loan at the
+// dollar mortgage rate. Uses the nearest earlier month with a rate.
+function rateAt(cur, ym) {
+  const s = (D.national.mortgage_rate || {})[cur === 'USD' ? 'usd' : 'amd'] || {};
+  if (s[ym] != null) return s[ym];
+  const ks = Object.keys(s).filter(k => k <= ym).sort();
+  return ks.length ? s[ks[ks.length - 1]] : null;
+}
+function mtgPayment(pricePerM2, ym, cur = ui.cur) {
+  const r = rateAt(cur, ym), price = toCur(pricePerM2 * 60, ym, cur);
+  if (r == null || price == null) return null;
+  const i = r / 100 / 12, n = 240, loan = price * 0.8;
+  return loan * i / (1 - Math.pow(1 + i, -n));
+}
 
 // ---------- map ----------
 function initMap() {
@@ -392,6 +464,17 @@ function initMap() {
   const distFeats = AREAS.features.filter(f => f.properties.kind === 'district').map(f => (f.properties.id = osmToDist[f.properties.osm_id], f));
   marzLayer = L.geoJSON({ type: 'FeatureCollection', features: marzFeats }, { pane: 'marz', style: () => ({}), onEachFeature: (f, l) => bindArea(l, 'marz', f.properties.id) }).addTo(map);
   distLayer = L.geoJSON({ type: 'FeatureCollection', features: distFeats }, { pane: 'dist', style: () => ({}), onEachFeature: (f, l) => bindArea(l, 'district', f.properties.id) }).addTo(map);
+  if (ZONES) {
+    // valuation zones sit under the district outlines; clicking one opens its district with that zone selected
+    map.createPane('zones'); map.getPane('zones').style.zIndex = 415;
+    zoneLayer = L.geoJSON(ZONES, { pane: 'zones', style: () => ({ opacity: 0, fillOpacity: 0 }), onEachFeature: (f, l) => {
+      l.on('click', e => { if (!isZoneMode()) return; L.DomEvent.stopPropagation(e); select('district', f.properties.district); ui.zone = String(f.properties.zone); renderDetail(); });
+      l.bindTooltip(() => {
+        const d = D.districts[f.properties.district], v = zonePrice(f.properties);
+        return `<b>Zone ${f.properties.zone}</b> · ${esc(d.en)}<br><small>Official valuation zone (approximate outline)</small><br>Apartment price per m²: <b>${v == null ? (f.properties.zone === 12 ? 'no apartment price (outskirts)' : 'no sales in this zone') : fmtMoney(v, ui.cur)}</b>`;
+      }, { sticky: true });
+    } }).addTo(map);
+  }
   townLayer = L.layerGroup().addTo(map);
   labelLayer = L.layerGroup().addTo(map);
   for (const [id, t] of Object.entries(D.towns)) {
@@ -422,8 +505,12 @@ function tipHtml(kind, id) {
 function restyle() {
   const marzMode = isMarzMetric(ui.metric) || (['deals', 'sales'].includes(ui.metric) && map.getZoom() < 10 && false);
   const vals = [];
+  const zoneMode = isZoneMode();
   if (marzMode) for (const id of Object.keys(D.marzes)) vals.push(valueOf('marz', id));
-  else {
+  else if (zoneMode) {
+    zoneLayer.eachLayer(l => vals.push(zonePrice(l.feature.properties)));
+    for (const id of Object.keys(D.towns)) vals.push(valueOf('town', id));
+  } else {
     for (const id of Object.keys(D.districts)) vals.push(valueOf('district', id));
     if (!['deals', 'sales'].includes(ui.metric)) for (const id of Object.keys(D.towns)) vals.push(valueOf('town', id));
     else for (const id of Object.keys(D.marzes)) if (id !== 'yerevan') vals.push(valueOf('marz', id));
@@ -441,10 +528,19 @@ function restyle() {
   distLayer.setStyle(f => {
     const id = f.properties.id, sel = ui.sel && ui.sel.kind === 'district' && ui.sel.id === id;
     if (marzMode) return { fillOpacity: 0, opacity: 0, interactive: false };
+    if (zoneMode) return { fillOpacity: 0, color: sel ? '#0b4a43' : '#1f2937', weight: sel ? 3 : 1.6, opacity: .9 };   // district outlines over the zones
     const v = valueOf('district', id);
     return { fillColor: v == null ? '#e5e7eb' : scale.color(v), fillOpacity: .82, color: sel ? '#0b4a43' : '#ffffff', weight: sel ? 3 : 1, opacity: 1 };
   });
-  distLayer.eachLayer(l => { const el = l.getElement && l.getElement(); if (el) el.style.pointerEvents = marzMode ? 'none' : ''; });
+  distLayer.eachLayer(l => { const el = l.getElement && l.getElement(); if (el) el.style.pointerEvents = marzMode || zoneMode ? 'none' : ''; });
+  if (zoneLayer) {
+    zoneLayer.setStyle(f => {
+      if (!zoneMode) return { opacity: 0, fillOpacity: 0 };
+      const v = zonePrice(f.properties), sel = ui.sel && ui.sel.kind === 'district' && ui.sel.id === f.properties.district && ui.zone === String(f.properties.zone);
+      return { fillColor: v == null ? '#f3f4f6' : scale.color(v), fillOpacity: v == null ? .55 : .85, color: sel ? '#e76f51' : '#ffffff', weight: sel ? 2.5 : .6, opacity: 1 };
+    });
+    zoneLayer.eachLayer(l => { const el = l.getElement && l.getElement(); if (el) el.style.pointerEvents = zoneMode ? '' : 'none'; });
+  }
   townLayer.eachLayer(c => {
     const id = c._place;
     if (marzMode || countMode) { c.setStyle({ fillColor: '#ffffff', color: '#374151', radius: 4, weight: 1.5 }); return; }
@@ -468,6 +564,7 @@ function labelValue(v, metric = ui.metric) {
 function updateLabels() {
   if (!labelLayer) return;
   labelLayer.clearLayers();
+  if (M[ui.metric]?.nat) return;   // a nationwide figure is the same everywhere: the legend shows it once
   const metric = ui.metric, marzMode = isMarzMetric(metric), countMode = ['deals', 'sales'].includes(metric);
   const size = map.getSize(), view = map.getBounds(), cand = [], placed = [];
   const fits = box => box[0] > 4 && box[1] > 56 && box[2] < size.x - 4 && box[3] < size.y - 4 && !placed.some(q => box[0] < q[2] && box[2] > q[0] && box[1] < q[3] && box[3] > q[1]);
@@ -483,10 +580,24 @@ function updateLabels() {
     cand.push({ kind, id, w, h, a, pt });
   });
   areaCand(marzLayer, 'marz');
-  if (!marzMode) areaCand(distLayer, 'district');
+  if (isZoneMode()) {
+    // zone pieces: "Zone 3" and its price, where there's room
+    zoneLayer.eachLayer(l => {
+      const b = l._bb || (l._bb = l.getBounds());
+      if (!b.isValid() || !view.intersects(b)) return;
+      const ne = map.latLngToContainerPoint(b.getNorthEast()), sw = map.latLngToContainerPoint(b.getSouthWest());
+      const w = ne.x - sw.x, h = sw.y - ne.y;
+      if (w < 44 || h < 26) return;
+      const a = l.getCenter();
+      cand.push({ kind: 'zone', props: l.feature.properties, w, h, a, pt: map.latLngToContainerPoint(a) });
+    });
+  } else if (!marzMode) areaCand(distLayer, 'district');
   cand.sort((x, y) => y.w * y.h - x.w * x.h);
   for (const c of cand) {
-    const name = placeName(c.kind, c.id).split(' (')[0], val = labelValue(valueOf(c.kind, c.id));
+    const zv = c.kind === 'zone' ? zonePrice(c.props) : null;
+    if (c.kind === 'zone' && zv == null) continue;
+    const name = c.kind === 'zone' ? `Zone ${c.props.zone}` : placeName(c.kind, c.id).split(' (')[0];
+    const val = labelValue(c.kind === 'zone' ? zv : valueOf(c.kind, c.id));
     const tw = Math.max(name.length * 6.4, val.length * 6.8) + 6, th = 28;
     if (tw > c.w * 1.15 || th > c.h * 1.2) continue;
     const box = [c.pt.x - tw / 2, c.pt.y - th / 2, c.pt.x + tw / 2, c.pt.y + th / 2];
@@ -511,12 +622,31 @@ function updateLabels() {
 function renderLegend() {
   const m = M[ui.metric];
   const when = m.yearly ? latestYearLabel(ui.metric) : monthLabel(['deals', 'sales'].includes(ui.metric) ? D.deals_month : D.latest_month);
-  const sub = m.level === 'marz' ? `By marz · ${when}` : ['deals', 'sales'].includes(ui.metric) ? `Yerevan districts and marzes · ${when}` : `Yerevan districts and 45 towns · ${when}`;
+  if (m.level === 'nationwide') {
+    const s = natSeries(m.nat), k = lastKey(s);
+    $('#legend').innerHTML = `<h3>${esc(m.label)}</h3><div class="sub">A nationwide rate: the same for every place · ${monthLabel(k)}</div>
+      <div class="us-val"><span>All of Armenia</span><b>${k ? esc(natFmt(m.nat, s[k])) : '–'}</b></div><div class="note" style="margin-top:6px">See its history in the Armenia overview.</div>${LEGEND_BTNS}`;
+    return;
+  }
+  const sub = m.level === 'marz' ? `By marz · ${when}` : ['deals', 'sales'].includes(ui.metric) ? `Yerevan districts and marzes · ${when}`
+    : isZoneMode() ? `Yerevan's 12 valuation zones (approx. outlines) and 45 towns · ${when}` : `Yerevan districts and 45 towns · ${when}`;
   $('#legend').innerHTML = `<h3>${esc(m.label)}${m.money ? ` (${ui.cur})` : ''}</h3><div class="sub">${sub}</div>
     <div class="bar">${scale.pal.map(c => `<i style="background:${c}"></i>`).join('')}</div>
     <div class="ticks">${scale.ticks.map(t => `<span>${t}</span>`).join('')}</div>
-    <div class="na"><i></i>No data</div>`;
+    <div class="na"><i></i>No data</div>${LEGEND_BTNS}`;
 }
+// The same Support (Ko-fi) and Feedback buttons as the US map, just above the legend
+const FEEDBACK_EMAIL = 'contact@openhousingatlas.com';
+const LEGEND_BTNS = `<a class="lg-support lg-feedback" href="mailto:${FEEDBACK_EMAIL}" data-feedback title="Questions, ideas or a mistake you spotted? Email us"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>Feedback</a><a class="lg-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener" title="This map is free. If it helps you, you can support it on Ko-fi."><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg>Support</a>`;
+// The feedback email starts with the page, place and data point the visitor was looking at
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-feedback]');
+  if (!a) return;
+  const place = ui.sel ? (ui.sel.kind === 'national' ? 'Armenia overview' : placeName(ui.sel.kind, ui.sel.id)) : '';
+  const about = `Page: ${location.href}${place ? `\nPlace: ${place}` : ''}\nData point: ${M[ui.metric] ? M[ui.metric].label : ''}\n\nMy feedback:\n`;
+  a.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent('Open Housing Atlas (Armenia) feedback')}&body=${encodeURIComponent(about)}`;
+  if (window.goatcounter && goatcounter.count) goatcounter.count({ path: 'feedback-click-armenia', title: 'Feedback clicked (Armenia)', event: true });
+});
 function latestYearLabel(metric) {
   const key = { wage: 'wage', poverty: 'poverty', population: 'population', space: 'space_per_person', built: 'new_housing_m2', house_sales: 'house_sales', apt_sales: 'apartment_sales' }[metric];
   const years = Object.values(D.marzes).map(p => lastKey(p[key])).filter(Boolean).sort();
@@ -529,7 +659,7 @@ function renderMetrics() {
   const q = $('#dpSearch').value.trim().toLowerCase();
   const groups = {};
   for (const m of METRICS) (groups[m.group] ||= []).push(m);
-  $('#groups').innerHTML = Object.entries(groups).map(([name, ms], gi) => {
+  $('#groups').innerHTML = Object.keys(GROUP_ICONS).filter(g => groups[g]).map(g => [g, groups[g]]).map(([name, ms], gi) => {
     const list = ms.filter(m => !q || m.label.toLowerCase().includes(q) || m.info.toLowerCase().includes(q));
     if (!list.length) return '';
     const open = q || ui.open.has(name);
@@ -562,7 +692,10 @@ $('#groups').addEventListener('click', e => {
 });
 $('#groups').addEventListener('change', e => {
   if (!e.target.name || !e.target.name.startsWith('metric')) return;
-  ui.metric = e.target.value; renderMetrics(); restyle(); refreshDetail(); saveState();
+  ui.metric = e.target.value;
+  if (M[ui.metric].nat) { ui.nat = M[ui.metric].nat; renderMetrics(); select('national', 'armenia'); }   // a nationwide rate: show its chart
+  else { renderMetrics(); restyle(); refreshDetail(); }
+  saveState();
   if (innerWidth <= 760) $('#side').classList.remove('open');
 });
 $('#dpSearch').addEventListener('input', renderMetrics);
@@ -627,7 +760,7 @@ function select(kind, id, fly) {
 function closeDetail() {
   ui.sel = null;
   $('#detail').classList.remove('show');
-  $('.stage').classList.remove('panel-open');
+  $('.stage').classList.remove('panel-open', 'sheet-open');
   setTimeout(() => map.invalidateSize(), 240);
   restyle(); saveState();
 }
@@ -641,6 +774,7 @@ const marzOf = (kind, id) => kind === 'district' ? 'yerevan' : kind === 'town' ?
 
 // The history of one data point for one place. Data published only by marz (wages, poverty…) uses the place's marz.
 function seriesFor(kind, id, metric) {
+  if (M[metric]?.nat) return { s: natSeries(M[metric].nat), bars: !!NAT[M[metric].nat]?.bars };   // nationwide data points
   const p = placeOf(kind, id), mid = marzOf(kind, id), m = D.marzes[mid];
   const byMonth = (src, f) => { const o = {}; for (const [ym, v] of Object.entries(src || {})) { const r = f(ym, v); if (r != null && !isNaN(r)) o[ym] = r; } return o; };
   const change = n => byMonth(p.price, (ym, v) => { const b = p.price?.[addMonths(ym, -n)]; return b ? (toCur(v, ym) / toCur(b, addMonths(ym, -n)) - 1) * 100 : null; });
@@ -648,9 +782,14 @@ function seriesFor(kind, id, metric) {
   switch (metric) {
     case 'price': return { s: seriesIn(p.price) };
     case 'typical': return { s: byMonth(p.price, (ym, v) => toCur(v * 60, ym)) };
+    case 'zone_price':   // a district: the selected zone's own history; a town: its price
+      if (kind === 'district' && ui.zone && p.zone_prices?.[ui.zone]) return { s: seriesIn(p.zone_prices[ui.zone]) };
+      return { s: kind === 'marz' ? {} : seriesIn(p.price) };
     case 'chg12': return { s: change(12) };
     case 'chg1': return { s: change(1) };
     case 'ptoi': return { s: byMonth(p.price, (ym, v) => { const w = wageIn(ym); return w ? v * 60 / (w * 12) : null; }) };
+    case 'mtg_pmt': return { s: byMonth(p.price, (ym, v) => mtgPayment(v, ym)) };
+    case 'rate_amd': case 'rate_usd': case 'rate_eur': return { s: natSeries(M[metric].nat) };
     case 'deals': return { s: kind === 'town' ? {} : (kind === 'district' ? p.deals : m.deals), bars: true };
     case 'sales': return { s: kind === 'town' ? {} : (kind === 'district' ? p.sales : m.sales), bars: true };
     case 'wage': return { s: yearlyIn(m.wage), marz: kind !== 'marz' };
@@ -679,6 +818,7 @@ function renderDetail() {
   const { kind, id } = ui.sel;
   $('#detail').classList.add('show');
   if (innerWidth > 760 && !$('.stage').classList.contains('panel-open')) { $('.stage').classList.add('panel-open'); setTimeout(() => map.invalidateSize(), 240); }
+  if (innerWidth <= 760) $('.stage').classList.add('sheet-open');   // phones: the legend hides under the sheet
   if (kind === 'national') return renderNational();
   const p = placeOf(kind, id), mid = marzOf(kind, id), m = M[ui.metric];
   $('#dTitle').textContent = p.en;
@@ -700,7 +840,7 @@ function renderDetail() {
   if (m.money && ui.cur === 'USD' && !m.yearly && last) h += `<p class="note">USD uses the Central Bank's average rate for each month (${usdRate(last)?.toFixed(2)} ֏ per $1 in ${monthLabel(last)}). The dram has moved against the dollar, so changes in USD can differ from changes in drams.</p>`;
   if (kind === 'town' && !m.yearly) h += `<p class="note">Town prices come from fewer sales than Yerevan districts, so month-to-month moves can be noisy.</p>`;
   // At a glance: click a tile to chart that data point (and color the map by it)
-  const tiles = kind === 'marz' ? ['house_sales', 'apt_sales', 'sales', 'deals', 'wage', 'poverty', 'space', 'built'] : ['price', 'typical', 'chg12', 'ptoi', 'wage', 'poverty', 'house_sales', kind === 'district' ? 'sales' : 'space'];
+  const tiles = kind === 'marz' ? ['house_sales', 'apt_sales', 'sales', 'deals', 'wage', 'poverty', 'space', 'built'] : ['price', 'typical', 'mtg_pmt', 'chg12', 'ptoi', 'wage', 'poverty', kind === 'district' ? 'sales' : 'house_sales'];
   h += `<h4 class="snap-h">At a glance</h4><div class="kpis">${tiles.map(t => {
     const r = seriesFor(kind, id, t), k = lastKey(r.s), v = k ? r.s[k] : null;
     return `<button type="button" class="kpi ${t === ui.metric ? 'on' : ''}" data-metric="${t}"><span>${esc(M[t].label)}${r.marz ? ` <small>(${esc(D.marzes[mid].en)})</small>` : ''}</span><b class="${M[t].pct ? chgCls(v) : ''}">${esc(fmtValue(v, t))}</b><small>${k ? esc(M[t].yearly ? k.slice(0, 4) : monthLabel(k)) : ''}</small></button>`;
@@ -752,6 +892,9 @@ function zoneOverview() {
 
 // Armenia overview: the same layout, with nationwide data points
 const NAT = {
+  mort_amd: { label: 'Mortgage rate in drams', note: 'Average interest rate on new mortgage loans to households in Armenian drams, % a year (Central Bank of Armenia, monthly statistical bulletin).' },
+  mort_usd: { label: 'Mortgage rate in US dollars', note: 'Average interest rate on new mortgage loans to households in US dollars, % a year (Central Bank of Armenia). For diaspora buyers borrowing in dollars.' },
+  loan_eur: { label: 'Long-term loan rate in euros', note: 'No separate euro mortgage rate is published. This is the average rate on new household loans of over 5 years in euros, mostly mortgages (Central Bank of Armenia). Few such loans are made, so it moves around month to month.' },
   mortgage: { label: 'Mortgage loans outstanding', unit: () => ui.cur === 'USD' ? '$ bn' : 'bn ֏', note: 'All commercial-bank mortgage loans at the end of each month (Central Bank of Armenia).' },
   amd_share: { label: 'Mortgages in drams (share)', note: 'Share of outstanding mortgage loans taken in drams rather than foreign currency.' },
   policy: { label: 'Policy (refinancing) rate', note: 'The Central Bank of Armenia\'s main interest rate, at the end of each month.' },
@@ -761,9 +904,21 @@ const NAT = {
   deals: { label: 'Property transactions (month)', bars: true, note: 'All registered transactions (sales, gifts, mortgages, leases…), whole country.' },
   house_sales: { label: 'House sales (year)', bars: true, yearly: true, note: 'Private houses sold in the year, whole country (Armstat).' },
 };
+// Every Armenia-overview data point is also in the sidebar ("Economy and lending (nationwide)"); the three
+// mortgage rates already have their own group.
+for (const [k, d] of Object.entries(NAT)) {
+  if (METRICS.some(m => m.nat === k)) continue;
+  const m = { id: 'nat_' + k, group: 'Economy and lending (nationwide)', label: d.label + ' (Armenia)', level: 'nationwide', nat: k,
+              rel: d.yearly ? 'year' : 'month', yearly: d.yearly, info: d.note };
+  METRICS.push(m);
+  M[m.id] = m;
+}
 function natSeries(k) {
   const n = D.national;
   switch (k) {
+    case 'mort_amd': return (n.mortgage_rate || {}).amd || {};
+    case 'mort_usd': return (n.mortgage_rate || {}).usd || {};
+    case 'loan_eur': return (n.longterm_rate || {}).eur || {};
     case 'mortgage': return Object.fromEntries(Object.entries(n.mortgage || {}).map(([m, v]) => [m, toCur(v.total * 1e6, m) / 1e9]));
     case 'amd_share': return Object.fromEntries(Object.entries(n.mortgage || {}).filter(([, v]) => v.amd != null && v.total).map(([m, v]) => [m, v.amd / v.total * 100]));
     case 'policy': {
@@ -785,6 +940,7 @@ function natSeries(k) {
 }
 function natFmt(k, v) {
   if (v == null || isNaN(v)) return '–';
+  if (k === 'mort_amd' || k === 'mort_usd' || k === 'loan_eur') return v.toFixed(2) + '%';
   if (k === 'mortgage') return ui.cur === 'USD' ? '$' + v.toFixed(2) + ' bn' : Math.round(v).toLocaleString('en-US') + ' bn ֏';
   if (k === 'amd_share' || k === 'policy') return v.toFixed(k === 'policy' ? 2 : 0) + '%';
   if (k === 'inflation') return fmtPct(v);
@@ -792,7 +948,7 @@ function natFmt(k, v) {
   return fmtInt(v);
 }
 function renderNational() {
-  if (!NAT[ui.nat]) ui.nat = 'mortgage';
+  if (!NAT[ui.nat]) ui.nat = 'mort_amd';
   const k = ui.nat, def = NAT[k], s = natSeries(k), keys = Object.keys(s).sort(), last = keys[keys.length - 1];
   $('#dTitle').textContent = 'Armenia overview';
   $('#dHy').textContent = 'Հայաստան';
@@ -941,9 +1097,12 @@ function loadState() {
 }
 
 // ---------- start ----------
-Promise.all([fetch('data/armenia.json').then(r => r.json()), fetch('data/areas.geojson').then(r => r.json())])
-  .then(([data, areas]) => {
+// 'no-cache' = always check for a newer file (cheap: unchanged files aren't downloaded again)
+Promise.all([fetch('data/armenia.json', { cache: 'no-cache' }).then(r => r.json()), fetch('data/areas.geojson').then(r => r.json()),
+  fetch('data/yerevan_zones.geojson', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null)])
+  .then(([data, areas, zones]) => {
     D = data; AREAS = areas;
+    ZONES = zones && { ...zones, features: zones.features.filter(f => f.geometry?.coordinates?.some(p => p.length && p[0].length > 3)) };
     // transaction tables can be a month behind the prices (some reports have them only as pictures)
     D.deals_month = lastKey(D.national.deals) || D.latest_month;
     loadState();
