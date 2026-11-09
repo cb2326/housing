@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths-ignore: ["last-update.txt", "data_cache/**"]
+    paths-ignore: ["last-update.txt", "data_cache/**", "armenia/cache/**"]
 
 permissions:
   contents: write   # to save data_cache/ and last-update.txt back into the repository
@@ -45,6 +45,14 @@ jobs:
           HUD_API_TOKEN: ${{ secrets.HUD_API_TOKEN }}
         run: python build_data.py
 
+      # The Armenia map (openhousingatlas.com/armenia/). Kept apart on purpose: if this step fails, the US map
+      # still publishes, and the Armenia page shows its last good data (saved in armenia/cache/).
+      - name: Armenia data
+        continue-on-error: true
+        run: |
+          pip install pypdf==7.0.0
+          python armenia/build_armenia.py
+
       - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v5
@@ -65,6 +73,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
           git add data_cache 2>/dev/null || true
+          git add armenia/cache 2>/dev/null || true
           git add last-update.txt 2>/dev/null || true
           git commit -m "Save yearly data" || true
           git pull --rebase || true
