@@ -666,6 +666,134 @@ def header_month(v):
             return f"{y:04d}-{EN_MON[m.group(1).lower()]:02d}"
     return None
 
+# ---- Mortgage interest rates (new mortgage loans to households, % a year) ----
+# The CBA's monthly statistical bulletin has a line "Mortgage loans of households" (Armenian: "Ֆիզիկական անձանց
+# հիպոտեկային վարկեր") with the rate in drams and in US dollars for the latest 9-13 months. English editions run to
+# 2022, Armenian ones after that. There is no separate euro mortgage rate; for euros the closest official figure is
+# the rate on new household loans of over 5 years in euros (CBA file 14, from 2018).
+ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"]
+
+def bulletin_urls(y, m):
+    r, base = ROMAN[m - 1], "https://www.cba.am/file_manager/"
+    return [f"{base}Statistical%20overview/Statistical_overview_{r}.{y}.pdf",
+            f"{base}Statistical%20overview/Statistical_Overview_{r}.{y}_eng.pdf",
+            f"{base}Statistics/Statistical-overview-en/Statistical-Overview-{r}.{y}-en.pdf"]
+
+def rate_numbers(line):
+    """The rates on one table line. PDF text sometimes splits a number ("1 1.3", "9 .6", "7. 8"); those are joined."""
+    line = line.replace("․", ".").replace(",", ".")      # some issues write the decimal point as "․" (Armenian)
+    toks = re.findall(r"\d+\.?\d*|\.\d+", line)
+    out, i = [], 0
+    while i < len(toks):
+        t = toks[i]
+        if i + 1 < len(toks) and ((len(t) == 1 and "." in toks[i + 1] and not toks[i + 1].startswith(".") and len(toks[i + 1].split(".")[0]) == 1)
+                                  or toks[i + 1].startswith(".") or t.endswith(".")):
+            t, i = t + toks[i + 1], i + 1
+        i += 1
+        try:
+            v = float(t)
+        except ValueError:
+            continue
+        if 2 <= v <= 40:
+            out.append(v)
+    return out
+
+def parse_mortgage_rates(text, issue_ym):
+    """{"amd": {month: rate}, "usd": {...}} from one bulletin (the last value is the issue month)."""
+    lines = text.splitlines()
+    for i, ln in enumerate(lines):
+        if not re.search(r"Mortgage loans of households|անձանց\s+հիպոտեկային\s+վարկեր", ln):
+            continue
+        got = {}
+        for ln2 in lines[i + 1:i + 5]:
+            m = re.match(r"\s*(AMD|USD|ՀՀ\s*դրամով|ԱՄՆ\s*դոլարով)(.*)", ln2)
+            if m:
+                cur = "amd" if m.group(1) in ("AMD",) or "դրամ" in m.group(1) else "usd"
+                vals = rate_numbers(m.group(2))
+                if len(vals) >= 5:
+                    got[cur] = {month_add(issue_ym, k - len(vals) + 1): v for k, v in enumerate(vals)}
+        if got.get("amd"):
+            return got
+    return None
+
+def update_mortgage_rates(saved, max_downloads=60):
+    rates = saved.get("mortgage_rate", {"amd": {}, "usd": {}})
+    tried = set(saved.get("bulletins_tried", []))
+    this = dt.date.today().strftime("%Y-%m")
+    # every third month from mid-2011 (each issue covers 9-13 months); the last 4 months are always checked again
+    want = []
+    ym = "2011-06"
+    while ym <= this:
+        want.append(ym)
+        ym = month_add(ym, 3)
+    want += [month_add(this, -k) for k in range(1, 5)]
+    downloads, written = 0, set()
+    try:
+        from pypdf import PdfReader  # noqa: F401
+    except ImportError:
+        notice("Armenia: pypdf is missing, so the mortgage-rate bulletins were not read.")
+        return rates, sorted(tried)
+    for ym in sorted(set(want), reverse=True):
+        recent = ym >= month_add(this, -4)
+        if (ym in tried and not recent) or downloads >= max_downloads:
+            continue
+        y, m = int(ym[:4]), int(ym[5:])
+        for url in bulletin_urls(y, m):
+            pdf = DL / "cba" / f"bulletin_{ym}.pdf"
+            try:
+                pdf.parent.mkdir(parents=True, exist_ok=True)
+                pdf.write_bytes(fetch(url, timeout=300, tries=1))
+            except Exception:
+                continue
+            downloads += 1
+            try:
+                got = parse_mortgage_rates(pdf_text(pdf), ym)
+            except Exception as e:
+                got = None
+                print(f"  bulletin {ym}: could not read ({e})")
+            pdf.unlink(missing_ok=True)
+            if got:
+                # issues are read newest first, so the first figure for a month in this run is the latest
+                # (revised) one; figures saved by earlier runs are replaced
+                for cur, s in got.items():
+                    for k, v in s.items():
+                        if (cur, k) not in written:
+                            rates.setdefault(cur, {})[k] = v
+                            written.add((cur, k))
+                print(f"  bulletin {ym}: mortgage rates for {len(got['amd'])} months")
+            else:
+                print(f"  bulletin {ym}: no mortgage-rate table found")
+            break
+        if not recent:
+            tried.add(ym)
+        time.sleep(0.5)
+    rates = {cur: dict(sorted(s.items())) for cur, s in rates.items()}
+    return rates, sorted(tried)
+
+def euro_longterm_rates():
+    """New household loans of over 5 years in euros (CBA file 14): average rate per month. Also AMD and USD."""
+    rows = xlsx_rows(fetch(CBA_STAT + "14_Deposit_and_lending_rates_eng.xlsx"))
+    over5 = 1 + 7 * 5      # maturity buckets of 5 columns (sum, min, average, max, stdev); "Over 5 year" is the 8th
+    month = section = sector = None
+    out = {}
+    for r in rows:
+        if not r:
+            continue
+        c0, c1 = r[0], (r[1] if len(r) > 1 else None)
+        if c0 in (None, "") and isinstance(c1, float) and 20000 < c1 < 80000:
+            month = header_month(c1)
+        elif isinstance(c0, str):
+            s = c0.strip()
+            if s in ("Loans", "Deposits"):
+                section = s
+            elif s in ("Households", "Non Financial Corporations"):
+                sector = s
+            elif s in ("AMD", "USD", "EUR") and section == "Loans" and sector == "Households" and month and len(r) > over5 + 2:
+                vol, avg = r[over5], r[over5 + 2]
+                if isinstance(avg, float) and isinstance(vol, float) and vol > 0:
+                    out.setdefault(s.lower(), {})[month] = round(avg, 2)
+    return out
+
 def update_cba():
     saved = load_json(CACHE / "cba.json", {})
     out = dict(saved)
@@ -686,6 +814,17 @@ def update_cba():
         print(f"CBA mortgages: {len(out['mortgage'])} months, latest {max(out['mortgage'])}")
     except Exception as e:
         notice(f"Armenia: CBA mortgage file failed: {e}")
+    # Mortgage interest rates (drams and US dollars) and the euro long-term household loan rate
+    try:
+        out["mortgage_rate"], out["bulletins_tried"] = update_mortgage_rates(saved)
+        print(f"CBA mortgage rates: {len(out['mortgage_rate'].get('amd', {}))} months, latest {max(out['mortgage_rate'].get('amd') or {'-': 0})}")
+    except Exception as e:
+        notice(f"Armenia: CBA mortgage-rate bulletins failed: {e}")
+    try:
+        out["longterm_rate"] = euro_longterm_rates()
+        print(f"CBA long-term household loan rates (AMD/USD/EUR): {len(out['longterm_rate'].get('eur', {}))} months")
+    except Exception as e:
+        notice(f"Armenia: CBA long-term loan rates failed: {e}")
     # Policy (refinancing) rate history
     try:
         rows = xlsx_rows(fetch(CBA_STAT + "8_policy_rates_eng.xlsx"))
@@ -776,12 +915,16 @@ def build(max_reports):
                              **{k: armstat.get(k, {}).get(i, {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales")}}
     data["national"] = {
         "usd": cba.get("usd", {}), "mortgage": cba.get("mortgage", {}), "policy_rate": cba.get("policy_rate", []),
+        "mortgage_rate": cba.get("mortgage_rate", {}), "longterm_rate": cba.get("longterm_rate", {}),
         "inflation": armstat.get("inflation", {}),
         "deals": series.get("marz_deals", {}).get("armenia", {}), "sales": series.get("marz_sales", {}).get("armenia", {}),
         **{k: armstat.get(k, {}).get("armenia", {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales")},
     }
     save_json(OUT / "armenia.json", data)
     shutil.copyfile(STATIC / "areas.geojson", OUT / "areas.geojson")
+    # Yerevan's valuation zones, traced from the official map (see setup/trace_zones.py)
+    if (STATIC / "yerevan_zones.geojson").exists():
+        shutil.copyfile(STATIC / "yerevan_zones.geojson", OUT / "yerevan_zones.geojson")
     size = (OUT / "armenia.json").stat().st_size
     print(f"Wrote {OUT / 'armenia.json'} ({size // 1024} KB), latest month {latest}, "
           f"{len(meta['months_read'])} reports read, {len(meta['months_unreadable'])} unreadable")
