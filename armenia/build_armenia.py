@@ -548,6 +548,11 @@ def update_armstat():
                  lambda c, t: (c != "indicators" or (re.search(r"by RA Marzes and Yerevan\s*-", t) and "Sectors" not in t)), "indicators"),
         "population": (P + "20 Census/PS-pp-1-1-2.px",
                        lambda c, t: (c not in ("settlement", "sex") or t.strip() == "Total"), "marzes"),
+        # sales ("trade transactions") registered in the year, by type of property
+        "house_sales": (P + "26 Housing/262 Shuka/PS-hs-rem03.px",
+                        lambda c, t: (c != "type of transaction" or t.strip().startswith("Residential houses")), "marzes"),
+        "apartment_sales": (P + "26 Housing/262 Shuka/PS-hs-rem03.px",
+                            lambda c, t: (c != "type of transaction" or t.strip().startswith("Apartments in multi-apartment")), "marzes"),
     }
     for name, (path, pick, marz_code) in jobs.items():
         try:
@@ -765,12 +770,12 @@ def build(max_reports):
         i = m["id"]
         data["marzes"][i] = {"hy": m["hy"], "en": m["en"],
                              "deals": series.get("marz_deals", {}).get(i, {}), "sales": series.get("marz_sales", {}).get(i, {}),
-                             **{k: armstat.get(k, {}).get(i, {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population")}}
+                             **{k: armstat.get(k, {}).get(i, {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales")}}
     data["national"] = {
         "usd": cba.get("usd", {}), "mortgage": cba.get("mortgage", {}), "policy_rate": cba.get("policy_rate", []),
         "inflation": armstat.get("inflation", {}),
         "deals": series.get("marz_deals", {}).get("armenia", {}), "sales": series.get("marz_sales", {}).get("armenia", {}),
-        **{k: armstat.get(k, {}).get("armenia", {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population")},
+        **{k: armstat.get(k, {}).get("armenia", {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales")},
     }
     save_json(OUT / "armenia.json", data)
     shutil.copyfile(STATIC / "areas.geojson", OUT / "areas.geojson")
