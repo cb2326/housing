@@ -594,6 +594,9 @@ const M = {
   inv_yoy:       { l: 'Listings change (1 year)', f: 'pct', d: 1, src: 'realtor', i: 'Change in active listings versus the same month last year.' },
   inv_mom:       { l: 'Listings change (1 month)', f: 'pct', d: 1, src: 'realtor', i: 'Change in active listings versus last month.' },
   inv_vs_2019:   { l: 'Listings vs 2017–19 normal', f: 'pct', d: 1, src: 'realtor', i: 'Active listings compared with the same month in 2017–2019. Negative means a shortage versus normal.' },
+  // single-family homes for sale (Redfin): history back to 2012
+  sfr_inv:       { l: 'Single-family homes for sale (since 2012)', f: 'num', src: 'redfin', i: 'Single-family houses listed for sale on the last day of the month (Redfin). History goes back to 2012, earlier than Realtor.com. Counts differ a little from Realtor.com because the two cover different listings. ZIP codes use rolling 3-month periods.' },
+  sfr_inv_yoy:   { l: 'Single-family homes for sale: change (1 year)', f: 'pct', d: 1, src: 'redfin', i: 'Change in single-family homes for sale versus the same month last year (Redfin).' },
   sales:         { l: 'Homes going under contract', f: 'num', src: 'realtor', i: 'Homes under contract (pending sales) this month, from Realtor.com: the most up-to-date count of sales for every place.' },
   sales_yoy:     { l: 'Sales change (1 year)', f: 'pct', d: 1, src: 'realtor', i: 'Change in pending home sales versus the same month last year.' },
   sales_vs_2019: { l: 'Sales vs 2017–19 normal', f: 'pct', d: 1, src: 'realtor', i: 'Pending home sales compared with the same month in 2017–2019.' },
@@ -757,7 +760,7 @@ const START_HERE = [['afford', 'What can I afford?'], ['hv', 'Home value'], ['hv
 const GROUPS = [
   ['Prices and affordability', ['hv', 'hv_long', 'hv_real', 'mtg_long', 'mtg_real', 'hv_yoy', 'hpi_change', 'hv_mom', 'hv_5y', 'fc_1y', 'sale_price', 'sale_price_yoy', 'hv_low', 'hv_high', 'sfr', 'sfr_yoy', 'condo', 'condo_yoy', 'hv_income', 'mtg_pmt', 'mtg_pct_income', 'salary_needed', 'prop_tax', 'prop_tax_rate', 'buy_vs_rent', 'fair_value', 'overvalued', 'from_2022_peak', 'crash_2007'], 'home'],
   ['Mortgage rates (nationwide)', ['mtg_rate', 't10', 'rate_spread'], 'percent'],
-  ['Market activity', ['market_heat', 'inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'sale_to_list', 'pct_above_list', 'days_to_pending', 'pending_ratio', 'dom', 'dom_yoy', 'cut', 'price_up', 'lp', 'lp_yoy', 'ppsf', 'med_sqft', 'months_supply', 'inv_pct_houses'], 'activity'],
+  ['Market activity', ['market_heat', 'inv', 'inv_yoy', 'inv_mom', 'inv_vs_2019', 'sfr_inv', 'sfr_inv_yoy', 'newl', 'newl_yoy', 'sales', 'sales_yoy', 'sales_vs_2019', 'sale_to_list', 'pct_above_list', 'days_to_pending', 'pending_ratio', 'dom', 'dom_yoy', 'cut', 'price_up', 'lp', 'lp_yoy', 'ppsf', 'med_sqft', 'months_supply', 'inv_pct_houses'], 'activity'],
   ['Schools', ['school_score'], 'school'],
   ['People and income', ['income', 'income_today', 'income_real', 'rpp_all', 'rpp_housing', 'income_growth', 'unemployment', 'jobs', 'job_growth', 'avg_pay', 'pay_growth', 'commute', 'poverty', 'college', 'remote', 'pop', 'pop_growth', 'pop_growth_5y', 'growth_score', 'density', 'mig_net', 'mig_net_pct', 'mig_in', 'mig_out', 'mig_in_income', 'mig_out_income', 'dom_mig', 'dom_mig_pct', 'intl_mig', 'intl_mig_pct', 'births', 'births_pct', 'deaths', 'deaths_pct', 'birth_death', 'natural', 'natural_pct', 'vote_r', 'vote_d'], 'people'],
   ['Climate, risk and walkability', ['risk', 'flood_risk', 'flood_zone_pct', 'flood_ins_pct', 'flood_claims', 'flood_claims_rate', 'flood_paid', 'fire_risk', 'hurricane_risk', 'tornado_risk', 'heat_risk', 'quake_risk', 'aqi_bad_days', 'aqi_median', 'noise_db', 'noise_loud', 'walk', 'temp'], 'leaf'],
@@ -949,6 +952,7 @@ function colorFor(v) {
 function sourceLine(k, meta, yr) {
   const s = M[k].src;
   if (s === 'realtor') return `Realtor.com, ${ymLabel(meta.months.realtor)}`;
+  if (s === 'redfin') return meta.months.redfin ? `Redfin, ${ymLabel(meta.months.redfin)}` : 'Redfin';
   if (s === 'forecast') return `Zillow forecast from ${ymLabel(meta.months.zillow)}`;
   if (s === 'income') return `Census income estimates, ${yr.income || meta.months.income}`;
   if (s === 'pop') return `Census population estimates, ${yr.pop || meta.months.population}`;
@@ -1621,6 +1625,8 @@ function seriesFor(key, h, p) {
     case 'inv_yoy': return h.inv && pctSeries(h.inv, 12);
     case 'inv_mom': return h.inv && pctSeries(h.inv, 1);
     case 'inv_vs_2019': return vsPre(h.inv);
+    case 'sfr_inv': return h.sfr_inv;
+    case 'sfr_inv_yoy': return h.sfr_inv && pctSeries(h.sfr_inv, 12);
     case 'inv_pct_houses': return per(h.inv, (x, k) => { const u = annualAt(a.units, k); return u ? x / u * 100 : null; });
     case 'sales': return h.pend;
     case 'sales_yoy': return h.pend && pctSeries(h.pend, 12);
@@ -1786,6 +1792,7 @@ const SRC = {
   zillow: ['Zillow Research', 'https://www.zillow.com/research/data/'],
   forecast: ['Zillow Home Value Forecast', 'https://www.zillow.com/research/data/'],
   realtor: ['Realtor.com Research', 'https://www.realtor.com/research/data/'],
+  redfin: ['Redfin Data Center', 'https://www.redfin.com/news/data-center/'],
   income: ['U.S. Census Bureau (SAIPE)', 'https://www.census.gov/programs-surveys/saipe.html'],
   pop: ['U.S. Census Bureau (Population Estimates)', 'https://www.census.gov/programs-surveys/popest.html'],
   age: ['U.S. Census Bureau (Population Estimates)', 'https://www.census.gov/programs-surveys/popest.html'],
@@ -1815,7 +1822,7 @@ const SRC = {
 // 'years' (fixed next date), or 'none' (a one-time study). manual: this site only picks it up after a code change.
 const RELEASE = {
   zillow: { every: 'month', day: 16 }, forecast: { every: 'month', day: 16 }, afford: { every: 'month', day: 16 }, fair: { every: 'month', day: 16 },
-  realtor: { every: 'month', day: 3 }, temp: { every: 'month', day: 8 },
+  realtor: { every: 'month', day: 3 }, temp: { every: 'month', day: 8 }, redfin: { every: 'month', day: 10 },
   income: { every: 'year', m: 12 }, acs: { every: 'year', m: 12 }, pop: { every: 'year', m: 3 }, age: { every: 'year', m: 6 },
   permits: { every: 'year', m: 5 }, units: { every: 'year', m: 5 }, bls: { every: 'year', m: 9 }, irs: { every: 'year', m: 6 },
   epa_air: { every: 'year', m: 6 }, fema: { every: 'year', m: 12, note: 'FEMA updates it about once a year' },
