@@ -533,7 +533,10 @@ def by_marz_year(rows, marz_code, year_code="years"):
 def update_armstat():
     """Yearly tables: refreshed at most once a week (they change once a year)."""
     saved = load_json(CACHE / "armstat.json", {})
-    if saved.get("fetched") and (dt.date.today() - dt.date.fromisoformat(saved["fetched"])).days < 7:
+    needed = ("poverty", "space_per_person", "new_housing_m2", "wage", "population", "house_sales", "apartment_sales",
+              "district_apartments", "inflation")
+    # refresh weekly, or at once when a table was added since the last download
+    if saved.get("fetched") and (dt.date.today() - dt.date.fromisoformat(saved["fetched"])).days < 7 and all(k in saved for k in needed):
         return saved
     out = {"fetched": dt.date.today().isoformat()}
     P = "2 Population and social processes/"
