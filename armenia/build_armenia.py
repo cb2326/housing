@@ -927,6 +927,30 @@ def update_cba():
         print(f"CBA long-term household loan rates (AMD/USD/EUR): {len(out['longterm_rate'].get('eur', {}))} months")
     except Exception as e:
         notice(f"Armenia: CBA long-term loan rates failed: {e}")
+    # Money supply (monetary aggregates, end of month, million AMD): M2 = money in drams (currency + dram deposits)
+    try:
+        rows = xlsx_rows(fetch("https://www.cba.am/en/statistics/monetary-aggregates/50/export-all/"))
+        head = next(r for r in rows if r and str(r[0]).strip().lower() == "indicators")
+        col = {re.sub(r"\s+", " ", str(h)).split(" mln")[0].strip().lower(): i for i, h in enumerate(head)}
+        money = {}
+        for r in rows:
+            m = re.match(r"(\d{4})-(\d{2})-\d{2}", str(r[0] if r else ""))
+            if not m:
+                continue
+            rec = {}
+            for k in ("m2", "m2x"):
+                try:
+                    rec[k] = round(float(r[col[k]]), 1)
+                except (KeyError, TypeError, ValueError, IndexError):
+                    pass
+            if rec.get("m2"):
+                money[f"{m.group(1)}-{m.group(2)}"] = rec
+        if len(money) < 60:
+            raise ValueError(f"only {len(money)} months")
+        out["money"] = dict(sorted(money.items()))
+        print(f"CBA money supply: {len(money)} months, latest {max(money)}")
+    except Exception as e:
+        notice(f"Armenia: CBA monetary aggregates failed: {e}")
     # Residential property price index (quarterly since 2018, from the Cadastre's sale records)
     try:
         out["rppi"] = update_rppi()
@@ -1025,7 +1049,7 @@ def build(max_reports):
         "usd": cba.get("usd", {}), "mortgage": cba.get("mortgage", {}), "policy_rate": cba.get("policy_rate", []),
         "mortgage_rate": cba.get("mortgage_rate", {}), "longterm_rate": cba.get("longterm_rate", {}),
         "rppi": cba.get("rppi", {}),
-        "cpi_am": armstat.get("cpi_index", {}), "cpi_us": us_cpi_index(),
+        "cpi_am": armstat.get("cpi_index", {}), "cpi_us": us_cpi_index(), "money": cba.get("money", {}),
         "inflation": armstat.get("inflation", {}),
         "deals": series.get("marz_deals", {}).get("armenia", {}), "sales": series.get("marz_sales", {}).get("armenia", {}),
         **{k: armstat.get(k, {}).get("armenia", {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales")},
