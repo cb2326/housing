@@ -668,7 +668,8 @@ function mtgPayment(pricePerM2, ym, cur = ui.cur) {
 
 // ---------- map ----------
 function initMap() {
-  map = L.map('map', { zoomControl: false, minZoom: 7, maxZoom: 15, maxBounds: [[37.8, 42.3], [42.2, 47.8]] }).setView([40.25, 44.95], 8);
+  // a roomy limit around Armenia: enough slack to drag any region out from behind the open panels
+  map = L.map('map', { zoomControl: false, minZoom: 6, maxZoom: 15, maxBounds: [[35.0, 37.0], [45.5, 53.0]] }).setView([40.25, 44.95], 8);
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Basemap &copy; Esri, HERE, Garmin, USGS, &copy; OpenStreetMap contributors', maxNativeZoom: 18 }).addTo(map);
   map.createPane('marz'); map.getPane('marz').style.zIndex = 410;
