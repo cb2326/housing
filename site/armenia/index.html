@@ -250,8 +250,8 @@ function valueOf(kind, id, metric = ui.metric) {
     case 'chg12': return recent(lastKey(p.price)) ? change(p.price, 12) : null;
     case 'chg1': return recent(lastKey(p.price)) ? change(p.price, 1) : null;
     case 'ptoi': { const k = lastKey(p.price), w = wageFor(marzId); return k && w ? (p.price[k] * 60) / (w * 12) : null; }
-    case 'deals': return p.deals ? p.deals[D.latest_month] ?? null : null;
-    case 'sales': return p.sales ? p.sales[D.latest_month] ?? null : null;
+    case 'deals': return p.deals ? p.deals[D.deals_month] ?? null : null;
+    case 'sales': return p.sales ? p.sales[D.deals_month] ?? null : null;
     case 'wage': { const w = latestYearVal(p.wage); return w == null ? null : ui.cur === 'USD' ? w / usdRate(lastKey(p.wage) + '-12') : w; }
     case 'poverty': return latestYearVal(p.poverty);
     case 'population': return p.population ? p.population['2022'] ?? latestYearVal(p.population) : null;
@@ -377,7 +377,7 @@ function updateLabels() {
 }
 function renderLegend() {
   const m = M[ui.metric];
-  const when = m.yearly ? latestYearLabel(ui.metric) : monthLabel(D.latest_month);
+  const when = m.yearly ? latestYearLabel(ui.metric) : monthLabel(['deals', 'sales'].includes(ui.metric) ? D.deals_month : D.latest_month);
   const sub = m.level === 'marz' ? `By marz · ${when}` : ['deals', 'sales'].includes(ui.metric) ? `Yerevan districts and marzes · ${when}` : `Yerevan districts and 45 towns · ${when}`;
   $('#legend').innerHTML = `<h3>${esc(m.label)}${m.money ? ` (${ui.cur})` : ''}</h3><div class="sub">${sub}</div>
     <div class="bar">${scale.pal.map(c => `<i style="background:${c}"></i>`).join('')}</div>
@@ -493,7 +493,7 @@ function renderDetail() {
       <p class="note">Yerevan is split into 11 valuation zones set by the government in 2020 (decision N 1023-N): zone 1 is the most central and expensive, zone 11 the outskirts. A district can contain several zones, and the same zone number means a similar location tier anywhere in the city. Click a zone to see its history. The zone boundaries are not published as open map data, so they can't be drawn on the map.</p>`;
     }
     if (kind === 'district') {
-      h += `<h3>Transactions per month</h3><div class="stats">${stat(`All transactions · ${monthLabel(D.latest_month)}`, fmtInt(p.deals[D.latest_month]))}${stat('Sales', fmtInt(p.sales[D.latest_month]))}</div>${chart(p.sales, fmtInt, true)}<p class="note">Bars: property sales each month.</p>`;
+      h += `<h3>Transactions per month</h3><div class="stats">${stat(`All transactions · ${monthLabel(D.deals_month)}`, fmtInt(p.deals[D.deals_month]))}${stat('Sales', fmtInt(p.sales[D.deals_month]))}</div>${chart(p.sales, fmtInt, true)}<p class="note">Bars: property sales each month.</p>`;
       const ap = p.apartments; const ay = lastKey(ap);
       if (ay) h += `<div class="stats">${stat(`Apartments in apartment buildings · ${ay}`, fmtInt(ap[ay]), '', true)}</div>`;
     }
@@ -548,8 +548,8 @@ function marzBlock(marzId, asContext) {
     ${stat(`Housing space per person · ${sy || ''}`, m.space_per_person?.[sy] != null ? m.space_per_person[sy].toFixed(1) + ' m²' : '–')}
     ${stat(`New housing built · ${by || ''}`, m.new_housing_m2?.[by] != null ? fmtInt(m.new_housing_m2[by]) + ' m²' : '–')}
     ${stat('New housing per 1,000 people', built == null ? '–' : built.toFixed(0) + ' m²')}
-    ${stat(`Transactions · ${monthLabel(D.latest_month)}`, fmtInt(m.deals?.[D.latest_month]))}
-    ${stat('Property sales', fmtInt(m.sales?.[D.latest_month]))}</div>`;
+    ${stat(`Transactions · ${monthLabel(D.deals_month)}`, fmtInt(m.deals?.[D.deals_month]))}
+    ${stat('Property sales', fmtInt(m.sales?.[D.deals_month]))}</div>`;
   if (!asContext) {
     h += `<h3>Property sales per month</h3>${chart(m.sales, fmtInt, true)}`;
     if (Object.keys(m.wage || {}).length > 2) h += `<h3>Average monthly wage (${ui.cur})</h3>${chart(yearlyIn(m.wage), v => fmtMoney(v, ui.cur))}`;
@@ -575,8 +575,8 @@ function renderNational() {
     ${stat(`Policy rate · since ${rate ? rate[0].split('-').reverse().join('.') : ''}`, rate ? rate[1].toFixed(2) + '%' : '–')}
     ${stat(`Inflation (12 months) · ${monthLabel(ik)}`, n.inflation?.[ik] != null ? fmtPct(n.inflation[ik]) : '–')}
     ${stat(`Dram per US dollar · ${monthLabel(uk)} avg.`, n.usd?.[uk] ? n.usd[uk].toFixed(2) + ' ֏' : '–')}
-    ${stat(`Transactions · ${monthLabel(D.latest_month)}`, fmtInt(n.deals?.[D.latest_month]))}
-    ${stat('Property sales', fmtInt(n.sales?.[D.latest_month]))}</div>
+    ${stat(`Transactions · ${monthLabel(D.deals_month)}`, fmtInt(n.deals?.[D.deals_month]))}
+    ${stat('Property sales', fmtInt(n.sales?.[D.deals_month]))}</div>
     <h3>Mortgage loans outstanding (${unit})</h3>${chart(mortTotal, v => v.toFixed(ui.cur === 'USD' ? 2 : 0) + (ui.cur === 'USD' ? ' bn $' : ' bn ֏'))}
     <p class="note">All commercial-bank mortgage loans, end of each month (Central Bank of Armenia). No mortgage interest rate is published separately.</p>
     <h3>Property sales per month (whole country)</h3>${chart(n.sales, fmtInt, true)}
@@ -689,6 +689,8 @@ function loadState() {
 Promise.all([fetch('data/armenia.json').then(r => r.json()), fetch('data/areas.geojson').then(r => r.json())])
   .then(([data, areas]) => {
     D = data; AREAS = areas;
+    // transaction tables can be a month behind the prices (some reports have them only as pictures)
+    D.deals_month = lastKey(D.national.deals) || D.latest_month;
     loadState();
     $('#built').textContent = `Prices through ${monthLabel(D.latest_month)}; updated ${D.built}.`;
     renderMetrics();
