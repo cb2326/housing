@@ -46,13 +46,31 @@
   .country a, .country span { flex: 1; text-align: center; padding: 6px 8px; border-radius: 9px; border: 1px solid var(--line); font-weight: 600; font-size: 12.5px; text-decoration: none; color: var(--muted); }
   .country span { background: var(--accent); border-color: var(--accent); color: #fff; }
   .country a:hover { border-color: #8ccdc0; color: var(--accent); }
+  .brand .byline { color: var(--accent); font-weight: 600; font-size: 12.5px; margin-top: 3px; }
+  /* data points: the same collapsible groups as the US map */
+  .dp-search { margin: 4px 14px 10px; position: relative; display: block; }
+  .dp-search input { width: 100%; padding: 8px 12px 8px 32px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+  .dp-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); }
   .groups { overflow-y: auto; flex: 1; padding: 0 8px 16px; }
-  .group { border-top: 1px solid var(--line); padding: 8px 0 4px; }
-  .group h2 { margin: 2px 8px 4px; font: 600 12px var(--sans); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-  .metric { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 8px; cursor: pointer; width: 100%; border: 0; background: none; text-align: left; }
+  .group { border-top: 1px solid var(--line); }
+  .group > button { width: 100%; display: flex; justify-content: space-between; align-items: center; background: none; border: 0; padding: 12px 8px; cursor: pointer; font-weight: 600; text-align: left; }
+  .group > button::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .15s; margin-right: 4px; }
+  .group.open > button::after { transform: rotate(-135deg); }
+  .group > button span { display: inline-flex; align-items: center; gap: 8px; }
+  .group ul { list-style: none; margin: 0 0 8px; padding: 0; display: none; }
+  .group.open ul { display: block; }
+  .gi { width: 17px; height: 17px; color: var(--accent); flex: none; }
+  .group .dot { width: 7px; height: 7px; border-radius: 50%; background: #e76f51; display: inline-block; }
+  .metric { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
   .metric:hover { background: var(--accent-soft); }
+  .metric input { accent-color: var(--accent); margin: 0; flex: none; }
+  .metric span { flex: 1; }
   .metric.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-  .metric .lvl { margin-left: auto; font-size: 11px; color: var(--muted); font-weight: 500; }
+  .metric .info { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted); font: 600 11px/16px var(--sans); text-align: center; background: var(--panel); cursor: pointer; padding: 0; }
+  .metric .info:hover { color: var(--accent); border-color: var(--accent); }
+  .info-pop { position: fixed; z-index: 1300; max-width: 280px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 12.5px; display: none; }
+  .rel { display: inline-block; margin-top: 3px; color: #126b60; font-size: 11.5px; }
+  .rel::before { content: '↻ '; }
   .side-foot { padding: 10px 16px 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
   .side-foot a { color: inherit; }
   .side-support { display: flex; align-items: center; gap: 10px; margin: 0 14px 10px; padding: 9px 12px; border-radius: 12px; background: #fbe9e3; border: 1px solid #f6b89b; color: #7a2a17; text-decoration: none; }
@@ -145,9 +163,11 @@
   <aside class="side" id="side">
     <a class="brand" href="/">
       <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#126b60"/><path d="M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z" fill="none" stroke="#e6f4f1" stroke-width="3.5" stroke-linejoin="round"/><path d="M25 15v29M39 20v29" stroke="#8ccdc0" stroke-width="3.5"/></svg>
-      <div><h1>Open Housing Atlas</h1><small>Armenia · Հայաստան</small></div>
+      <div><h1>Open Housing Atlas</h1><small class="byline">Free Armenia housing data</small><small id="asof">Loading data…</small></div>
     </a>
     <div class="country"><a href="/">United States</a><span>Armenia</span></div>
+    <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="dpSearch" type="search" placeholder="Find a data point" aria-label="Find a data point"></label>
     <div class="groups" id="groups"></div>
     <a class="side-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span><b>Support on Ko-fi</b><small>Keep this atlas free for everyone</small></span></a>
     <div class="side-foot">
@@ -178,6 +198,7 @@
       <div class="d-body" id="dBody"></div>
     </section>
     <div class="loading" id="loading">Loading Armenia data…</div>
+    <div class="info-pop" id="infoPop"></div>
   </main>
 </div>
 
@@ -185,29 +206,52 @@
 <script>
 'use strict';
 // ---------- data points ----------
+// rel: how often the source updates ('month' = Cadastre monthly report, 'year' = Armstat yearly, 'census' = once)
 const METRICS = [
-  { id: 'price', group: 'Home prices', label: 'Apartment price per m²', level: 'district · town', money: true,
-    info: 'Average market price of apartments in apartment buildings, per square meter (Cadastre Committee, monthly).' },
-  { id: 'chg12', group: 'Home prices', label: '12-month price change', level: 'district · town', pct: true },
-  { id: 'chg1', group: 'Home prices', label: '1-month price change', level: 'district · town', pct: true },
-  { id: 'ptoi', group: 'Home prices', label: 'Years of wages for 60 m²', level: 'district · town', unit: 'yrs',
-    info: 'Price of a 60 m² apartment divided by a year of the average gross wage in its marz (Armstat). Higher = less affordable.' },
-  { id: 'deals', group: 'Market activity', label: 'Property transactions (month)', level: 'district · marz',
-    info: 'All registered real estate transactions (sales, gifts, mortgages, leases…).' },
-  { id: 'sales', group: 'Market activity', label: 'Property sales (month)', level: 'district · marz' },
-  { id: 'wage', group: 'People & income', label: 'Average monthly wage', level: 'marz', money: true, yearly: true },
-  { id: 'poverty', group: 'People & income', label: 'Poverty rate', level: 'marz', unit: '%', yearly: true },
-  { id: 'population', group: 'People & income', label: 'Population (2022 census)', level: 'marz', yearly: true },
-  { id: 'space', group: 'Housing', label: 'Housing space per person', level: 'marz', unit: 'm²', yearly: true },
-  { id: 'built', group: 'Housing', label: 'New housing built (m² per 1,000 people)', level: 'marz', yearly: true,
-    info: 'Floor area of new dwellings put into use in the latest year, per 1,000 residents (Armstat).' },
+  { id: 'price', group: 'Prices and affordability', label: 'Apartment price per m²', level: 'district · town', money: true, rel: 'month',
+    info: 'Average market price per square meter of apartments in apartment buildings, from the Cadastre Committee\'s monthly market report. Shown for Yerevan\'s 12 districts and 45 regional towns.' },
+  { id: 'typical', group: 'Prices and affordability', label: 'Typical apartment price (60 m²)', level: 'district · town', money: true, rel: 'month',
+    info: 'What a 60 m² apartment costs at the average price per m², a size typical of Soviet-era two-room flats. Armenia publishes no average house price, so this is the closest full-price figure.' },
+  { id: 'chg12', group: 'Prices and affordability', label: 'Price change (1 year)', level: 'district · town', pct: true, rel: 'month',
+    info: 'Change in the apartment price per m² compared with the same month a year earlier.' },
+  { id: 'chg1', group: 'Prices and affordability', label: 'Price change (1 month)', level: 'district · town', pct: true, rel: 'month',
+    info: 'Change in the apartment price per m² compared with the month before.' },
+  { id: 'ptoi', group: 'Prices and affordability', label: 'Years of wages for a 60 m² apartment', level: 'district · town', unit: 'yrs', rel: 'month',
+    info: 'Price of a 60 m² apartment divided by a year of the average gross wage in its marz (Armstat). Higher means less affordable.' },
+  { id: 'deals', group: 'Market activity', label: 'Property transactions (month)', level: 'district · marz', rel: 'month',
+    info: 'All real estate transactions registered with the Cadastre in the month: sales, gifts, mortgages, leases and more.' },
+  { id: 'sales', group: 'Market activity', label: 'Property sales (month)', level: 'district · marz', rel: 'month',
+    info: 'Sales of all kinds of property registered with the Cadastre in the month.' },
+  { id: 'house_sales', group: 'Market activity', label: 'House sales (year)', level: 'marz', yearly: true, rel: 'year',
+    info: 'Number of private houses sold in the year, by marz (Armstat, from Cadastre registrations). Armenia publishes no house prices, only how many sell.' },
+  { id: 'apt_sales', group: 'Market activity', label: 'Apartment sales (year)', level: 'marz', yearly: true, rel: 'year',
+    info: 'Number of apartments in apartment buildings sold in the year, by marz (Armstat, from Cadastre registrations).' },
+  { id: 'wage', group: 'People and income', label: 'Average monthly wage', level: 'marz', money: true, yearly: true, rel: 'year',
+    info: 'Average gross monthly wage of employees, by marz (Armstat).' },
+  { id: 'poverty', group: 'People and income', label: 'Poverty rate', level: 'marz', unit: '%', yearly: true, rel: 'year',
+    info: 'Share of people living below the national poverty line, by marz (Armstat household survey).' },
+  { id: 'population', group: 'People and income', label: 'Population (2022 census)', level: 'marz', yearly: true, rel: 'census',
+    info: 'Permanent population counted in the 2022 census (Armstat).' },
+  { id: 'space', group: 'Housing', label: 'Housing space per person', level: 'marz', unit: 'm²', yearly: true, rel: 'year',
+    info: 'Total floor area of the housing stock divided by the population, by marz (Armstat).' },
+  { id: 'built', group: 'Housing', label: 'New housing built (m² per 1,000 people)', level: 'marz', yearly: true, rel: 'year',
+    info: 'Floor area of new homes put into use in the latest year, per 1,000 residents (Armstat).' },
 ];
+const GROUP_ICONS = { 'Prices and affordability': 'home', 'Market activity': 'activity', 'People and income': 'people', 'Housing': 'building' };
+const ICONS = {
+  home: 'M3 11 12 4l9 7M5 10v10h14V10M10 20v-5h4v5',
+  activity: 'M3 12h4l3 7 4-14 3 7h4',
+  people: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6',
+  building: 'M4 21V8l8-5 8 5v13M9 21v-6h6v6M3 21h18',
+};
+const icon = name => `<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
 const M = Object.fromEntries(METRICS.map(m => [m.id, m]));
-const PALETTE = ['#edf8f4', '#c4e6dc', '#8ccdc0', '#4fae9f', '#21887a', '#126b60', '#0b4a43'];
-const DIVERGE = ['#b42318', '#e8836f', '#f6d2c6', '#eef2f0', '#b9e0d6', '#4fae9f', '#126b60'];
+// The same colors as the US map: amounts light to dark teal; changes teal (falling), cream (flat), coral (rising)
+const PALETTE = ['#e6f4f1', '#bfe3dc', '#8ccdc0', '#56b0a0', '#2b8f80', '#126b60', '#06463f'];
+const DIVERGE = ['#0b5d5a', '#2a9d8f', '#8fd3c7', '#f4efe6', '#f6b89b', '#e76f51', '#9c2f1c'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const ui = { metric: 'price', cur: 'AMD', sel: null };
+const ui = { metric: 'price', cur: 'AMD', sel: null, open: new Set(['Prices and affordability']) };
 let D = null, AREAS = null, map, marzLayer, distLayer, townLayer, labelLayer;
 
 // ---------- helpers ----------
@@ -247,6 +291,9 @@ function valueOf(kind, id, metric = ui.metric) {
   const marzId = kind === 'district' ? 'yerevan' : kind === 'town' ? p.marz : id;
   switch (metric) {
     case 'price': { const k = lastKey(p.price); return recent(k) ? toCur(p.price[k], k) : null; }
+    case 'typical': { const k = lastKey(p.price); return recent(k) ? toCur(p.price[k] * 60, k) : null; }
+    case 'house_sales': return latestYearVal(p.house_sales);
+    case 'apt_sales': return latestYearVal(p.apartment_sales);
     case 'chg12': return recent(lastKey(p.price)) ? change(p.price, 12) : null;
     case 'chg1': return recent(lastKey(p.price)) ? change(p.price, 1) : null;
     case 'ptoi': { const k = lastKey(p.price), w = wageFor(marzId); return k && w ? (p.price[k] * 60) / (w * 12) : null; }
@@ -385,23 +432,54 @@ function renderLegend() {
     <div class="na"><i></i>No data</div>`;
 }
 function latestYearLabel(metric) {
-  const key = { wage: 'wage', poverty: 'poverty', population: 'population', space: 'space_per_person', built: 'new_housing_m2' }[metric];
+  const key = { wage: 'wage', poverty: 'poverty', population: 'population', space: 'space_per_person', built: 'new_housing_m2', house_sales: 'house_sales', apt_sales: 'apartment_sales' }[metric];
   const years = Object.values(D.marzes).map(p => lastKey(p[key])).filter(Boolean).sort();
   return metric === 'population' ? '2022 census' : years[years.length - 1] || '';
 }
 
 // ---------- sidebar ----------
+// The same collapsible groups as the US map: click a group to open it, pick a data point, "i" explains it.
 function renderMetrics() {
+  const q = $('#dpSearch').value.trim().toLowerCase();
   const groups = {};
   for (const m of METRICS) (groups[m.group] ||= []).push(m);
-  $('#groups').innerHTML = Object.entries(groups).map(([g, ms]) => `<div class="group"><h2>${esc(g)}</h2>${ms.map(m =>
-    `<button class="metric${m.id === ui.metric ? ' on' : ''}" data-m="${m.id}" title="${esc(m.info || '')}"><span>${esc(m.label)}</span><span class="lvl">${esc(m.level)}</span></button>`).join('')}</div>`).join('');
+  $('#groups').innerHTML = Object.entries(groups).map(([name, ms], gi) => {
+    const list = ms.filter(m => !q || m.label.toLowerCase().includes(q) || m.info.toLowerCase().includes(q));
+    if (!list.length) return '';
+    const open = q || ui.open.has(name);
+    const here = list.some(m => m.id === ui.metric) ? ' <i class="dot" aria-label="selected here"></i>' : '';
+    return `<div class="group ${open ? 'open' : ''}"><button type="button" data-group="${esc(name)}"><span>${icon(GROUP_ICONS[name])}${esc(name)}${here}</span></button><ul>${list.map(m =>
+      `<li><label class="metric ${ui.metric === m.id ? 'on' : ''}"><input type="radio" name="metric-${gi}" value="${m.id}" ${ui.metric === m.id ? 'checked' : ''}><span>${esc(m.label)}</span><button class="info" type="button" data-info="${m.id}" aria-label="About ${esc(m.label)}">i</button></label></li>`).join('')}</ul></div>`;
+  }).join('') || '<p class="note" style="padding:8px">No data points match.</p>';
 }
+function releaseText(id) {
+  const m = M[id];
+  // the Cadastre publishes each month's report about 5–6 weeks after the month ends; the site checks on the 5th and 20th
+  if (m.rel === 'month') return `Updated monthly · ${monthLabel(addMonths(D.latest_month, 1))} figures expected around ${monthLabel(addMonths(D.latest_month, 3))} · appears here automatically`;
+  if (m.rel === 'year') return 'Updated once a year · appears here automatically';
+  if (m.rel === 'census') return 'From the 2022 census · the next census is years away';
+  return '';
+}
+function showInfo(btn) {
+  const pop = $('#infoPop'), r = btn.getBoundingClientRect(), m = M[btn.dataset.info];
+  pop.innerHTML = `<b>${esc(m.label)}</b><br>${esc(m.info)}<br><span style="color:var(--muted)">Shown for: ${esc(m.level)}</span>${releaseText(m.id) ? `<br><span class="rel">${esc(releaseText(m.id))}</span>` : ''}`;
+  pop.style.display = 'block';
+  pop.style.left = Math.min(r.right + 8, innerWidth - 290) + 'px';
+  pop.style.top = Math.max(10, Math.min(r.top - 6, innerHeight - pop.offsetHeight - 10)) + 'px';
+}
+document.addEventListener('click', e => { if (!e.target.closest('[data-info]')) $('#infoPop').style.display = 'none'; });
 $('#groups').addEventListener('click', e => {
-  const b = e.target.closest('[data-m]'); if (!b) return;
-  ui.metric = b.dataset.m; renderMetrics(); restyle(); refreshDetail(); saveState();
+  const info = e.target.closest('[data-info]');
+  if (info) { e.preventDefault(); showInfo(info); return; }
+  const g = e.target.closest('[data-group]');
+  if (g) { const n = g.dataset.group; ui.open.has(n) ? ui.open.delete(n) : ui.open.add(n); renderMetrics(); saveState(); }
+});
+$('#groups').addEventListener('change', e => {
+  if (!e.target.name || !e.target.name.startsWith('metric')) return;
+  ui.metric = e.target.value; renderMetrics(); restyle(); refreshDetail(); saveState();
   if (innerWidth <= 760) $('#side').classList.remove('open');
 });
+$('#dpSearch').addEventListener('input', renderMetrics);
 $('#cur').addEventListener('click', e => {
   const b = e.target.closest('[data-c]'); if (!b) return;
   ui.cur = b.dataset.c;
@@ -549,9 +627,12 @@ function marzBlock(marzId, asContext) {
     ${stat(`New housing built · ${by || ''}`, m.new_housing_m2?.[by] != null ? fmtInt(m.new_housing_m2[by]) + ' m²' : '–')}
     ${stat('New housing per 1,000 people', built == null ? '–' : built.toFixed(0) + ' m²')}
     ${stat(`Transactions · ${monthLabel(D.deals_month)}`, fmtInt(m.deals?.[D.deals_month]))}
-    ${stat('Property sales', fmtInt(m.sales?.[D.deals_month]))}</div>`;
+    ${stat('Property sales', fmtInt(m.sales?.[D.deals_month]))}
+    ${stat(`Houses sold · ${lastKey(m.house_sales) || ''}`, fmtInt(latestYearVal(m.house_sales)))}
+    ${stat(`Apartments sold · ${lastKey(m.apartment_sales) || ''}`, fmtInt(latestYearVal(m.apartment_sales)))}</div>`;
   if (!asContext) {
     h += `<h3>Property sales per month</h3>${chart(m.sales, fmtInt, true)}`;
+    if (Object.keys(m.house_sales || {}).length > 2) h += `<h3>Houses sold per year</h3>${chart(yearly(m.house_sales), fmtInt, true)}<h3>Apartments sold per year</h3>${chart(yearly(m.apartment_sales), fmtInt, true)}<p class="note">Armenia publishes no house prices; these yearly counts (Armstat) show how active the market for private houses is.</p>`;
     if (Object.keys(m.wage || {}).length > 2) h += `<h3>Average monthly wage (${ui.cur})</h3>${chart(yearlyIn(m.wage), v => fmtMoney(v, ui.cur))}`;
     if (Object.keys(m.poverty || {}).length > 2) h += `<h3>Poverty rate</h3>${chart(yearly(m.poverty), v => v.toFixed(1) + '%')}`;
   }
@@ -576,7 +657,9 @@ function renderNational() {
     ${stat(`Inflation (12 months) · ${monthLabel(ik)}`, n.inflation?.[ik] != null ? fmtPct(n.inflation[ik]) : '–')}
     ${stat(`Dram per US dollar · ${monthLabel(uk)} avg.`, n.usd?.[uk] ? n.usd[uk].toFixed(2) + ' ֏' : '–')}
     ${stat(`Transactions · ${monthLabel(D.deals_month)}`, fmtInt(n.deals?.[D.deals_month]))}
-    ${stat('Property sales', fmtInt(n.sales?.[D.deals_month]))}</div>
+    ${stat('Property sales', fmtInt(n.sales?.[D.deals_month]))}
+    ${stat(`Houses sold · ${lastKey(n.house_sales) || ''}`, fmtInt(latestYearVal(n.house_sales)))}
+    ${stat(`Apartments sold · ${lastKey(n.apartment_sales) || ''}`, fmtInt(latestYearVal(n.apartment_sales)))}</div>
     <h3>Mortgage loans outstanding (${unit})</h3>${chart(mortTotal, v => v.toFixed(ui.cur === 'USD' ? 2 : 0) + (ui.cur === 'USD' ? ' bn $' : ' bn ֏'))}
     <p class="note">All commercial-bank mortgage loans, end of each month (Central Bank of Armenia). No mortgage interest rate is published separately.</p>
     <h3>Property sales per month (whole country)</h3>${chart(n.sales, fmtInt, true)}
@@ -664,7 +747,7 @@ function wireCharts() {
 
 // ---------- remembered view (this browser only) ----------
 function saveState() {
-  try { localStorage.setItem('oha-armenia', JSON.stringify({ metric: ui.metric, cur: ui.cur })); } catch (e) { }
+  try { localStorage.setItem('oha-armenia', JSON.stringify({ metric: ui.metric, cur: ui.cur, open: [...ui.open] })); } catch (e) { }
   const q = new URLSearchParams();
   if (ui.metric !== 'price') q.set('m', ui.metric);
   if (ui.cur !== 'AMD') q.set('c', ui.cur);
@@ -672,7 +755,8 @@ function saveState() {
   history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
 }
 function loadState() {
-  try { const s = JSON.parse(localStorage.getItem('oha-armenia') || '{}'); if (M[s.metric]) ui.metric = s.metric; if (s.cur === 'USD') ui.cur = 'USD'; } catch (e) { }
+  try { const s = JSON.parse(localStorage.getItem('oha-armenia') || '{}'); if (M[s.metric]) ui.metric = s.metric; if (s.cur === 'USD') ui.cur = 'USD'; if (Array.isArray(s.open)) ui.open = new Set(s.open); } catch (e) { }
+  ui.open.add(M[ui.metric].group);   // the group holding the chosen data point starts open
   const q = new URLSearchParams(location.search);
   if (M[q.get('m')]) ui.metric = q.get('m');
   if (q.get('c') === 'USD') ui.cur = 'USD';
@@ -693,6 +777,7 @@ Promise.all([fetch('data/armenia.json').then(r => r.json()), fetch('data/areas.g
     D.deals_month = lastKey(D.national.deals) || D.latest_month;
     loadState();
     $('#built').textContent = `Prices through ${monthLabel(D.latest_month)}; updated ${D.built}.`;
+    $('#asof').textContent = `Updated ${D.built}`;
     renderMetrics();
     initMap();
     restyle();
