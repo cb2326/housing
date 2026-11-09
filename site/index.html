@@ -404,6 +404,14 @@
     .drawer header { padding: 12px 56px 10px 16px; flex-wrap: wrap; position: relative; }
     .drawer header h2 { flex-basis: 100%; }
     .drawer header #dClose { position: absolute; right: 12px; top: 12px; }
+    /* a shorter chart with tighter controls, so the chart doesn't fill the phone screen */
+    .metric-head { margin: 0 0 4px; }
+    .chart-ctrl { margin-bottom: 4px; gap: 6px; }
+    .seg-sm button { padding: 3px 9px; }
+    .ov-pick { margin: 0 0 4px; }
+    .ov-pick select { padding: 4px 6px; }
+    .ref-chk, .ax-pick { margin-bottom: 4px; }
+    .chart + .note, .chart .note { margin-top: 2px !important; }
     /* the Data menu: whole screen too, with a slim footer so the list of data points gets the room */
     .side { width: 100vw; padding-top: env(safe-area-inset-top); }
     .side-x { display: inline-flex; }
@@ -1789,7 +1797,7 @@ function chartSvg(series, def, s2, def2, ref) {
   const shared = has2 && unit(def2.f) === unit(def.f) && overlayAxis !== 'right';
   // Phones get a smaller drawing so the numbers stay readable once it is fitted to the screen.
   const narrow = innerWidth <= 820;
-  const W = narrow ? 400 : 760, H = narrow ? 290 : 380, L0 = narrow ? 50 : 62, R0 = has2 && !shared ? (narrow ? 46 : 62) : (narrow ? 12 : 18), T0 = has2 || hasR ? 40 : 26, B0 = 28;
+  const W = narrow ? 400 : 760, H = narrow ? 215 : 380, L0 = narrow ? 50 : 62, R0 = has2 && !shared ? (narrow ? 46 : 62) : (narrow ? 12 : 18), T0 = has2 || hasR ? 40 : 26, B0 = 28;
   const range = (vs, d) => {
     let lo = Math.min(...vs), hi = Math.max(...vs);
     if (d) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
@@ -1807,6 +1815,8 @@ function chartSvg(series, def, s2, def2, ref) {
   const every = Math.ceil(years.length / (narrow ? 6 : 10));
   const yearly = chartMode === 'yearly' || keys[0].length === 4;
   const xt = keys.map((k, i) => [k, i]).filter(([k, i]) => yearly ? i % every === 0 || i === keys.length - 1 : k.endsWith('-01') && years.indexOf(k.slice(0, 4)) % every === 0);
+  // the last year label always shows; drop the one before it if the two would overlap
+  if (xt.length > 2 && x(xt[xt.length - 1][1]) - x(xt[xt.length - 2][1]) < 34) xt.splice(xt.length - 2, 1);
   const path = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
   // the second line skips gaps
   const path2 = has2 ? vals2.map((v, i) => v == null ? '' : `${i && vals2[i - 1] != null ? 'L' : 'M'}${x(i).toFixed(1)},${y2(v).toFixed(1)}`).join('') : '';
