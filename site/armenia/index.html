@@ -133,6 +133,18 @@
   .legend .zb:hover, .legend .zb.on { background: var(--panel-2); }
   .legend .zb i { width: 16px; height: 12px; border-radius: 3px; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
   .legend .zhint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  /* no browser focus box around a clicked area (the selected area already gets its own outline) */
+  .leaflet-interactive:focus, .leaflet-container path:focus { outline: none; }
+  /* zone legend: one color bar like the US map, each piece tappable */
+  .legend .zbar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; }
+  .legend .zbar button { flex: 1; border: 0; padding: 0; cursor: pointer; transition: opacity .15s, transform .15s; }
+  .legend .zbar.pick button:not(.on) { opacity: .25; }
+  .legend .zbar button:hover { transform: scaleY(1.25); }
+  .legend .zticks { position: relative; height: 15px; font-size: 11px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .legend .zticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .legend .zticks span:first-child { transform: none; }
+  .legend .zticks span:last-child { transform: translateX(-100%); }
+  .legend .na i.nos { background: repeating-linear-gradient(45deg, #e5e7eb 0 3px, #fff 3px 6px); border: 1px solid #d1d5db; }
   /* calmer, grey basemap under the zone colors */
   #map.zone-mode .leaflet-tile-pane { filter: grayscale(1) contrast(.9) brightness(1.06); opacity: .7; }
   .plabel.zl .in { font-size: 12px; }
@@ -352,7 +364,7 @@ const icon = name => `<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="cu
 const M = Object.fromEntries(METRICS.map(m => [m.id, m]));
 // The same colors as the US map: amounts light to dark teal; changes teal (falling), cream (flat), coral (rising)
 const PALETTE = ['#e6f4f1', '#bfe3dc', '#8ccdc0', '#56b0a0', '#2b8f80', '#126b60', '#06463f'];
-const ZONE_PAL = ['#fff1a8', '#fdd27b', '#f9a65a', '#f1743f', '#d9423e', '#a91d5c', '#5e0f66'];
+const ZONE_PAL = ['#0b5d5a', '#2a9d8f', '#8fd3c7', '#f4efe6', '#f6b89b', '#e76f51', '#9c2f1c'];   // same colors as the US map's legend
 const DIVERGE =['#0b5d5a', '#2a9d8f', '#8fd3c7', '#f4efe6', '#f6b89b', '#e76f51', '#9c2f1c'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -374,6 +386,8 @@ function zoneValue(props, metric = ui.metric) {
   }
   return null;
 }
+// "Kentron – Zone 1": a zone piece named by its district first
+const zoneName = props => `${(D.districts[props.district]?.en || '').split(' (')[0]} – Zone ${props.zone}`;
 // ---------- map level: Marz / District / Town / Zone, like State / Metro / County / Zip on the US map ----------
 const ZONE_METRICS = ['price', 'typical', 'chg12', 'chg1', 'mtg_pmt', 'ptoi'];
 function levelsFor(metric) {
@@ -490,15 +504,15 @@ function makeScale(values, metric, zone) {
   }
   const q = p => v[Math.min(v.length - 1, Math.floor(p * (v.length - 1)))];
   if (zone && v[v.length - 1] > v[0]) {
-    // round-number bands (e.g. 50k ֏ steps for the price per m²) set from the zone values, in a yellow → red → purple scale
-    const step = niceStep((v[v.length - 1] - v[0]) / 14);
+    // round-number bands (e.g. 50k ֏ steps for the price per m²) set from the zone values, in the US map's teal → red scale
+    const step = niceStep((v[v.length - 1] - v[0]) / 20);
     const breaks = [...new Set([1, 2, 3, 4, 5, 6].map(i => Math.round(q(i / 7) / step) * step))].filter(b => b > v[0] && b < v[v.length - 1]);
-    const pal = ZONE_PAL.slice(ZONE_PAL.length - breaks.length - 1);
+    const n = breaks.length + 1, pal = Array.from({ length: n }, (_, i) => ZONE_PAL[n === 1 ? 6 : Math.round(i * 6 / (n - 1))]);
     const color = x => pal[bandOf(x)];
     const bandOf = x => { let i = 0; while (i < breaks.length && x >= breaks[i]) i++; return i; };
     const short = x => labelValue(x, metric);
     const bands = pal.map((c, i) => ({ c, label: i === 0 ? `under ${short(breaks[0])}` : i === breaks.length ? `${short(breaks[i - 1])} +` : `${short(breaks[i - 1]).replace(/ (֏|yrs)$/, '')}–${short(breaks[i])}` }));
-    return { color, pal, bands, bandOf, ticks: [] };
+    return { color, pal, bands, bandOf, breaks, short, ticks: [] };
   }
   const breaks = [1, 2, 3, 4, 5, 6].map(i => q(i / 7));
   const color = x => { let i = 0; while (i < breaks.length && x > breaks[i]) i++; return PALETTE[i]; };
@@ -548,7 +562,7 @@ function initMap() {
       l.on('mouseout', () => { if (isZoneMode()) l.setStyle(zoneStyle(f)); });
       l.bindTooltip(() => {
         const d = D.districts[f.properties.district], v = zoneValue(f.properties);
-        return `<b>Zone ${f.properties.zone}</b> · ${esc(d.en)}<br><small>Official valuation zone (approximate outline)</small><br>${esc(M[ui.metric].label)}: <b>${v == null ? (f.properties.zone === 12 ? 'no apartment price (outskirts)' : 'no sales in this zone') : fmtValue(v)}</b>`;
+        return `<b>${esc(zoneName(f.properties))}</b><br><small>Official valuation zone (approximate outline)</small><br>${esc(M[ui.metric].label)}: <b>${v == null ? (f.properties.zone === 12 ? 'no apartment price (outskirts)' : 'no sales in this zone') : fmtValue(v)}</b>`;
       }, { sticky: true });
     } }).addTo(map);
   }
@@ -632,8 +646,8 @@ function zoneStyle(f) {
   if (!isZoneMode()) return { opacity: 0, fillOpacity: 0 };
   const v = zoneValue(f.properties), sel = ui.sel && ui.sel.kind === 'district' && ui.sel.id === f.properties.district && ui.zone === String(f.properties.zone);
   const off = ui.zband != null && !!scale.bandOf && (v == null || scale.bandOf(v) !== ui.zband);
-  if (v == null) return { fillColor: '#e5e7eb', fillOpacity: off ? .15 : .5, color: '#ffffff', weight: .5, opacity: .6 };
-  return { fillColor: scale.color(v), fillOpacity: off ? .12 : .88, color: sel ? '#111827' : 'rgba(255,255,255,.75)', weight: sel ? 2.5 : .5, opacity: 1 };
+  if (v == null) return { fillColor: '#9ca3af', fillOpacity: off ? .04 : .12, color: '#ffffff', weight: .5, opacity: .6 };
+  return { fillColor: scale.color(v), fillOpacity: off ? .1 : .9, color: sel ? '#111827' : 'rgba(255,255,255,.8)', weight: sel ? 2.5 : .5, opacity: 1 };
 }
 // Name and value written on the map, like the US map: the biggest areas first, and a label is skipped when it
 // doesn't fit inside its area or would overlap one already placed. Towns get theirs beside the dot.
@@ -694,9 +708,9 @@ function updateLabels() {
   for (const c of cand) {
     const zv = c.kind === 'zone' ? zoneValue(c.props) : null;
     if (c.kind === 'zone' && zv == null) continue;
-    const name = c.kind === 'zone' ? `Zone ${c.props.zone}` : placeName(c.kind, c.id).split(' (')[0];
+    const name = c.kind === 'zone' ? zoneName(c.props) : placeName(c.kind, c.id).split(' (')[0];
     const val = labelValue(c.kind === 'zone' ? zv : valueOf(c.kind, c.id));
-    const tw = Math.max(name.length * 6.4, val.length * 6.8) + 6, th = 28;
+    const tw = Math.max(name.length * (c.kind === 'zone' ? 5.6 : 6.4), val.length * 6.8) + 6, th = 28;
     if (tw > c.w * 1.15 || th > c.h * 1.2) continue;
     const box = [c.pt.x - tw / 2, c.pt.y - th / 2, c.pt.x + tw / 2, c.pt.y + th / 2];
     if (!fits(box)) continue;
@@ -731,15 +745,25 @@ function renderLegend() {
     : isZoneMode() ? `Yerevan, by official valuation zone · ${when}` : `Yerevan's 12 districts · ${when}`;
   if (isZoneMode() && scale.bands) {
     $('#legend').innerHTML = `<h3>${esc(m.label)} (${ui.cur})</h3><div class="sub">${sub}</div>
-      <div class="zbands">${scale.bands.map((b, i) => `<button class="zb${ui.zband === i ? ' on' : ''}" data-zband="${i}"><i style="background:${b.c}"></i>${esc(b.label)}</button>`).join('')}
-      <span class="zb" style="cursor:default"><i style="background:#e5e7eb"></i>No sales</span></div>
-      <div class="zhint">${ui.zband != null ? 'Showing one band · tap it again to show all' : 'Tap a band to show only those zones'}</div>${LEGEND_BTNS}`;
+      <div class="zbar${ui.zband != null ? ' pick' : ''}">${scale.bands.map((b, i) => `<button type="button" class="${ui.zband === i ? 'on' : ''}" data-zband="${i}" style="background:${b.c}" title="${esc(b.label)}" aria-label="${esc(b.label)}"></button>`).join('')}</div>
+      <div class="zticks">${zoneTicks()}</div>
+      <div class="na"><i class="nos"></i>No sales${ui.zband != null ? ` · showing ${esc(scale.bands[ui.zband].label)} (tap again for all)` : ' · tap a color to show only those zones'}</div>${LEGEND_BTNS}`;
     return;
   }
   $('#legend').innerHTML = `<h3>${esc(m.label)}${m.money ? ` (${ui.cur})` : ''}</h3><div class="sub">${sub}</div>
     <div class="bar">${scale.pal.map(c => `<i style="background:${c}"></i>`).join('')}</div>
     <div class="ticks">${scale.ticks.map(t => `<span>${t}</span>`).join('')}</div>
     <div class="na"><i></i>No data</div>${LEGEND_BTNS}`;
+}
+// Three values under the zone color bar, like the US map: "< lowest break" at the left, the middle break where it
+// falls on the bar, "> highest break" at the right
+function zoneTicks() {
+  const b = scale.breaks || [], n = b.length + 1, s = x => scale.short(x);
+  if (!b.length) return '';
+  const out = [`<span style="left:0">&lt; ${esc(s(b[0]))}</span>`];
+  if (b.length > 2) { const m = Math.floor(b.length / 2); out.push(`<span style="left:${(m + 1) / n * 100}%">${esc(s(b[m]))}</span>`); }
+  out.push(`<span style="left:100%">&gt; ${esc(s(b[b.length - 1]))}</span>`);
+  return out.join('');
 }
 // The same Support (Ko-fi) and Feedback buttons as the US map, just above the legend
 const FEEDBACK_EMAIL = 'contact@openhousingatlas.com';
@@ -962,7 +986,7 @@ function renderDetail() {
       const c = v.ly ? (v.price / v.ly - 1) * 100 : null;
       return `<tr data-zone="${z}" class="${z === ui.zone ? 'on' : ''}"><td><span class="zchip">${z}</span> Zone ${z}</td><td>${fmtMoney(toCur(v.price, p.zones.month), ui.cur)}</td><td class="${chgCls(c)}">${fmtPct(c)}</td></tr>`;
     }).join('')}</table>
-    <h4 class="snap-h">Zone ${ui.zone}: price per m² (${ui.cur})</h4>${chart(rangeFilter(seriesIn(p.zone_prices?.[ui.zone])), v => fmtMoney(v, ui.cur))}
+    <h4 class="snap-h">${esc(p.en.split(' (')[0])} – Zone ${ui.zone}: price per m² (${ui.cur})</h4>${chart(rangeFilter(seriesIn(p.zone_prices?.[ui.zone])), v => fmtMoney(v, ui.cur))}
     <p class="note">Yerevan is split into 11 valuation zones set by the government in 2020 (decision N 1023-N): zone 1 is the most central, zone 11 the outskirts. Click a zone to see its history. The zone boundaries aren't published as open map data, so they can't be drawn on the map.</p>`;
   }
   if (kind === 'marz' && id !== 'yerevan') {
