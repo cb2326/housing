@@ -58,6 +58,11 @@
   .brand h1 { margin: 0; font: 600 21px/1.1 var(--serif); }
   .brand small { display: block; color: var(--muted); font: 12px var(--sans); margin-top: 2px; }
   .brand .byline { color: var(--accent); font-weight: 600; font-size: 12.5px; margin-top: 3px; }
+  /* switch between the US map and the Armenia map (openhousingatlas.com/armenia/) */
+  .country { display: flex; gap: 6px; margin: 0 14px 10px; }
+  .country a, .country span { flex: 1; text-align: center; padding: 6px 8px; border-radius: 9px; border: 1px solid var(--line); font-weight: 600; font-size: 12.5px; text-decoration: none; color: var(--muted); }
+  .country span { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .country a:hover { border-color: #8ccdc0; color: var(--accent); }
   .dp-search { margin: 4px 14px 10px; position: relative; }
   .dp-search input { width: 100%; padding: 8px 12px 8px 32px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
   .dp-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); }
@@ -470,6 +475,7 @@
       <div><h1>Open Housing Atlas</h1><small class="byline">Free US housing data</small><small id="asof">Loading data…</small></div>
       <button class="side-x" id="sideClose" type="button" aria-label="Close the data menu">✕</button>
     </div>
+    <div class="country"><span>United States</span><a href="/armenia/">Armenia</a></div>
     <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="dpSearch" type="search" placeholder="Find a data point" aria-label="Find a data point"></label>
     <div class="groups" id="groups"></div>
