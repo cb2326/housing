@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 150
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
 
@@ -59,10 +59,17 @@ jobs:
         with:
           path: site
 
+      # GitHub allows a publish at most 10 minutes, and copying the site (~8,000 files) sometimes runs out of time
+      # even when nothing is wrong. So a timed-out publish is tried once more automatically.
       - name: Publish
         id: deployment
+        continue-on-error: true
         uses: actions/deploy-pages@v5
-        # (GitHub allows this step at most 10 minutes; if it ever runs out, re-running the job usually works.)
+
+      - name: Publish (second try)
+        id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v5
 
       # Saves the once-a-year results (data_cache/) so later runs don't work them out again. On scheduled runs it also
       # notes the date: GitHub pauses scheduled jobs in repositories with no activity for 60 days.
