@@ -534,7 +534,7 @@ def update_armstat():
     """Yearly tables: refreshed at most once a week (they change once a year)."""
     saved = load_json(CACHE / "armstat.json", {})
     needed = ("poverty", "space_per_person", "new_housing_m2", "wage", "population", "house_sales", "apartment_sales",
-              "district_apartments", "inflation")
+              "district_apartments", "inflation", "cpi_index")
     # refresh weekly, or at once when a table was added since the last download
     if saved.get("fetched") and (dt.date.today() - dt.date.fromisoformat(saved["fetched"])).days < 7 and all(k in saved for k in needed) \
             and "armenia" in saved.get("wage", {}):   # (re-download once to add the national wage)
@@ -609,8 +609,56 @@ def update_armstat():
         notice(f"Armenia: Armstat inflation table failed: {e}")
         if "inflation" in saved:
             out["inflation"] = saved["inflation"]
+    # Consumer price level by month (Jan 2018 = 100), chained from the month-on-month index, for prices in today's drams
+    try:
+        rows = px_table("1 Econnomy and finance/12 Consumer Prices/1.2.1 Monthly indicators/EF-cpi-mi1.px", lambda c, t: True)
+        months = {n: i + 1 for i, n in enumerate(["January", "February", "March", "April", "May", "June", "July",
+                                                  "August", "September", "October", "November", "December"])}
+        mm = {}
+        for r in rows:
+            mo, y = months.get(r["months"].strip()), year_of(r["years"])
+            if mo and y and r["value"] > 0:
+                mm[f"{y}-{mo:02d}"] = r["value"]
+        level, ym, v = {}, "2018-01", 100.0
+        level[ym] = v
+        while True:
+            nxt = month_add(ym, 1)
+            if nxt not in mm:
+                break
+            v = v * mm[nxt] / 100
+            level[nxt] = round(v, 3)
+            ym = nxt
+        if len(level) < 24:
+            raise ValueError(f"only {len(level)} months")
+        out["cpi_index"] = level
+        print(f"Armstat price level: {len(level)} months, latest {max(level)}")
+    except Exception as e:
+        notice(f"Armenia: Armstat month-on-month CPI table failed: {e}")
+        if "cpi_index" in saved:
+            out["cpi_index"] = saved["cpi_index"]
     save_json(CACHE / "armstat.json", out, pretty=True)
     return out
+
+def us_cpi_index():
+    """US consumer price level by month (BLS CPI-U), for prices in today's dollars. The US map's build saves it in
+    data_cache/cpi_index.json just before this script runs; FRED is the backup."""
+    try:
+        idx = load_json(REPO / "data_cache" / "cpi_index.json", {})
+        if len(idx) > 100:
+            return {k: v for k, v in idx.items() if k >= "2017-01"}
+        data = fetch("https://fred.stlouisfed.org/graph/fredgraph.csv?id=CPIAUCNS").decode("utf-8")
+        out = {}
+        for line in data.splitlines()[1:]:
+            d, _, val = line.partition(",")
+            try:
+                if d[:7] >= "2017-01":
+                    out[d[:7]] = float(val)
+            except ValueError:
+                pass
+        return out
+    except Exception as e:
+        notice(f"Armenia: US CPI for today's-dollar prices failed: {e}")
+        return {}
 
 # ---------------------------------------------------------------- Central Bank of Armenia
 CBA_STAT = "http://old.cba.am/stat/stat_data_eng/"
@@ -977,6 +1025,7 @@ def build(max_reports):
         "usd": cba.get("usd", {}), "mortgage": cba.get("mortgage", {}), "policy_rate": cba.get("policy_rate", []),
         "mortgage_rate": cba.get("mortgage_rate", {}), "longterm_rate": cba.get("longterm_rate", {}),
         "rppi": cba.get("rppi", {}),
+        "cpi_am": armstat.get("cpi_index", {}), "cpi_us": us_cpi_index(),
         "inflation": armstat.get("inflation", {}),
         "deals": series.get("marz_deals", {}).get("armenia", {}), "sales": series.get("marz_sales", {}).get("armenia", {}),
         **{k: armstat.get(k, {}).get("armenia", {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales")},
