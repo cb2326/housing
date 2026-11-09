@@ -1340,8 +1340,42 @@ def mortgage_rate():
     if not weekly:
         data = fetch("https://fred.stlouisfed.org/graph/fredgraph.csv?id=MORTGAGE30US", "fred_mortgage.csv", PLAIN, timeout=40, tries=2)
         weekly = [(r[0], num(r[1])) for r in list(rows(data))[1:] if len(r) == 2 and num(r[1]) is not None]
-    monthly = {day[:7]: v for day, v in weekly}
+    by_month = {}
+    for day, v in weekly:
+        by_month.setdefault(day[:7], []).append(v)
+    monthly = {m: round(sum(vs) / len(vs), 2) for m, vs in sorted(by_month.items())}  # each month's average (since April 1971)
     return monthly, weekly[-1][1], weekly[-1][0]
+
+
+def treasury_10y():
+    """The 10-year Treasury yield (constant maturity), every month's average since January 1962, plus the latest day,
+    from the Federal Reserve's H.15 release. Saved, so a failed download keeps the last copy."""
+    cached = load_dcache("t10.json") or {}
+    url = ("https://www.federalreserve.gov/datadownload/Output.aspx?rel=H15&series=bf17364827e38702b42a58cf8eaa3f78"
+           "&lastobs=&from=&to=&filetype=csv&label=include&layout=seriescolumn")
+    try:
+        data = fetch(url, "fed_h15.csv", PLAIN, timeout=120, tries=2)
+        r = rows(data)
+        col = None
+        days = []
+        for row in r:
+            if row and row[0] == "Time Period":
+                col = next(i for i, h in enumerate(row) if h.startswith("RIFLGFCY10"))
+                continue
+            if col is not None and len(row) > col and re.match(r"\d{4}-\d\d-\d\d$", row[0]) and (v := num(row[col])) is not None:
+                days.append((row[0], v))
+        if len(days) < 5000:
+            raise ValueError(f"only {len(days)} days")
+        by_month = {}
+        for d, v in days:
+            by_month.setdefault(d[:7], []).append(v)
+        out = {"monthly": {m: round(sum(vs) / len(vs), 2) for m, vs in sorted(by_month.items())}, "now": days[-1][1], "date": days[-1][0]}
+        save_dcache("t10.json", out)
+        print(f"  10-year Treasury: {min(out['monthly'])} to {out['date']} ({out['now']}%)")
+        return out
+    except Exception as e:
+        print(f"  (10-year Treasury not available: {e}); using the saved copy")
+        return cached
 
 
 def xlsx_rows(data):
@@ -2168,6 +2202,7 @@ def main():
     hmda, hmda_year_ = hmda_years(county_to_cbsa)
     print("Mortgage rate")
     rate_hist, rate, rate_day = mortgage_rate()
+    t10 = treasury_10y()
     print("Inflation (CPI)")
     cpi, cpi_index = cpi_inflation()
     LONG = long_view(rate_hist, cpi_index)
@@ -2566,6 +2601,9 @@ def main():
         "mortgage": {"rate": rate, "date": rate_day, "history": trim_series(rate_hist, "2000-01")},
         "cpi": {k: v for k, v in cpi.items() if k >= "2000-01"},
         "long": LONG,
+        # nationwide rates for the rate charts: the 30-year mortgage rate (monthly average since April 1971) and the
+        # 10-year Treasury yield (monthly average since January 1962), with the latest week / day
+        "rates": {"mortgage": rate_hist, "t10": t10.get("monthly") or {}, "t10_now": t10.get("now"), "t10_date": t10.get("date")},
         "counts": {k: len(v) for k, v in places.items()},
     }
     for lvl, ps in places.items():
