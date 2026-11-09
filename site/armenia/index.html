@@ -126,6 +126,17 @@
   .us-val b { font-size: 20px; font-family: var(--display); color: #06463f; }
   .legend .na { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 5px; }
   .legend .na i { width: 12px; height: 12px; border-radius: 3px; background: var(--na); display: inline-block; }
+  /* zone map: price bands you can read at a glance; hovering or tapping a band shows only those zones */
+  .legend .zbands { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; margin-top: 2px; }
+  .legend .zb { display: flex; align-items: center; gap: 7px; font-size: 12px; font-variant-numeric: tabular-nums; padding: 2px 4px; border-radius: 6px; cursor: pointer; border: 0; background: none; color: inherit; text-align: left; font-family: inherit; }
+  .legend .zb:hover, .legend .zb.on { background: var(--panel-2); }
+  .legend .zb i { width: 16px; height: 12px; border-radius: 3px; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+  .legend .zhint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  /* calmer, grey basemap under the zone colors */
+  #map.zone-mode .leaflet-tile-pane { filter: grayscale(1) contrast(.9) brightness(1.06); opacity: .7; }
+  .plabel.zl .in { font-size: 12px; }
+  .plabel.zl .in b { font-size: 10px; font-weight: 600; color: #374151; }
+  .plabel.dl .in { font: 700 11px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: #1f2937; }
 
   /* detail panel: like the US map, it opens on the left next to the data points and the map moves to its right */
   .stage { --pw: min(680px, 58%); }
@@ -338,11 +349,12 @@ const icon = name => `<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="cu
 const M = Object.fromEntries(METRICS.map(m => [m.id, m]));
 // The same colors as the US map: amounts light to dark teal; changes teal (falling), cream (flat), coral (rising)
 const PALETTE = ['#e6f4f1', '#bfe3dc', '#8ccdc0', '#56b0a0', '#2b8f80', '#126b60', '#06463f'];
-const DIVERGE = ['#0b5d5a', '#2a9d8f', '#8fd3c7', '#f4efe6', '#f6b89b', '#e76f51', '#9c2f1c'];
+const ZONE_PAL = ['#fff1a8', '#fdd27b', '#f9a65a', '#f1743f', '#d9423e', '#a91d5c', '#5e0f66'];
+const DIVERGE =['#0b5d5a', '#2a9d8f', '#8fd3c7', '#f4efe6', '#f6b89b', '#e76f51', '#9c2f1c'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const ui = { metric: 'price', cur: 'AMD', sel: null, open: new Set(['Prices and affordability']), range: 'all', nat: 'mort_amd' };
-let D = null, AREAS = null, ZONES = null, map, marzLayer, distLayer, townLayer, labelLayer, zoneLayer;
+let D = null, AREAS = null, ZONES = null, map, marzLayer, distLayer, townLayer, labelLayer, zoneLayer, distHalo;
 // A traced zone piece (one zone inside one district): its latest apartment price per m² from the Cadastre report
 function zonePrice(props) {
   const zs = D.districts[props.district]?.zones;
@@ -433,6 +445,17 @@ function makeScale(values, metric) {
     return { color, pal: DIVERGE, ticks: [fmtPct(-lim, 0), '0%', fmtPct(lim, 0)] };
   }
   const q = p => v[Math.min(v.length - 1, Math.floor(p * (v.length - 1)))];
+  if (metric === 'zone_price') {
+    // round-number price bands (50k ֏ or $100 steps) set from the zone prices, in a yellow → red → purple scale
+    const step = ui.cur === 'USD' ? 100 : 50000;
+    const breaks = [...new Set([1, 2, 3, 4, 5, 6].map(i => Math.round(q(i / 7) / step) * step))].filter(b => b > v[0] && b < v[v.length - 1]);
+    const pal = ZONE_PAL.slice(ZONE_PAL.length - breaks.length - 1);
+    const color = x => pal[bandOf(x)];
+    const bandOf = x => { let i = 0; while (i < breaks.length && x >= breaks[i]) i++; return i; };
+    const short = x => labelValue(x, metric);
+    const bands = pal.map((c, i) => ({ c, label: i === 0 ? `under ${short(breaks[0])}` : i === breaks.length ? `${short(breaks[i - 1])} +` : `${short(breaks[i - 1]).replace(/ ֏$/, '')}–${short(breaks[i])}` }));
+    return { color, pal, bands, bandOf, ticks: [] };
+  }
   const breaks = [1, 2, 3, 4, 5, 6].map(i => q(i / 7));
   const color = x => { let i = 0; while (i < breaks.length && x > breaks[i]) i++; return PALETTE[i]; };
   return { color, pal: PALETTE, ticks: [fmtValue(v[0], metric), fmtValue(q(.5), metric), fmtValue(v[v.length - 1], metric)] };
@@ -473,8 +496,12 @@ function initMap() {
   if (ZONES) {
     // valuation zones sit under the district outlines; clicking one opens its district with that zone selected
     map.createPane('zones'); map.getPane('zones').style.zIndex = 415;
+    // a white halo under the district outlines so they read clearly over any zone color
+    distHalo = L.geoJSON({ type: 'FeatureCollection', features: distFeats }, { pane: 'zones', interactive: false, style: () => ({ opacity: 0, fill: false }) }).addTo(map);
     zoneLayer = L.geoJSON(ZONES, { pane: 'zones', style: () => ({ opacity: 0, fillOpacity: 0 }), onEachFeature: (f, l) => {
-      l.on('click', e => { if (!isZoneMode()) return; L.DomEvent.stopPropagation(e); select('district', f.properties.district); ui.zone = String(f.properties.zone); renderDetail(); });
+      l.on('click', e => { if (!isZoneMode()) return; L.DomEvent.stopPropagation(e); select('district', f.properties.district); ui.zone = String(f.properties.zone); renderDetail(); restyle(); });
+      l.on('mouseover', () => { if (isZoneMode()) l.setStyle({ color: '#111827', weight: 2, opacity: 1 }); });
+      l.on('mouseout', () => { if (isZoneMode()) l.setStyle(zoneStyle(f)); });
       l.bindTooltip(() => {
         const d = D.districts[f.properties.district], v = zonePrice(f.properties);
         return `<b>Zone ${f.properties.zone}</b> · ${esc(d.en)}<br><small>Official valuation zone (approximate outline)</small><br>Apartment price per m²: <b>${v == null ? (f.properties.zone === 12 ? 'no apartment price (outskirts)' : 'no sales in this zone') : fmtMoney(v, ui.cur)}</b>`;
@@ -491,6 +518,7 @@ function initMap() {
     townLayer.addLayer(c);
   }
   map.on('moveend', updateLabels);
+  if (ui.metric === 'zone_price' && ZONES) map.setView([40.178, 44.512], 12, { animate: false });   // opened on the zone map: start over Yerevan
 }
 function bindArea(layer, kind, id) {
   layer.on('click', e => { L.DomEvent.stopPropagation(e); select(kind, id); });
@@ -513,10 +541,8 @@ function restyle() {
   const vals = [];
   const zoneMode = isZoneMode();
   if (marzMode) for (const id of Object.keys(D.marzes)) vals.push(valueOf('marz', id));
-  else if (zoneMode) {
-    zoneLayer.eachLayer(l => vals.push(zonePrice(l.feature.properties)));
-    for (const id of Object.keys(D.towns)) vals.push(valueOf('town', id));
-  } else {
+  else if (zoneMode) zoneLayer.eachLayer(l => vals.push(zonePrice(l.feature.properties)));   // bands from Yerevan's zones; towns use the same bands
+  else {
     for (const id of Object.keys(D.districts)) vals.push(valueOf('district', id));
     if (!['deals', 'sales'].includes(ui.metric)) for (const id of Object.keys(D.towns)) vals.push(valueOf('town', id));
     else for (const id of Object.keys(D.marzes)) if (id !== 'yerevan') vals.push(valueOf('marz', id));
@@ -534,27 +560,35 @@ function restyle() {
   distLayer.setStyle(f => {
     const id = f.properties.id, sel = ui.sel && ui.sel.kind === 'district' && ui.sel.id === id;
     if (marzMode) return { fillOpacity: 0, opacity: 0, interactive: false };
-    if (zoneMode) return { fillOpacity: 0, color: sel ? '#0b4a43' : '#1f2937', weight: sel ? 3 : 1.6, opacity: .9 };   // district outlines over the zones
+    if (zoneMode) return { fillOpacity: 0, color: sel ? '#111827' : '#374151', weight: sel ? 3 : 1.3, opacity: sel ? 1 : .85, dashArray: null };   // district outlines over the zones
     const v = valueOf('district', id);
     return { fillColor: v == null ? '#e5e7eb' : scale.color(v), fillOpacity: .82, color: sel ? '#0b4a43' : '#ffffff', weight: sel ? 3 : 1, opacity: 1 };
   });
   distLayer.eachLayer(l => { const el = l.getElement && l.getElement(); if (el) el.style.pointerEvents = marzMode || zoneMode ? 'none' : ''; });
   if (zoneLayer) {
-    zoneLayer.setStyle(f => {
-      if (!zoneMode) return { opacity: 0, fillOpacity: 0 };
-      const v = zonePrice(f.properties), sel = ui.sel && ui.sel.kind === 'district' && ui.sel.id === f.properties.district && ui.zone === String(f.properties.zone);
-      return { fillColor: v == null ? '#f3f4f6' : scale.color(v), fillOpacity: v == null ? .55 : .85, color: sel ? '#e76f51' : '#ffffff', weight: sel ? 2.5 : .6, opacity: 1 };
-    });
+    document.getElementById('map').classList.toggle('zone-mode', zoneMode);
+    if (!zoneMode) ui.zband = null;
+    distHalo.setStyle({ opacity: zoneMode ? .9 : 0, color: '#ffffff', weight: 4.5, fill: false });
+    zoneLayer.setStyle(zoneStyle);
     zoneLayer.eachLayer(l => { const el = l.getElement && l.getElement(); if (el) el.style.pointerEvents = zoneMode ? '' : 'none'; });
   }
   townLayer.eachLayer(c => {
     const id = c._place;
     if (marzMode || countMode) { c.setStyle({ fillColor: '#ffffff', color: '#374151', radius: 4, weight: 1.5 }); return; }
     const v = valueOf('town', id), sel = ui.sel && ui.sel.kind === 'town' && ui.sel.id === id;
-    c.setStyle({ fillColor: v == null ? '#e5e7eb' : scale.color(v), color: sel ? '#0b4a43' : '#ffffff', radius: sel ? 10 : 7, weight: sel ? 3 : 1.5 });
+    const off = zoneMode && ui.zband != null && (v == null || scale.bandOf(v) !== ui.zband);
+    c.setStyle({ fillColor: v == null ? '#e5e7eb' : scale.color(v), fillOpacity: off ? .2 : 1, opacity: off ? .3 : 1, color: sel ? '#0b4a43' : zoneMode ? '#374151' : '#ffffff', radius: sel ? 10 : 7, weight: sel ? 3 : zoneMode ? 1 : 1.5 });
   });
   updateLabels();
   renderLegend();
+}
+// One zone piece: filled with its price band; pieces outside the band picked in the legend fade out
+function zoneStyle(f) {
+  if (!isZoneMode()) return { opacity: 0, fillOpacity: 0 };
+  const v = zonePrice(f.properties), sel = ui.sel && ui.sel.kind === 'district' && ui.sel.id === f.properties.district && ui.zone === String(f.properties.zone);
+  const off = ui.zband != null && (v == null || scale.bandOf(v) !== ui.zband);
+  if (v == null) return { fillColor: '#e5e7eb', fillOpacity: off ? .15 : .5, color: '#ffffff', weight: .5, opacity: .6 };
+  return { fillColor: scale.color(v), fillOpacity: off ? .12 : .88, color: sel ? '#111827' : 'rgba(255,255,255,.75)', weight: sel ? 2.5 : .5, opacity: 1 };
 }
 // Name and value written on the map, like the US map: the biggest areas first, and a label is skipped when it
 // doesn't fit inside its area or would overlap one already placed. Towns get theirs beside the dot.
@@ -587,13 +621,27 @@ function updateLabels() {
   });
   areaCand(marzLayer, 'marz');
   if (isZoneMode()) {
-    // zone pieces: "Zone 3" and its price, where there's room
+    // district names first (small capitals), then each zone piece's price where there's room; zoomed out,
+    // only the bigger pieces get a price so the map stays readable
+    const z = map.getZoom(), minW = z >= 14 ? 40 : z >= 13 ? 50 : 76, minH = z >= 14 ? 24 : z >= 13 ? 28 : 40;
+    if (z >= 11) distLayer.eachLayer(l => {
+      const b = l._bb || (l._bb = l.getBounds());
+      if (!view.intersects(b)) return;
+      const name = placeName('district', l.feature.properties.id).split(' (')[0];
+      const pt = map.latLngToContainerPoint(b.getCenter()), tw = name.length * 8 + 8;
+      const box = [pt.x - tw / 2, pt.y - 8, pt.x + tw / 2, pt.y + 8];
+      if (!fits(box)) return;
+      placed.push(box);
+      L.marker(b.getCenter(), { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: 'plabel dl', iconSize: [0, 0], html: `<div class="in">${esc(name)}</div>` }) }).addTo(labelLayer);
+    });
     zoneLayer.eachLayer(l => {
       const b = l._bb || (l._bb = l.getBounds());
       if (!b.isValid() || !view.intersects(b)) return;
       const ne = map.latLngToContainerPoint(b.getNorthEast()), sw = map.latLngToContainerPoint(b.getSouthWest());
       const w = ne.x - sw.x, h = sw.y - ne.y;
-      if (w < 44 || h < 26) return;
+      if (w < minW || h < minH) return;
+      const v = zonePrice(l.feature.properties);
+      if (ui.zband != null && (v == null || scale.bandOf(v) !== ui.zband)) return;
       const a = l.getCenter();
       cand.push({ kind: 'zone', props: l.feature.properties, w, h, a, pt: map.latLngToContainerPoint(a) });
     });
@@ -609,7 +657,7 @@ function updateLabels() {
     const box = [c.pt.x - tw / 2, c.pt.y - th / 2, c.pt.x + tw / 2, c.pt.y + th / 2];
     if (!fits(box)) continue;
     placed.push(box);
-    L.marker(c.a, { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: 'plabel', iconSize: [0, 0], html: `<div class="in"><b>${esc(name)}</b><span>${esc(val)}</span></div>` }) }).addTo(labelLayer);
+    L.marker(c.a, { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: c.kind === 'zone' ? 'plabel zl' : 'plabel', iconSize: [0, 0], html: `<div class="in"><b>${esc(name)}</b><span>${esc(val)}</span></div>` }) }).addTo(labelLayer);
   }
   // towns: name and value to the right of the dot (only for data points that have town values)
   if (marzMode || countMode) return;
@@ -635,7 +683,14 @@ function renderLegend() {
     return;
   }
   const sub = m.level === 'marz' ? `By marz · ${when}` : ['deals', 'sales'].includes(ui.metric) ? `Yerevan districts and marzes · ${when}`
-    : isZoneMode() ? `Yerevan's 12 valuation zones (approx. outlines) and 45 towns · ${when}` : `Yerevan districts and 45 towns · ${when}`;
+    : isZoneMode() ? `Per m², by official valuation zone · ${when}` : `Yerevan districts and 45 towns · ${when}`;
+  if (isZoneMode() && scale.bands) {
+    $('#legend').innerHTML = `<h3>${esc(m.label)} (${ui.cur})</h3><div class="sub">${sub}</div>
+      <div class="zbands">${scale.bands.map((b, i) => `<button class="zb${ui.zband === i ? ' on' : ''}" data-zband="${i}"><i style="background:${b.c}"></i>${esc(b.label)}</button>`).join('')}
+      <span class="zb" style="cursor:default"><i style="background:#e5e7eb"></i>No sales</span></div>
+      <div class="zhint">${ui.zband != null ? 'Showing one price band · tap it again to show all' : 'Tap a band to show only those zones · towns use the same colors'}</div>${LEGEND_BTNS}`;
+    return;
+  }
   $('#legend').innerHTML = `<h3>${esc(m.label)}${m.money ? ` (${ui.cur})` : ''}</h3><div class="sub">${sub}</div>
     <div class="bar">${scale.pal.map(c => `<i style="background:${c}"></i>`).join('')}</div>
     <div class="ticks">${scale.ticks.map(t => `<span>${t}</span>`).join('')}</div>
@@ -982,9 +1037,16 @@ function sourceNote() {
     Exchange rates and mortgages: <a href="https://www.cba.am/" target="_blank" rel="noopener">Central Bank of Armenia</a>.${gaps}</div>`;
 }
 function setMetric(k) {
+  const wasZone = ui.metric === 'zone_price';
   ui.metric = k; ui.open.add(M[k].group);
   renderMetrics(); restyle(); refreshDetail(); saveState();
+  if (k === 'zone_price' && !wasZone && zoneLayer && map.getZoom() < 11) map.flyTo([40.178, 44.512], 12, { duration: .8 });   // the zones are only readable up close
 }
+// legend price bands: tap one to show only those zones, tap again to show all
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-zband]'); if (!b) return;
+  const i = +b.dataset.zband; ui.zband = ui.zband === i ? null : i; restyle();
+});
 $('#dBody').addEventListener('click', e => {
   const mt = e.target.closest('[data-metric]'); if (mt) { setMetric(mt.dataset.metric); return; }
   const nt = e.target.closest('[data-nat]'); if (nt) { ui.nat = nt.dataset.nat; renderDetail(); return; }
