@@ -536,7 +536,8 @@ def update_armstat():
     needed = ("poverty", "space_per_person", "new_housing_m2", "wage", "population", "house_sales", "apartment_sales",
               "district_apartments", "inflation")
     # refresh weekly, or at once when a table was added since the last download
-    if saved.get("fetched") and (dt.date.today() - dt.date.fromisoformat(saved["fetched"])).days < 7 and all(k in saved for k in needed):
+    if saved.get("fetched") and (dt.date.today() - dt.date.fromisoformat(saved["fetched"])).days < 7 and all(k in saved for k in needed) \
+            and "armenia" in saved.get("wage", {}):   # (re-download once to add the national wage)
         return saved
     out = {"fetched": dt.date.today().isoformat()}
     P = "2 Population and social processes/"
@@ -548,7 +549,8 @@ def update_armstat():
         "new_housing_m2": ("3 Industry, Construction, trade and services/31 Construction/IC-co-1-2024.px",
                            lambda c, t: (c != "indicators" or t.strip().startswith("Total space of dwellings put in place, (sq. metres")), "marzes"),
         "wage": (P + "23 Employment and unemployment/PS-eu-19-2024.px",
-                 lambda c, t: (c != "indicators" or (re.search(r"by RA Marzes and Yerevan\s*-", t) and "Sectors" not in t)), "indicators"),
+                 lambda c, t: (c != "indicators" or (re.search(r"by RA Marzes and Yerevan\s*-", t) and "Sectors" not in t)
+                               or t.strip().lower() == "average monthly nominal wages, amd"), "indicators"),   # + the national average
         "population": (P + "20 Census/PS-pp-1-1-2.px",
                        lambda c, t: (c not in ("settlement", "sex") or t.strip() == "Total"), "marzes"),
         # sales ("trade transactions") registered in the year, by type of property
@@ -561,6 +563,11 @@ def update_armstat():
         try:
             rows = px_table(path, pick)
             vals = by_marz_year(rows, marz_code)
+            if name == "wage":   # the whole-country average sits in the same table under its own heading
+                nat = {year_of(r["years"]): round(r["value"], 2) for r in rows
+                       if r["indicators"].strip().lower() == "average monthly nominal wages, amd" and year_of(r["years"])}
+                if nat:
+                    vals["armenia"] = dict(sorted(nat.items()))
             if len(vals) < 10:
                 raise ValueError(f"only {len(vals)} marzes found")
             out[name] = vals
@@ -794,6 +801,53 @@ def euro_longterm_rates():
                     out.setdefault(s.lower(), {})[month] = round(avg, 2)
     return out
 
+RPPI_URL = "https://www.cba.am/en/statistics/residential-property-price-index/277/export-all/"
+# Columns of the CBA price index file -> our keys. The Yerevan areas group the districts like this (CBA RPPI
+# methodology, Appendix A): Center = Kentron; North = Arabkir, Davtashen, Kanaker-Zeytun; East = Avan, Nor Nork,
+# Nork-Marash; South = Erebuni, Nubarashen, Shengavit; West = Ajapnyak, Malatia-Sebastia.
+RPPI_COLS = [("residential property price index, armenia", "all"), ("apartments, armenia", "apt"),
+             ("apartments, yerevan-center", "center"), ("apartments, yerevan-east", "east"),
+             ("apartments, yerevan-north", "north"), ("apartments, yerevan-south", "south"),
+             ("apartments, yerevan-west", "west"), ("apartments, outside yerevan", "outside"),
+             ("apartments, yerevan", "yerevan"), ("individual houses, armenia", "houses")]
+
+def update_rppi():
+    """The Central Bank's quarterly residential property price index: the index (2018 = 100) and the change from
+    the same quarter a year earlier, for Armenia, apartments (Yerevan, its 5 areas, outside Yerevan) and houses.
+    Quarters are keyed by their last month ("2026-06" = Q2 2026)."""
+    data = fetch(RPPI_URL)
+    out = {}
+    for sheet, key in (("base index, quarter", "index"), ("compared  to the same period of", "yoy")):
+        rows = xlsx_rows(data, sheet)
+        head = next(r for r in rows if r and isinstance(r[0], str) and r[0].strip().lower() == "indicators")
+        cols = {}
+        for i, h in enumerate(head):
+            h = re.sub(r"\s+", " ", str(h or "")).lower().replace("index for ", "")
+            for label, k in RPPI_COLS:   # longest labels first where they overlap ("yerevan-center" before "yerevan")
+                if h.startswith(label) and k not in cols.values():
+                    cols[i] = k
+                    break
+        if len(set(cols.values())) < len(RPPI_COLS):
+            raise ValueError(f"{sheet}: found columns {sorted(set(cols.values()))}")
+        series = {k: {} for _, k in RPPI_COLS}
+        for r in rows:
+            m = re.match(r"(\d{4})-(\d{2})-\d{2}", str(r[0] if r else ""))
+            if not m:
+                continue
+            for i, k in cols.items():
+                v = r[i] if i < len(r) else None
+                if isinstance(v, str):
+                    try:
+                        v = float(v)
+                    except ValueError:
+                        v = None
+                if isinstance(v, (int, float)):
+                    series[k][f"{m.group(1)}-{m.group(2)}"] = round(v, 2)
+        if len(series["yerevan"]) < 8:
+            raise ValueError(f"{sheet}: only {len(series['yerevan'])} quarters")
+        out[key] = series
+    return out
+
 def update_cba():
     saved = load_json(CACHE / "cba.json", {})
     out = dict(saved)
@@ -825,6 +879,12 @@ def update_cba():
         print(f"CBA long-term household loan rates (AMD/USD/EUR): {len(out['longterm_rate'].get('eur', {}))} months")
     except Exception as e:
         notice(f"Armenia: CBA long-term loan rates failed: {e}")
+    # Residential property price index (quarterly since 2018, from the Cadastre's sale records)
+    try:
+        out["rppi"] = update_rppi()
+        print(f"CBA price index: {len(out['rppi']['index'].get('yerevan', {}))} quarters, latest {max(out['rppi']['index']['yerevan'])}")
+    except Exception as e:
+        notice(f"Armenia: CBA residential property price index failed: {e}")
     # Policy (refinancing) rate history
     try:
         rows = xlsx_rows(fetch(CBA_STAT + "8_policy_rates_eng.xlsx"))
@@ -916,6 +976,7 @@ def build(max_reports):
     data["national"] = {
         "usd": cba.get("usd", {}), "mortgage": cba.get("mortgage", {}), "policy_rate": cba.get("policy_rate", []),
         "mortgage_rate": cba.get("mortgage_rate", {}), "longterm_rate": cba.get("longterm_rate", {}),
+        "rppi": cba.get("rppi", {}),
         "inflation": armstat.get("inflation", {}),
         "deals": series.get("marz_deals", {}).get("armenia", {}), "sales": series.get("marz_sales", {}).get("armenia", {}),
         **{k: armstat.get(k, {}).get("armenia", {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales")},
