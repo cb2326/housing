@@ -1458,6 +1458,24 @@ async function openDetail(level, id) {
 }
 // A place's history (charts, school list). Kept once loaded, so Compare and reopening a place are instant.
 const histCache = {};
+// History files are stored gzip-compressed (file.json.gz, about 3x smaller, so the site publishes quickly). The
+// browser unpacks them; very old browsers get a small library for it. Falls back to a plain .json file if there's
+// no .gz (older builds).
+let pakoLoad = null;
+async function gunzipText(buf) {
+  const b = new Uint8Array(buf);
+  if (b[0] !== 0x1f || b[1] !== 0x8b) return new TextDecoder().decode(b);   // already unpacked (e.g. by the server)
+  if ('DecompressionStream' in window) return await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  pakoLoad ||= new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  await pakoLoad;
+  return window.pako.ungzip(b, { to: 'string' });
+}
+async function fetchJsonGz(url) {
+  const r = await fetch(url + '.gz');
+  if (r.ok) return JSON.parse(await gunzipText(await r.arrayBuffer()));
+  const p = await fetch(url);
+  return p.ok ? p.json() : {};
+}
 async function loadHist(level, id) {
   const key = level + ':' + id;
   if (histCache[key]) return histCache[key];
@@ -1465,9 +1483,9 @@ async function loadHist(level, id) {
   try {
     if (level === 'zip') {
       // ZIP histories come bundled by the first three digits, stored as [first month, [values…]].
-      const bundle = await fetch(`data/hist/zip/${id.slice(0, 3)}.json`).then(r => r.ok ? r.json() : {});
+      const bundle = await fetchJsonGz(`data/hist/zip/${id.slice(0, 3)}.json`);
       for (const [k, s] of Object.entries(bundle[id] || {})) h[k] = k === 'a' || k === 'sch' || k === 'mig' ? s : expand(s);
-    } else h = await fetch(`data/hist/${level}/${id}.json`).then(r => r.ok ? r.json() : {});
+    } else h = await fetchJsonGz(`data/hist/${level}/${id}.json`);
   } catch (e) { return {}; }
   return (histCache[key] = h);
 }
