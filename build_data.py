@@ -3128,7 +3128,7 @@ def write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa)
 <title>{esc(name)} Housing Market: Home Prices, Rent and Forecast ({zm[:4]}) | Open Housing Atlas</title>
 <meta name="description" content="{esc(desc)}"><link rel="canonical" href="{SITE_URL}{p['_url']}">
 <meta property="og:title" content="{esc(name)} housing market"><meta property="og:description" content="{esc(desc)}">
-<meta property="og:url" content="{SITE_URL}{p['_url']}"><meta property="og:image" content="{SITE_URL}/og.png?v=2"><meta name="twitter:card" content="summary_large_image">
+<meta property="og:url" content="{SITE_URL}{p['_url']}"><meta property="og:image" content="{SITE_URL}/og.png?v=3"><meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
 <style>{PAGE_CSS}</style><script type="application/ld+json">{json.dumps(ld, separators=(",", ":"))}</script>
 <script data-goatcounter="https://openhousingatlas.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script></head><body>
