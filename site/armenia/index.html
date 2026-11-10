@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Armenia Housing Map | Open Housing Atlas</title>
 <meta name="description" content="Free map of Armenian housing data: apartment prices per square meter for every Yerevan district and 45 regional towns, transactions, wages, poverty and new housing by marz. Official data from the Cadastre Committee, Armstat and the Central Bank of Armenia.">
-<meta name="theme-color" content="#126b60">
+<meta name="theme-color" content="#1e40af">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Open Housing Atlas">
 <meta property="og:title" content="Armenia Housing Map: apartment prices by Yerevan district and town">
@@ -28,7 +28,7 @@
   :root {
     color-scheme: light;
     --bg: #f5f6f8; --panel: #ffffff; --panel-2: #f3f4f6; --line: #e5e7eb; --text: #111827; --muted: #6b7280;
-    --accent: #126b60; --accent-soft: #e6f4f1; --warm: #f59e0b;
+    --accent: #1e40af; --accent-soft: #e8eefc; --warm: #f59e0b;
     --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 8px 24px -10px rgba(16, 24, 40, .18);
     --display: "Fraunces", Georgia, "Times New Roman", serif;
     --sans: "Inter", "Noto Sans Armenian", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
@@ -51,7 +51,7 @@
   .country { display: flex; gap: 6px; margin: 6px 14px 10px; }
   .country a, .country span { flex: 1; text-align: center; padding: 6px 8px; border-radius: 9px; border: 1px solid var(--line); font-weight: 600; font-size: 12.5px; text-decoration: none; color: var(--muted); }
   .country span { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .country a:hover { border-color: #8ccdc0; color: var(--accent); }
+  .country a:hover { border-color: #9db4ef; color: var(--accent); }
   .brand .byline { color: var(--accent); font-weight: 600; font-size: 12.5px; margin-top: 3px; }
   /* data points: the same collapsible groups as the US map */
   .dp-search { margin: 4px 14px 10px; position: relative; display: block; }
@@ -75,7 +75,7 @@
   .metric .info { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted); font: 600 11px/16px var(--sans); text-align: center; background: var(--panel); cursor: pointer; padding: 0; }
   .metric .info:hover { color: var(--accent); border-color: var(--accent); }
   .info-pop { position: fixed; z-index: 1300; max-width: 280px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 12.5px; display: none; }
-  .rel { display: inline-block; margin-top: 3px; color: #126b60; font-size: 11.5px; }
+  .rel { display: inline-block; margin-top: 3px; color: #1e40af; font-size: 11.5px; }
   .rel::before { content: '↻ '; }
   .side-foot { padding: 10px 16px 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
   .side-foot a { color: inherit; }
@@ -107,7 +107,7 @@
   .seg button.on { background: var(--accent); color: #fff; }
   .seg button:disabled { opacity: .35; cursor: not-allowed; }
   .pill-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 9px 14px; cursor: pointer; font-weight: 600; box-shadow: var(--shadow); display: inline-flex; gap: 7px; align-items: center; }
-  .pill-btn:hover { border-color: #8ccdc0; color: var(--accent); }
+  .pill-btn:hover { border-color: #9db4ef; color: var(--accent); }
   .menu-btn { display: none; }
 
   .legend { position: absolute; right: 14px; bottom: 22px; z-index: 500; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 9px; box-shadow: var(--shadow); width: 300px; max-width: calc(100% - 28px); }
@@ -115,8 +115,8 @@
   /* Support (Ko-fi) and Feedback buttons sitting just above the legend, as on the US map */
   .lg-support { position: absolute; right: 0; bottom: calc(100% + 8px); display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px 4px 8px; border-radius: 999px; background: #fbe9e3; border: 1px solid #f6b89b; color: #9c2f1c; font-size: 12px; font-weight: 600; text-decoration: none; box-shadow: var(--shadow); }
   .lg-support:hover { background: #f8dccf; }
-  .lg-support.lg-feedback { bottom: calc(100% + 46px); background: #fff; border-color: #8ccdc0; color: #126b60; }
-  .lg-support.lg-feedback:hover { background: #e6f4f1; }
+  .lg-support.lg-feedback { bottom: calc(100% + 46px); background: #fff; border-color: #9db4ef; color: #1e40af; }
+  .lg-support.lg-feedback:hover { background: #e8eefc; }
   .lg-support svg { width: 13px; height: 13px; }
   .legend .sub { color: var(--muted); font-size: 12px; margin-bottom: 7px; }
   .legend .bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; }
@@ -124,7 +124,7 @@
   .legend .ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; }
   .us-val { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 6px; padding: 8px 10px; background: var(--panel-2); border-radius: 10px; }
   .us-val span { font-size: 13px; color: var(--muted); }
-  .us-val b { font-size: 20px; font-family: var(--display); color: #06463f; }
+  .us-val b { font-size: 20px; font-family: var(--display); color: #172b6b; }
   .legend .na { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 5px; }
   .legend .na i { width: 12px; height: 12px; border-radius: 3px; background: var(--na); display: inline-block; }
   /* zone map: price bands you can read at a glance; hovering or tapping a band shows only those zones */
@@ -135,8 +135,8 @@
   .legend .zhint { font-size: 11px; color: var(--muted); margin-top: 5px; }
   /* Compare places (like the US map) */
   .cmp-add { margin-top: 8px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; color: var(--accent); cursor: pointer; }
-  .cmp-add.on { background: var(--accent-soft); border-color: #8ccdc0; }
-  .cmp-pill { border-color: #8ccdc0; color: #06463f; background: var(--accent-soft); }
+  .cmp-add.on { background: var(--accent-soft); border-color: #9db4ef; }
+  .cmp-pill { border-color: #9db4ef; color: #172b6b; background: var(--accent-soft); }
   .cmp-view { position: absolute; inset: 72px 14px 14px; z-index: 1100; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); display: none; flex-direction: column; overflow: hidden; }
   .cmp-view.show { display: flex; }
   .tv-head { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
@@ -199,7 +199,7 @@
   .dp-switch .sw { font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
   .dp-switch select { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
   .mnow { text-align: right; flex: none; }
-  .mnow b { display: block; font: 700 24px/1.1 var(--display); color: #06463f; }
+  .mnow b { display: block; font: 700 24px/1.1 var(--display); color: #172b6b; }
   .mnow span { font-size: 12px; color: var(--muted); }
   .chart-ctrl { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 4px 0 6px; }
   .seg-sm { display: inline-flex; background: var(--panel-2); border-radius: 999px; padding: 3px; }
@@ -212,7 +212,7 @@
   .snap-h small { color: var(--muted); font-weight: 500; }
   .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
   .kpi { text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 9px 11px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
-  .kpi:hover { border-color: #8ccdc0; }
+  .kpi:hover { border-color: #9db4ef; }
   .kpi.on { border-color: var(--accent); background: var(--accent-soft); }
   .kpi span { font-size: 12px; color: var(--muted); line-height: 1.3; }
   .kpi span small { font-size: 11px; }
@@ -231,6 +231,12 @@
   .d-body h3 { font: 600 14px var(--sans); margin: 14px 0 6px; }
   .chart { width: 100%; height: auto; display: block; }
   .chart-tip { font-size: 12px; color: var(--muted); min-height: 18px; }
+  /* value box when hovering a chart, like the US map */
+  .chart-wrap { position: relative; }
+  .chart-bubble { position: absolute; pointer-events: none; display: none; z-index: 3; background: #1d1b17; color: #f4eee4; border-radius: 9px; padding: 7px 10px; font-size: 12.5px; line-height: 1.45; white-space: normal; width: max-content; max-width: min(250px, 80%); box-shadow: 0 8px 20px rgba(0,0,0,.25); font-variant-numeric: tabular-nums; }
+  .chart-bubble b { display: block; margin-bottom: 2px; }
+  .chart-bubble i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+  .chart-bubble em { font-style: normal; font-weight: 700; }
   .with-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 8px; font-size: 13px; color: var(--muted); }
   .with-row label { display: flex; align-items: center; gap: 8px; flex: 1 1 220px; min-width: 0; }
   .with-row select { flex: 1; min-width: 0; width: 100%; max-width: 100%; text-overflow: ellipsis; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); font: inherit; font-size: 13px; color: var(--text); }
@@ -304,7 +310,7 @@
 <div class="app">
   <aside class="side" id="side">
     <a class="brand" href="/">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#126b60"/><path d="M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z" fill="none" stroke="#e6f4f1" stroke-width="3.5" stroke-linejoin="round"/><path d="M25 15v29M39 20v29" stroke="#8ccdc0" stroke-width="3.5"/></svg>
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#1e40af"/><path d="M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z" fill="none" stroke="#e8eefc" stroke-width="3.5" stroke-linejoin="round"/><path d="M25 15v29M39 20v29" stroke="#9db4ef" stroke-width="3.5"/></svg>
       <div><h1>Open Housing Atlas</h1><small class="byline">Free Armenia housing data</small><small id="asof">Loading data…</small></div>
     </a>
     <div class="country"><a href="/">United States</a><span>Armenia</span></div>
@@ -313,7 +319,7 @@
     <div class="groups" id="groups"></div>
     <a class="side-support" href="https://ko-fi.com/chrisbogh" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.8 8.4 2.9 4.5 6.7 4.5c2.1 0 3.6 1.1 5.3 3 1.7-1.9 3.2-3 5.3-3 3.8 0 5.9 3.9 4.3 7.4C19.5 16.4 12 21 12 21z"/></svg><span><b>Support on Ko-fi</b><small>Keep this atlas free for everyone</small></span></a>
     <div class="side-foot">
-      Data: <a href="https://cadastre.am/en/market_analysis" target="_blank" rel="noopener">Cadastre Committee of Armenia</a>,
+      Created by Chris B. Data: <a href="https://cadastre.am/en/market_analysis" target="_blank" rel="noopener">Cadastre Committee of Armenia</a>,
       <a href="https://statbank.armstat.am/" target="_blank" rel="noopener">Armstat</a>,
       <a href="https://www.cba.am/" target="_blank" rel="noopener">Central Bank of Armenia</a>.
       Map shapes © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.
@@ -422,9 +428,9 @@ const ICONS = {
 const icon = name => `<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
 const M = Object.fromEntries(METRICS.map(m => [m.id, m]));
 // The same colors as the US map: amounts light to dark teal; changes teal (falling), cream (flat), coral (rising)
-const PALETTE = ['#e6f4f1', '#bfe3dc', '#8ccdc0', '#56b0a0', '#2b8f80', '#126b60', '#06463f'];
-const ZONE_PAL = ['#0b5d5a', '#2a9d8f', '#8fd3c7', '#f4efe6', '#f6b89b', '#e76f51', '#9c2f1c'];   // same colors as the US map's legend
-const DIVERGE =['#0b5d5a', '#2a9d8f', '#8fd3c7', '#f4efe6', '#f6b89b', '#e76f51', '#9c2f1c'];
+const PALETTE = ['#1e3a8a', '#3b6fd8', '#a9c3f2', '#f2efe9', '#f6b98f', '#e0703a', '#9a3412'];
+const ZONE_PAL = ['#1e3a8a', '#3b6fd8', '#a9c3f2', '#f2efe9', '#f6b98f', '#e0703a', '#9a3412'];   // same colors as the US map's legend
+const DIVERGE = ['#1e3a8a', '#3b6fd8', '#a9c3f2', '#f2efe9', '#f6b98f', '#e0703a', '#9a3412'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const ui = { metric: 'price', cur: 'AMD', sel: null, open: new Set(['Prices and affordability']), range: 'all', nat: 'mort_amd', level: 'district' };
@@ -594,8 +600,12 @@ const realButtons = metric => REAL_METRICS.includes(metric) && realAvailable() ?
 const viewButtons = () => `<div class="seg-sm" title="Show prices as sold, in today's money, or both">${[['nominal', 'As sold'], ['real', ui.cur === 'USD' ? 'Today\'s $' : 'Today\'s ֏'], ['both', 'Both']].map(([v, l]) => `<button type="button" class="${(ui.rview || 'both') === v ? 'on' : ''}" data-rview="${v}">${l}</button>`).join('')}</div>`;
 // the unit a data point is measured in, so two of them share a scale only when it makes sense
 const PCT_NAT = ['inflation', 'rppi_houses', 'rppi_all', 'm2_yoy'], RATE_NAT = ['mort_amd', 'mort_usd', 'loan_eur', 'policy', 'amd_share'];
+// Two data points can share the left scale when they're measured alike: both amounts of money (֏ or $), or both
+// percentages (changes, rates, shares). Only truly different kinds (money vs %, counts, years…) need their own scale.
 function unitOf(id) { if (M[id]?.real) id = M[id].real;   // a real price is measured like its nominal one
-  const m = M[id]; if (!m) return ''; if (m.nat) return PCT_NAT.includes(m.nat) ? 'pct' : RATE_NAT.includes(m.nat) ? 'rate' : 'nat:' + m.nat; return m.money ? 'money:' + (id === 'typical' ? 'big' : ['mtg_pmt', 'wage'].includes(id) ? 'month' : id) : m.pct ? 'pct' : m.unit || id; }
+  const m = M[id]; if (!m) return '';
+  if (m.nat) return PCT_NAT.includes(m.nat) || RATE_NAT.includes(m.nat) ? 'pct' : 'nat:' + m.nat;   // (money supply, loans: billions)
+  return m.money ? 'money' : m.pct || m.unit === '%' ? 'pct' : m.unit || id; }
 // "Compare with" under the chart: pick any other data point; Left axis = same scale, Right axis = its own scale
 const withRow = m => `<div class="with-row"><label>Compare with <select id="withPick" aria-label="Compare with another data point"><option value="">None</option>${metricOptions(ui.with || '').replace(`<option value="${ui.metric}"`, `<option disabled value="${ui.metric}"`)}</select></label>${ui.with && ui.with !== ui.metric ? `<div class="seg-sm">${[['left', 'Left axis'], ['right', 'Right axis']].map(([v, l]) => `<button type="button" class="${(unitOf(ui.metric) !== unitOf(ui.with) ? 'right' : ui.axis || 'left') === v ? 'on' : ''}" data-axis="${v}"${v === 'left' && unitOf(ui.metric) !== unitOf(ui.with) ? ' disabled title="Different units: shown on its own scale"' : ''}>${l}</button>`).join('')}</div>` : ''}</div>`;
 const realNote = () => `<p class="note" style="margin:2px 0 0">In today's ${ui.cur === 'USD' ? 'dollars: earlier prices raised by US inflation since then (BLS consumer prices), as felt by a buyer earning dollars' : 'drams: earlier prices raised by Armenian inflation since then (Armstat consumer prices)'}.</p>`;
@@ -740,7 +750,7 @@ function bindArea(layer, kind, id) {
   // on the Armenia level the whole country is one place: any marz opens Armenia
   const arm = () => kind === 'marz' && curLevel() === 'armenia';
   layer.on('click', e => { L.DomEvent.stopPropagation(e); arm() ? select('armenia', 'armenia') : select(kind, id); });
-  layer.on('mouseover', () => { if (!arm()) layer.setStyle({ weight: 2.5, color: '#0b4a43' }); });
+  layer.on('mouseover', () => { if (!arm()) layer.setStyle({ weight: 2.5, color: '#172b6b' }); });
   layer.on('mouseout', () => restyle());
   layer.bindTooltip(() => arm() ? tipHtml('armenia', 'armenia') : tipHtml(kind, id), { sticky: true });
 }
@@ -770,21 +780,21 @@ function restyle() {
   marzLayer.setStyle(f => {
     const id = f.properties.id, sel = ui.sel && ui.sel.kind === 'marz' && ui.sel.id === id;
     // the whole country in one color (grey when the figure isn't published for all of Armenia)
-    if (armMode) return { fillColor: armV == null ? '#e5e7eb' : '#2a9d8f', fillOpacity: armSel ? .75 : .6, color: '#ffffff', weight: 1, opacity: .7, dashArray: null };
+    if (armMode) return { fillColor: armV == null ? '#e5e7eb' : '#3b6fd8', fillOpacity: armSel ? .75 : .6, color: '#ffffff', weight: 1, opacity: .7, dashArray: null };
     if (marzMode) {
       const v = valueOf('marz', id);
-      return { fillColor: v == null ? '#e5e7eb' : scale.color(v), fillOpacity: .78, color: sel ? '#0b4a43' : '#ffffff', weight: sel ? 3 : 1.5 };
+      return { fillColor: v == null ? '#e5e7eb' : scale.color(v), fillOpacity: .78, color: sel ? '#172b6b' : '#ffffff', weight: sel ? 3 : 1.5 };
     }
-    return { fillColor: '#ffffff', fillOpacity: id === 'yerevan' ? 0 : .35, color: sel ? '#0b4a43' : '#6b7280', weight: sel ? 3 : 1, dashArray: id === 'yerevan' ? null : '3 3' };
+    return { fillColor: '#ffffff', fillOpacity: id === 'yerevan' ? 0 : .35, color: sel ? '#172b6b' : '#6b7280', weight: sel ? 3 : 1, dashArray: id === 'yerevan' ? null : '3 3' };
   });
   distLayer.setStyle(f => {
     const id = f.properties.id, sel = ui.sel && ui.sel.kind === 'district' && ui.sel.id === id;
     if (marzMode || armMode) return { fillOpacity: 0, opacity: 0, interactive: false };
     // district outlines over the zones: thin and grey, so a selected zone's own outline is the one that stands out
     if (zoneMode) return { fillOpacity: 0, color: '#4b5563', weight: 1.2, opacity: .7, dashArray: null };
-    if (townMode) return { fillColor: '#ffffff', fillOpacity: .3, color: sel ? '#0b4a43' : '#9ca3af', weight: sel ? 3 : 1, opacity: 1 };   // Yerevan in grey: towns are the colored ones
+    if (townMode) return { fillColor: '#ffffff', fillOpacity: .3, color: sel ? '#172b6b' : '#9ca3af', weight: sel ? 3 : 1, opacity: 1 };   // Yerevan in grey: towns are the colored ones
     const v = valueOf('district', id);
-    return { fillColor: v == null ? '#e5e7eb' : scale.color(v), fillOpacity: .82, color: sel ? '#0b4a43' : '#ffffff', weight: sel ? 3 : 1, opacity: 1 };
+    return { fillColor: v == null ? '#e5e7eb' : scale.color(v), fillOpacity: .82, color: sel ? '#172b6b' : '#ffffff', weight: sel ? 3 : 1, opacity: 1 };
   });
   distLayer.eachLayer(l => { const el = l.getElement && l.getElement(); if (el) el.style.pointerEvents = marzMode || zoneMode || armMode ? 'none' : ''; });
   if (zoneLayer) {
@@ -806,9 +816,9 @@ function restyle() {
     const el = c.getElement && c.getElement();
     if (el) el.style.pointerEvents = armMode ? 'none' : '';
     if (armMode) { c.setStyle({ opacity: 0, fillOpacity: 0 }); return; }   // the whole country: no town dots
-    if (!townMode) { c.setStyle({ fillColor: '#ffffff', fillOpacity: 1, opacity: 1, color: sel ? '#0b4a43' : '#374151', radius: sel ? 6 : 4, weight: sel ? 2.5 : 1.5 }); return; }
+    if (!townMode) { c.setStyle({ fillColor: '#ffffff', fillOpacity: 1, opacity: 1, color: sel ? '#172b6b' : '#374151', radius: sel ? 6 : 4, weight: sel ? 2.5 : 1.5 }); return; }
     const v = valueOf('town', id);
-    c.setStyle({ fillColor: v == null ? '#e5e7eb' : scale.color(v), fillOpacity: 1, opacity: 1, color: sel ? '#0b4a43' : '#ffffff', radius: sel ? 10 : 7, weight: sel ? 3 : 1.5 });
+    c.setStyle({ fillColor: v == null ? '#e5e7eb' : scale.color(v), fillOpacity: 1, opacity: 1, color: sel ? '#172b6b' : '#ffffff', radius: sel ? 10 : 7, weight: sel ? 3 : 1.5 });
   });
   updateLabels();
   renderLegend();
@@ -1405,7 +1415,7 @@ function chart(series, fmt, bars = false, big = false, est = null, extra = null)
   if (bars) {
     const slots = pts.every(([k]) => k.endsWith('-12')) ? (x1 - x0) / 12 + 1 : x1 - x0 + 1;   // yearly data: one slot per year
     const bw = Math.max(1.5, Math.min((W - L0 - R0) / slots * .6, ((W - L0 - R0) / Math.max(1, x1 - x0 + 1)) * 12 * .6));
-    body = pts.map(([ym, v]) => `<rect x="${(X(ym) - bw / 2).toFixed(1)}" y="${Y(Math.max(v, 0)).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(.5, Math.abs(Y(v) - Y(0))).toFixed(1)}" fill="#56b0a0" rx="1"/>`).join('');
+    body = pts.map(([ym, v]) => `<rect x="${(X(ym) - bw / 2).toFixed(1)}" y="${Y(Math.max(v, 0)).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(.5, Math.abs(Y(v) - Y(0))).toFixed(1)}" fill="#6a8fe0" rx="1"/>`).join('');
   } else {
     // a gap is a jump bigger than the series' usual spacing (monthly data: > 3 months; yearly data: > 18 months)
     const steps = pts.slice(1).map(([ym], i) => toIdx(ym) - toIdx(pts[i][0])).sort((a, b) => a - b);
@@ -1413,12 +1423,12 @@ function chart(series, fmt, bars = false, big = false, est = null, extra = null)
     let d = '', prev = null;
     for (const [ym, v] of pts) { d += (prev != null && toIdx(ym) - prev <= gap ? 'L' : 'M') + X(ym).toFixed(1) + ' ' + Y(v).toFixed(1); prev = toIdx(ym); }
     const lone = pts.filter(([ym], i) => !(i > 0 && toIdx(ym) - toIdx(pts[i - 1][0]) <= gap) && !(i < pts.length - 1 && toIdx(pts[i + 1][0]) - toIdx(ym) <= gap));
-    body = `<path d="${d}" fill="none" stroke="#126b60" stroke-width="${big ? 2.4 : 2}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` +
-      lone.map(([ym, v]) => `<circle cx="${X(ym).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2.8" fill="#126b60"/>`).join('');
+    body = `<path d="${d}" fill="none" stroke="#1e40af" stroke-width="${big ? 2.4 : 2}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` +
+      lone.map(([ym, v]) => `<circle cx="${X(ym).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2.8" fill="#1e40af"/>`).join('');
     if (ePts.length) {
       let e = '', pe = null;
       for (const [ym, v] of ePts) { e += (pe != null && toIdx(ym) - pe <= 1 ? 'L' : 'M') + X(ym).toFixed(1) + ' ' + Y(v).toFixed(1); pe = toIdx(ym); }
-      body = `<path d="${e}" fill="none" stroke="#126b60" stroke-width="${big ? 2 : 1.6}" stroke-dasharray="5 4" opacity=".8"/>` + body;
+      body = `<path d="${e}" fill="none" stroke="#1e40af" stroke-width="${big ? 2 : 1.6}" stroke-dasharray="5 4" opacity=".8"/>` + body;
     }
     if (xS.length) {   // the second line (Compare with), in orange, with its own dashed estimate
       let d2 = '', p2 = null, e2 = '', q2 = null;
@@ -1449,10 +1459,10 @@ function chart(series, fmt, bars = false, big = false, est = null, extra = null)
   const hoverPts = ePts.length ? [...pts, ...ePts.filter(p => !real.has(p[0])).map(p => [p[0], p[1], 'est'])].sort() : pts;
   const xmap = xS.length ? Object.fromEntries([...xE, ...xS]) : null;
   CHARTS[id] = { pts: hoverPts, fmt, fmt2, X, Y, Y2, W, yearlyPts, xmap, xlabel: extra?.label, mlabel: extra?.mainLabel, diff: !!extra?.diff };
-  const legend = xS.length ? `<div class="chart-legend"><span><i style="background:#126b60"></i>${esc(extra.mainLabel)}${right ? ' (left)' : ''}</span><span><i style="background:#e76f51"></i>${esc(extra.label)}${right ? ' (right)' : ''}</span></div>` : '';
+  const legend = xS.length ? `<div class="chart-legend"><span><i style="background:#1e40af"></i>${esc(extra.mainLabel)}${right ? ' (left)' : ''}</span><span><i style="background:#e76f51"></i>${esc(extra.label)}${right ? ' (right)' : ''}</span></div>` : '';
   const label = ym => yearlyPts ? ym.slice(0, 4) : monthLabel(ym);
-  return legend + `<svg class="chart${big ? ' big' : ''}" id="${id}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Chart">${axis}${body}<line class="cur" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="#9ca3af" stroke-dasharray="2 2" visibility="hidden"/><circle class="dot" r="4" fill="#126b60" stroke="#fff" stroke-width="1.5" visibility="hidden"/><circle class="dot2" r="4" fill="#e76f51" stroke="#fff" stroke-width="1.5" visibility="hidden"/></svg>
-    <div class="chart-tip" id="${id}t">Latest: <b>${esc(label(pts[pts.length - 1][0]))}</b> · ${esc(fmt(pts[pts.length - 1][1]))} <span style="opacity:.7">· move over the chart to read any point</span></div>${ePts.length ? '<p class="note" style="margin:2px 0 0">Dashed line: estimated from the Central Bank of Armenia price index where the Cadastre\'s monthly reports are missing. It joins the real prices on both sides.</p>' : ''}`;
+  return legend + `<div class="chart-wrap"><svg class="chart${big ? ' big' : ''}" id="${id}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Chart">${axis}${body}<line class="cur" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="#9ca3af" stroke-dasharray="2 2" visibility="hidden"/><circle class="dot" r="5" fill="#f59e0b" stroke="#fff" stroke-width="2" visibility="hidden"/><circle class="dot2" r="5" fill="#e76f51" stroke="#fff" stroke-width="2" visibility="hidden"/></svg><div class="chart-bubble" id="${id}b"></div></div>
+    <div class="chart-tip" id="${id}t">${esc(label(pts[0][0]))} → ${esc(label(pts[pts.length - 1][0]))}: ${esc(fmt(pts[0][1]))} → ${esc(fmt(pts[pts.length - 1][1]))}${pts[0][1] > 0 && !bars ? ` (${fmtPct((pts[pts.length - 1][1] / pts[0][1] - 1) * 100)})` : ''}</div>${ePts.length ? '<p class="note" style="margin:2px 0 0">Dashed line: estimated from the Central Bank of Armenia price index where the Cadastre\'s monthly reports are missing. It joins the real prices on both sides.</p>' : ''}`;
 }
 // Charts are drawn at the panel's width; if the panel wasn't laid out yet (it was just opening), draw once more
 // at its real width so nothing gets squashed
@@ -1466,7 +1476,8 @@ function fitCharts(redraw) {
 function wireCharts() {
   for (const [id, c] of Object.entries(CHARTS)) {
     const svg = document.getElementById(id); if (!svg) { delete CHARTS[id]; continue; }
-    const tip = document.getElementById(id + 't');
+    const bub = document.getElementById(id + 'b');
+    const hide = () => { bub.style.display = 'none'; ['.cur', '.dot', '.dot2'].forEach(s => svg.querySelector(s)?.setAttribute('visibility', 'hidden')); };
     const show = e => {
       const r = svg.getBoundingClientRect();
       const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
@@ -1478,16 +1489,23 @@ function wireCharts() {
       dot.setAttribute('cx', c.X(best[0])); dot.setAttribute('cy', c.Y(best[1])); dot.setAttribute('visibility', 'visible');
       const xv = c.xmap ? c.xmap[best[0]] : null, dot2 = svg.querySelector('.dot2');
       if (dot2) { if (xv != null) { dot2.setAttribute('cx', c.X(best[0])); dot2.setAttribute('cy', c.Y2(xv)); dot2.setAttribute('visibility', 'visible'); } else dot2.setAttribute('visibility', 'hidden'); }
-      tip.innerHTML = `<b>${esc(c.yearlyPts ? best[0].slice(0, 4) : monthLabel(best[0]))}</b> · ${c.xmap ? esc(c.mlabel) + ': ' : ''}${esc(c.fmt(best[1]))}${xv != null ? ' · <span style="color:#c2410c">' + esc(c.xlabel) + ': ' + esc(c.fmt2(xv)) + '</span>' + (c.diff && Math.abs(xv - best[1]) > Math.abs(best[1]) * .001 ? ' · <b>difference: ' + (xv > best[1] ? '+' : '−') + esc(c.fmt(Math.abs(xv - best[1]))) + ' (' + (xv > best[1] ? '+' : '−') + Math.abs((xv / best[1] - 1) * 100).toFixed(0) + '%)</b>' : '') : ''}${best[2] === 'est' ? ' <span style="opacity:.75">(estimate)</span>' : ''}`;
+      const name = c.mlabel || M[ui.metric]?.label || '';
+      bub.innerHTML = `<b>${esc(c.yearlyPts ? best[0].slice(0, 4) : monthLabel(best[0]))}</b>` +
+        `<div><i style="background:#1e40af"></i>${esc(name)}: <em>${esc(c.fmt(best[1]))}</em>${best[2] === 'est' ? ' <span style="opacity:.7">(estimate)</span>' : ''}</div>` +
+        (xv != null ? `<div><i style="background:#e76f51"></i>${esc(c.xlabel)}: <em>${esc(c.fmt2(xv))}</em></div>` : '');
+      bub.style.display = 'block';
+      const wrap = svg.parentElement.getBoundingClientRect(), px = c.X(best[0]) / c.W * r.width + (r.left - wrap.left), py = c.Y(best[1]) / svg.viewBox.baseVal.height * r.height + (r.top - wrap.top);
+      bub.style.left = (px + 14 + bub.offsetWidth > wrap.width ? Math.max(0, px - 14 - bub.offsetWidth) : px + 14) + 'px';
+      bub.style.top = Math.max(0, Math.min(wrap.height - bub.offsetHeight, py - bub.offsetHeight - 10)) + 'px';
     };
-    svg.addEventListener('mousemove', show); svg.addEventListener('touchmove', show, { passive: true });
+    svg.addEventListener('mousemove', show); svg.addEventListener('touchmove', show, { passive: true }); svg.addEventListener('mouseleave', hide);
     delete CHARTS[id];
   }
 }
 
 // ---------- Compare places (up to 4), like the US map ----------
 // A place is [kind, id]: armenia, marz, district, town, or zone with id "district#zone" (e.g. "kentron#1").
-const CMP_COLORS = ['#126b60', '#e76f51', '#334155', '#c99a06'];
+const CMP_COLORS = ['#1e40af', '#e76f51', '#334155', '#c99a06'];
 let cmpList = [], cmpMetric = null;
 try { cmpList = (JSON.parse(localStorage.getItem('oha-armenia-cmp') || '[]') || []).slice(0, 4); } catch (e) { }
 const saveCmp = () => { try { localStorage.setItem('oha-armenia-cmp', JSON.stringify(cmpList)); } catch (e) { } };
