@@ -1,7 +1,7 @@
 // Open Housing Atlas app helper. Always tries the network first, so the app shows the same, current data as the
 // website; when there is no connection it falls back to the last copy it saw, so the app still opens offline.
-const CACHE = 'oha-v1';
-const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CACHE = 'oha-v2';   // (new version: navy icons)
+const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png?v=2', '/icons/icon-512.png?v=2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
