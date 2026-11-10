@@ -3,7 +3,7 @@
 Downloads free public housing data and writes small JSON files the map reads:
   site/data/meta.json                 when it was built, latest months/years, mortgage rate
   site/data/{state,metro,county}.json latest value of every data point for every place
-  site/data/hist/{level}/{id}.json    history for the charts (monthly series + yearly data points)
+  site/data/hist/{level}/{id}.json.gz history for the charts (gzip) (monthly series + yearly data points)
   site/data/zip/...                   the same for ~30,000 ZIP codes, one file per state
 
 Sources (no accounts needed; the Census API key is optional but unlocks the American Community Survey):
@@ -148,6 +148,15 @@ def write_json(path, obj):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, separators=(",", ":"))
+
+
+def write_json_gz(path, obj):
+    """The same JSON, gzip-compressed (about 3x smaller). Used for the per-place history files, which make up most of
+    the site: keeping them small lets GitHub Pages publish the site within its 10-minute limit. The map unpacks them
+    in the browser (DecompressionStream). mtime=0 keeps the file identical when the data hasn't changed."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with gzip.GzipFile(path, "wb", compresslevel=9, mtime=0) as f:
+        f.write(json.dumps(obj, separators=(",", ":")).encode("utf-8"))
 
 
 def save_dcache(name, obj):
@@ -2737,7 +2746,7 @@ def main():
     for lvl, ps in places.items():
         write_json(os.path.join(OUT, f"{lvl}.json"), ps)
         for pid, bundle in hist[lvl].items():  # one small file per place, loaded when you click it
-            write_json(os.path.join(OUT, "hist", lvl, f"{pid}.json"), bundle)
+            write_json_gz(os.path.join(OUT, "hist", lvl, f"{pid}.json.gz"), bundle)
     print(f"Done: {meta['counts']} - Zillow {zillow_month}, Realtor.com {realtor_month}, mortgage {rate}% ({rate_day})")
     try:
         write_pages(places, hist, meta, metro_names, metro_counties, county_to_cbsa)
@@ -3707,7 +3716,7 @@ def build_zips(county_to_cbsa, county_income, rate, fc_hist, zillow_month, acs_z
         write_json(os.path.join(OUT, "zip", f"{st}.json"), recs)
         write_json(os.path.join(OUT, "zip", "shapes", f"{st}.json"), {z: pack_shape(shapes[z]) for z in recs})
     for prefix, group in hist_groups.items():
-        write_json(os.path.join(OUT, "hist", "zip", f"{prefix}.json"), group)
+        write_json_gz(os.path.join(OUT, "hist", "zip", f"{prefix}.json.gz"), group)
     write_json(os.path.join(OUT, "zip", "index.json"), index)
     rankings = {}
     for name, (key, direction, ok) in ZIP_RANKINGS.items():
