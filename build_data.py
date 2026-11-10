@@ -2745,6 +2745,17 @@ def main():
     }
     for lvl, ps in places.items():
         write_json(os.path.join(OUT, f"{lvl}.json"), ps)
+        if lvl in ("county", "metro"):
+            # small bundles of neighboring places (counties by the first 4 digits of the FIPS code, about 5 each;
+            # metros by the first 3 digits of the CBSA code): far fewer files, so GitHub Pages can publish the site
+            # within its 10-minute limit, while each bundle stays small and quick to load. The map reads them.
+            n = 4 if lvl == "county" else 3
+            groups = {}
+            for pid, bundle in hist[lvl].items():
+                groups.setdefault(pid[:n], {})[pid] = bundle
+            for key, group in groups.items():
+                write_json_gz(os.path.join(OUT, "hist", lvl, f"b{key}.json.gz"), group)
+            continue
         for pid, bundle in hist[lvl].items():  # one small file per place, loaded when you click it
             write_json_gz(os.path.join(OUT, "hist", lvl, f"{pid}.json.gz"), bundle)
     print(f"Done: {meta['counts']} - Zillow {zillow_month}, Realtor.com {realtor_month}, mortgage {rate}% ({rate_day})")
