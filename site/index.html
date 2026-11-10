@@ -1457,7 +1457,7 @@ async function openDetail(level, id) {
   if (openPlace && openPlace.id === id) { hist = h; renderDrawer(); }
 }
 // A place's history (charts, school list). Kept once loaded, so Compare and reopening a place are instant.
-const histCache = {};
+const histCache = {}, histBundles = {};
 // History files are stored gzip-compressed (file.json.gz, about 3x smaller, so the site publishes quickly). The
 // browser unpacks them; very old browsers get a small library for it. Falls back to a plain .json file if there's
 // no .gz (older builds).
@@ -1485,6 +1485,11 @@ async function loadHist(level, id) {
       // ZIP histories come bundled by the first three digits, stored as [first month, [values…]].
       const bundle = await fetchJsonGz(`data/hist/zip/${id.slice(0, 3)}.json`);
       for (const [k, s] of Object.entries(bundle[id] || {})) h[k] = k === 'a' || k === 'sch' || k === 'mig' ? s : expand(s);
+    } else if (level === 'county' || level === 'metro') {
+      // counties and metros come in small bundles of neighbors (the first 4 or 3 digits of the code); each loads once
+      const key = level + (level === 'county' ? id.slice(0, 4) : id.slice(0, 3));
+      histBundles[key] ||= fetchJsonGz(`data/hist/${level}/b${key.slice(level.length)}.json`).catch(() => ({}));
+      h = (await histBundles[key])[id] || {};
     } else h = await fetchJsonGz(`data/hist/${level}/${id}.json`);
   } catch (e) { return {}; }
   return (histCache[key] = h);
