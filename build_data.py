@@ -2881,7 +2881,7 @@ def _chart_svg(points, fair):
     out += [f'<text x="{X(y):.1f}" y="{H - 6}" text-anchor="middle">{y}</text>' for y in years]
     if len(fair) > 2:
         out.append(f'<polyline fill="none" stroke="#8a94a3" stroke-width="2" stroke-dasharray="5 4" points="{path(fair)}"/>')
-    out.append(f'<polyline fill="none" stroke="#126b60" stroke-width="2.4" points="{path(points)}"/>')
+    out.append(f'<polyline fill="none" stroke="#1e40af" stroke-width="2.4" points="{path(points)}"/>')
     out.append("</svg>")
     return "".join(out)
 
@@ -2934,22 +2934,22 @@ def _summary(name, v, rate):
 
 
 PAGE_CSS = """*{box-sizing:border-box}body{margin:0;font:16px/1.6 Inter,'Segoe UI',system-ui,sans-serif;color:#1d1b17;background:#faf7f1}
-a{color:#126b60}header.top{background:#fff;border-bottom:1px solid #e7e2d8}header.top div{max-width:960px;margin:0 auto;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
-.logo{font:600 20px Fraunces,Georgia,serif;color:#06463f;text-decoration:none}.btn{background:#126b60;color:#fff;padding:8px 14px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;white-space:nowrap}
+a{color:#1e40af}header.top{background:#fff;border-bottom:1px solid #e7e2d8}header.top div{max-width:960px;margin:0 auto;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.logo{font:600 20px Fraunces,Georgia,serif;color:#172b6b;text-decoration:none}.btn{background:#1e40af;color:#fff;padding:8px 14px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;white-space:nowrap}
 main{max-width:960px;margin:0 auto;padding:20px}.crumbs{font-size:13px;color:#6b6457}.crumbs a{color:#6b6457}
-h1{font:600 32px/1.2 Fraunces,Georgia,serif;margin:6px 0 4px;color:#06463f}h2{font:600 21px Fraunces,Georgia,serif;margin:28px 0 10px;color:#06463f}
+h1{font:600 32px/1.2 Fraunces,Georgia,serif;margin:6px 0 4px;color:#172b6b}h2{font:600 21px Fraunces,Georgia,serif;margin:28px 0 10px;color:#172b6b}
 .sub{color:#6b6457;font-size:14px;margin:0 0 18px}.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 .kpi{background:#fff;border:1px solid #e7e2d8;border-radius:12px;padding:12px 14px}.kpi span{display:block;font-size:13px;color:#6b6457}.kpi b{font-size:22px}
-.kpi small{display:block;font-size:13px;color:#4b463d;line-height:1.4;margin-top:3px}.kpi small em{font-style:normal;font-weight:600}.up{color:#9c2f1c}.dn{color:#0b5d5a}
-.kpi b{display:block;line-height:1.25}.kpi .word{font-size:18px}.more{margin-top:6px}.more summary{cursor:pointer;color:#126b60;font-weight:600;font-size:14px;padding:4px 2px}.more table{margin-top:6px}.lede{background:#fff;border:1px solid #e7e2d8;border-radius:12px;padding:16px 18px;margin-top:16px}
+.kpi small{display:block;font-size:13px;color:#4b463d;line-height:1.4;margin-top:3px}.kpi small em{font-style:normal;font-weight:600}.up{color:#9c2f1c}.dn{color:#1e3a8a}
+.kpi b{display:block;line-height:1.25}.kpi .word{font-size:18px}.more{margin-top:6px}.more summary{cursor:pointer;color:#1e40af;font-weight:600;font-size:14px;padding:4px 2px}.more table{margin-top:6px}.lede{background:#fff;border:1px solid #e7e2d8;border-radius:12px;padding:16px 18px;margin-top:16px}
 .chart{background:#fff;border:1px solid #e7e2d8;border-radius:12px;padding:12px 14px}.chart svg{width:100%;height:auto;font-size:11px;fill:#6b6457}
 .legend{font-size:12.5px;color:#6b6457}table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e7e2d8;border-radius:12px;overflow:hidden}
 td{padding:8px 14px;border-bottom:1px solid #efeae0;font-size:15px}td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
 .links{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:15px}.faq dt{font-weight:600;margin-top:12px}.faq dd{margin:4px 0 0}
 footer{max-width:960px;margin:30px auto 0;padding:18px 20px 40px;font-size:13px;color:#6b6457;border-top:1px solid #e7e2d8}
 @media(max-width:600px){h1{font-size:26px}}
-.acts{display:flex;gap:8px;align-items:center}.btn.ghost{background:#fff;color:#126b60;border:1px solid #8ccdc0;cursor:pointer;font:600 14px Inter,'Segoe UI',system-ui,sans-serif}
-.btn.ghost:hover{background:#e6f4f1}.print-only{display:none}
+.acts{display:flex;gap:8px;align-items:center}.btn.ghost{background:#fff;color:#1e40af;border:1px solid #9db4ef;cursor:pointer;font:600 14px Inter,'Segoe UI',system-ui,sans-serif}
+.btn.ghost:hover{background:#e8eefc}.print-only{display:none}
 @media(max-width:520px){.acts .btn{padding:7px 10px;font-size:13px}}
 @media print{@page{margin:12mm}body{background:#fff;font-size:12pt}header.top,.btn,.links,footer a,.more summary{display:none!important}
 main{padding:0;max-width:none}.print-only{display:block;font-size:10pt;color:#6b6457;margin:0 0 10px}
