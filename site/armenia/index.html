@@ -261,6 +261,7 @@
   .with-row label { display: flex; align-items: center; gap: 8px; flex: 1 1 220px; min-width: 0; }
   .with-row select { flex: 1; min-width: 0; width: 100%; max-width: 100%; text-overflow: ellipsis; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); font: inherit; font-size: 13px; color: var(--text); }
   .seg-sm button:disabled { opacity: .4; cursor: not-allowed; }
+  .side-x { display: none; position: absolute; top: calc(12px + env(safe-area-inset-top)); right: 12px; z-index: 3; border: 0; background: var(--panel-2); width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 14px; align-items: center; justify-content: center; }
   .dl-btn { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
   .dl-btn:hover { background: var(--accent-soft); }
   .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); margin: 0 0 4px; }
@@ -289,21 +290,27 @@
 
   @media (max-width: 760px) {
     .app { grid-template-columns: 1fr; }
-    .side { position: fixed; inset: 0 auto 0 0; width: min(86vw, 320px); transform: translateX(-102%); transition: transform .2s; box-shadow: var(--shadow); z-index: 1200; }
+    .side { position: fixed; inset: 0 auto 0 0; width: 100vw; padding-top: env(safe-area-inset-top); transform: translateX(-102%); transition: transform .2s; box-shadow: var(--shadow); z-index: 1300; }   /* the data menu fills the screen, like the US map */
+    .side-x { display: inline-flex; }
+    .side-support { margin: 0 12px 6px; padding: 6px 10px; gap: 8px; }
+    .side-support small { display: none; }
+    .side-foot { font-size: 11px; padding: 6px 16px calc(8px + env(safe-area-inset-bottom)); }
+    .menu-btn { padding: 7px 11px; font-size: 16px; }
+    .menu-btn .btxt { display: none; }
     .side.open { transform: none; }
     .menu-btn { display: inline-flex; }
     .topbar { top: 10px; left: 10px; right: 10px; gap: 8px; }
-    .place-search { flex-basis: 100%; max-width: none; order: 3; }
+    .place-search { flex-basis: 100%; max-width: none; order: -1; }   /* search first, like the US map */
     .seg { padding: 3px; }
     .seg button { padding: 6px 9px; font-size: 13px; }
     #overviewBtn { display: none; }   /* on phones the Armenia tile opens the whole-country panel */
     #cmpBtn { padding: 7px 11px; font-size: 13px; }
     .legend { left: 10px; right: 10px; bottom: 14px; width: auto; max-width: none; }
-    .detail { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-width: none; height: 70dvh; border-radius: 16px 16px 0 0; border-right: 0; transform: translateY(102%); }
+    .detail { top: 0; left: 0; right: 0; bottom: 0; width: auto; max-width: none; height: 100dvh; border-radius: 0; border-right: 0; transform: translateY(102%); z-index: 1250; padding-top: env(safe-area-inset-top); }   /* a place opens full screen, like the US map */
     .detail.show { transform: none; }
     /* phone-sized details sheet: handle bar, compact header, value under the name, two columns of tiles */
-    .detail { height: 82dvh; box-shadow: 0 -8px 30px rgba(0,0,0,.18); }
-    .detail::before { content: ''; position: absolute; top: 7px; left: 50%; width: 42px; height: 4px; border-radius: 2px; background: #d1d5db; transform: translateX(-50%); z-index: 2; }
+    .detail { box-shadow: none; }
+    .detail::before { display: none; }
     .d-head { padding: 18px 56px 10px 16px; }
     .d-head h2 { font-size: 20px; padding-right: 0; }
     .d-head .hy { font-size: 13.5px; }
@@ -335,6 +342,7 @@
       <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#1e40af"/><path d="M14 20l11-5 14 5 11-5v29l-11 5-14-5-11 5z" fill="none" stroke="#e8eefc" stroke-width="3.5" stroke-linejoin="round"/><path d="M25 15v29M39 20v29" stroke="#9db4ef" stroke-width="3.5"/></svg>
       <div><h1>Open Housing Atlas</h1><small class="byline">Free Armenia housing data</small><small id="asof">Loading data…</small></div>
     </a>
+    <button class="side-x" id="sideClose" type="button" aria-label="Close the data menu">✕</button>
     <div class="country"><a href="/">United States</a><span>Armenia</span></div>
     <label class="dp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="dpSearch" type="search" placeholder="Find a data point" aria-label="Find a data point"></label>
@@ -353,7 +361,7 @@
   <main class="stage">
     <div id="map"></div>
     <div class="topbar">
-      <button class="pill-btn menu-btn" id="menuBtn" aria-label="Data points">☰ Data</button>
+      <button class="pill-btn menu-btn" id="menuBtn" aria-label="Data points">☰<span class="btxt"> Data</span></button>
       <div class="place-search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input id="search" type="search" placeholder="Search a district, town or marz (English or Հայերեն)" autocomplete="off" aria-label="Search places">
@@ -1098,6 +1106,7 @@ $('#cur').addEventListener('click', e => {
   restyle(); refreshDetail(); saveState();
 });
 $('#menuBtn').addEventListener('click', () => $('#side').classList.toggle('open'));
+$('#sideClose').addEventListener('click', () => $('#side').classList.remove('open'));
 $('#overviewBtn').addEventListener('click', () => select('national', 'armenia'));
 $('#dClose').addEventListener('click', () => closeDetail());
 
@@ -1828,7 +1837,8 @@ function loadState() {
     const ok = p[0] === 'national' || p[0] === 'armenia' || (p[0] === 'district' && D.districts[p[1]]) || (p[0] === 'town' && D.towns[p[1]]) || (p[0] === 'marz' && D.marzes[p[1]]);
     if (ok) ui.sel = { kind: p[0], id: p[1] };
   }
-  ui.open.add(M[ui.metric].group);   // the group holding the chosen data point starts open
+  if (innerWidth <= 760) ui.open = new Set();   // phones: every section starts collapsed, like the US map
+  else ui.open.add(M[ui.metric].group);   // the group holding the chosen data point starts open
   document.querySelectorAll('#cur button').forEach(x => x.classList.toggle('on', x.dataset.c === ui.cur));
 }
 
