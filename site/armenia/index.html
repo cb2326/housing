@@ -238,9 +238,31 @@
   .chart-bubble i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
   .chart-bubble em { font-style: normal; font-weight: 700; }
   .with-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 8px; font-size: 13px; color: var(--muted); }
+  .avg-chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); margin: 0 0 6px; cursor: pointer; }
+  .avg-chk input { accent-color: #1e40af; width: 15px; height: 15px; margin: 0; }
+  .avg-dash { width: 18px; border-top: 2px dashed #6b7280; display: inline-block; }
+  .with-l { flex: none; }
+  .with-btn { flex: 1 1 200px; min-width: 0; max-width: 340px; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; text-align: left; }
+  .with-btn svg { flex: none; color: #1e40af; }
+  .with-btn.set { color: #9a3412; border-color: #f6b98f; }
+  .with-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .with-clear { flex: none; border: 0; background: var(--panel-2); width: 26px; height: 26px; border-radius: 50%; cursor: pointer; font-size: 12px; }
+  .dp-pop { position: fixed; z-index: 1400; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,.18); display: flex; flex-direction: column; overflow: hidden; }
+  .dp-pop .dp-search { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--muted); }
+  .dp-pop .dp-search input { flex: 1; border: 0; outline: 0; font: inherit; font-size: 15px; background: none; min-width: 0; color: var(--text); }
+  .dp-close { border: 0; background: var(--panel-2); width: 28px; height: 28px; border-radius: 50%; cursor: pointer; flex: none; }
+  .dp-list { overflow-y: auto; padding: 4px 6px 8px; }
+  .dp-g { font-weight: 600; font-size: 11.5px; color: var(--muted); padding: 10px 8px 4px; }
+  .dp-o { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 8px; font: inherit; font-size: 14px; cursor: pointer; color: var(--text); }
+  .dp-o:hover, .dp-o:focus-visible { background: #e8eefc; outline: 0; }
+  .dp-o.on { background: #e8eefc; color: #172b6b; font-weight: 600; }
+  .dp-none { padding: 14px; color: var(--muted); font-size: 13px; margin: 0; }
+  @media (max-width: 760px) { .dp-pop { left: 10px !important; right: 10px; width: auto !important; } .dp-pop .dp-search input { font-size: 16px; } }
   .with-row label { display: flex; align-items: center; gap: 8px; flex: 1 1 220px; min-width: 0; }
   .with-row select { flex: 1; min-width: 0; width: 100%; max-width: 100%; text-overflow: ellipsis; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); font: inherit; font-size: 13px; color: var(--text); }
   .seg-sm button:disabled { opacity: .4; cursor: not-allowed; }
+  .dl-btn { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
+  .dl-btn:hover { background: var(--accent-soft); }
   .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); margin: 0 0 4px; }
   .chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
   .chart-legend i { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
@@ -607,7 +629,47 @@ function unitOf(id) { if (M[id]?.real) id = M[id].real;   // a real price is mea
   if (m.nat) return PCT_NAT.includes(m.nat) || RATE_NAT.includes(m.nat) ? 'pct' : 'nat:' + m.nat;   // (money supply, loans: billions)
   return m.money ? 'money' : m.pct || m.unit === '%' ? 'pct' : m.unit || id; }
 // "Compare with" under the chart: pick any other data point; Left axis = same scale, Right axis = its own scale
-const withRow = m => `<div class="with-row"><label>Compare with <select id="withPick" aria-label="Compare with another data point"><option value="">None</option>${metricOptions(ui.with || '').replace(`<option value="${ui.metric}"`, `<option disabled value="${ui.metric}"`)}</select></label>${ui.with && ui.with !== ui.metric ? `<div class="seg-sm">${[['left', 'Left axis'], ['right', 'Right axis']].map(([v, l]) => `<button type="button" class="${(unitOf(ui.metric) !== unitOf(ui.with) ? 'right' : ui.axis || 'left') === v ? 'on' : ''}" data-axis="${v}"${v === 'left' && unitOf(ui.metric) !== unitOf(ui.with) ? ' disabled title="Different units: shown on its own scale"' : ''}>${l}</button>`).join('')}</div>` : ''}</div>`;
+// "Compare with" under the chart, like the US map: a search box that opens a list of every data point (grouped,
+// searchable, with an x to close); Left axis = same scale, Right axis = its own scale
+const SEARCH_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+const withRow = m => `<div class="with-row"><span class="with-l">Compare with</span><button type="button" class="with-btn${ui.with && ui.with !== ui.metric && M[ui.with] ? ' set' : ''}" data-withpick aria-haspopup="listbox"><span class="with-t">${ui.with && ui.with !== ui.metric && M[ui.with] ? esc(M[ui.with].label) : 'Search or choose a data point'}</span>${SEARCH_SVG}</button>${ui.with && ui.with !== ui.metric && M[ui.with] ? `<button type="button" class="with-clear" data-withclear aria-label="Stop comparing" title="Stop comparing">✕</button>` : ''}${ui.with && ui.with !== ui.metric ? `<div class="seg-sm">${[['left', 'Left axis'], ['right', 'Right axis']].map(([v, l]) => `<button type="button" class="${(unitOf(ui.metric) !== unitOf(ui.with) ? 'right' : ui.axis || 'left') === v ? 'on' : ''}" data-axis="${v}"${v === 'left' && unitOf(ui.metric) !== unitOf(ui.with) ? ' disabled title="Different units: shown on its own scale"' : ''}>${l}</button>`).join('')}</div>` : ''}</div>`;
+function closeWithPicker() { document.getElementById('withPop')?.remove(); }
+function openWithPicker(btn) {
+  closeWithPicker();
+  const pop = document.createElement('div');
+  pop.id = 'withPop'; pop.className = 'dp-pop'; pop.setAttribute('role', 'dialog');
+  pop.innerHTML = `<div class="dp-search">${SEARCH_SVG}<input id="withQ" type="search" autocomplete="off" placeholder="Search to compare" aria-label="Search data points to compare"><button type="button" class="dp-close" aria-label="Close">✕</button></div><div class="dp-list" id="withList" role="listbox"></div>`;
+  document.body.appendChild(pop);
+  const b = btn.getBoundingClientRect(), w = Math.min(440, innerWidth - 20);
+  pop.style.left = Math.max(10, Math.min(b.left, innerWidth - w - 10)) + 'px';
+  pop.style.top = Math.min(b.bottom + 6, innerHeight - 200) + 'px';
+  pop.style.width = w + 'px';
+  pop.style.maxHeight = Math.max(200, Math.min(460, innerHeight - b.bottom - 16)) + 'px';
+  const q = pop.querySelector('#withQ');
+  const fill = () => {
+    const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean), groups = {};
+    for (const x of METRICS) if (x.id !== ui.metric && words.every(w => (x.label + ' ' + x.group).toLowerCase().includes(w))) (groups[x.group] ||= []).push(x);
+    const html = Object.entries(groups).map(([g, xs]) => `<div class="dp-g">${esc(g)}</div>` + xs.map(x => `<button type="button" class="dp-o ${x.id === ui.with ? 'on' : ''}" data-pick-w="${x.id}" role="option">${esc(x.label)}</button>`).join('')).join('');
+    pop.querySelector('#withList').innerHTML = html || '<p class="dp-none">No data point matches. Try another word.</p>';
+  };
+  fill();
+  q.addEventListener('input', fill);
+  q.addEventListener('keydown', e => { if (e.key === 'Escape') closeWithPicker(); if (e.key === 'Enter') pop.querySelector('[data-pick-w]')?.click(); });
+  pop.querySelector('.dp-close').addEventListener('click', closeWithPicker);
+  pop.addEventListener('click', e => { const o = e.target.closest('[data-pick-w]'); if (!o) return; ui.with = o.dataset.pickW; closeWithPicker(); saveState(); renderDetail(); });
+  if (innerWidth > 760) q.focus();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-withpick]');
+  if (b) { e.stopPropagation(); if (document.getElementById('withPop')) closeWithPicker(); else openWithPicker(b); return; }
+  if (e.target.closest('[data-withclear]')) { e.stopPropagation(); ui.with = ''; closeWithPicker(); saveState(); renderDetail(); return; }
+  if (!e.target.closest('#withPop')) closeWithPicker();
+}, true);
+addEventListener('resize', closeWithPicker);
+// a dashed average line for data points that swing around a long-run norm (money supply growth)
+const AVG_LINE = ['nat_m2_yoy'];
+function avgRef(metric, s) { if (!AVG_LINE.includes(metric) || ui.showAvg === false) return null; const v = Object.values(s || {}).filter(x => x != null && !isNaN(x)); if (v.length < 12) return null; const ks = Object.keys(s).sort(); return { v: v.reduce((a, b) => a + b, 0) / v.length, label: `Average ${ks[0].slice(0, 4)}–${ks[ks.length - 1].slice(0, 4)}` }; }
+const avgToggle = metric => AVG_LINE.includes(metric) ? `<label class="avg-chk"><input type="checkbox" data-avg ${ui.showAvg === false ? '' : 'checked'}> <span class="avg-dash"></span> Show average</label>` : '';
 const realNote = () => `<p class="note" style="margin:2px 0 0">In today's ${ui.cur === 'USD' ? 'dollars: earlier prices raised by US inflation since then (BLS consumer prices), as felt by a buyer earning dollars' : 'drams: earlier prices raised by Armenian inflation since then (Armstat consumer prices)'}.</p>`;
 function wageFor(marzId) { return latestYearVal(marzObj(marzId)?.wage); }
 function valueOf(kind, id, metric = ui.metric) {
@@ -1125,11 +1187,25 @@ function seriesFor(kind, id, metric, zone) {
   // long gaps in the price history get a dashed estimate from the Central Bank index for the place's area
   const gap = kind !== 'marz' && p.price ? gapFill(p.price, rppiArea(kind, id)) : {};
   const both = f => ({ s: byMonth(p.price, f), est: Object.keys(gap).length ? byMonth(gap, f) : null });
+  // price change over n months: real where both months have Cadastre prices, a dashed estimate where either month
+  // comes from the Central Bank index (the gap), joined to the real line on both sides
+  const changeBoth = n => {
+    if (!Object.keys(gap).length) return { s: change(n) };
+    const all = { ...gap, ...p.price }, s = {}, e = {};
+    for (const ym of Object.keys(all)) {
+      const ym0 = addMonths(ym, -n), b = all[ym0];
+      if (!b) continue;
+      const v = (toCur(all[ym], ym) / toCur(b, ym0) - 1) * 100;
+      if (p.price[ym] && p.price[ym0]) s[ym] = v; else e[ym] = v;
+    }
+    for (const ym of Object.keys(e)) for (const nb of [addMonths(ym, -1), addMonths(ym, 1)]) if (s[nb] != null) e[nb] = s[nb];
+    return { s, est: Object.keys(e).length ? e : null };
+  };
   switch (metric) {
     case 'price': return both((ym, v) => toCur(v, ym));
     case 'typical': return both((ym, v) => toCur(v * 60, ym));
-    case 'chg12': return { s: change(12) };
-    case 'chg1': return { s: change(1) };
+    case 'chg12': return changeBoth(12);
+    case 'chg1': return changeBoth(1);
     case 'ptoi': return both((ym, v) => { const w = wageIn(ym); return w ? v * 60 / (w * 12) : null; });
     case 'mtg_pmt': return both((ym, v) => mtgPayment(v, ym));
     case 'rate_amd': case 'rate_usd': case 'rate_eur': return { s: natSeries(M[metric].nat) };
@@ -1191,9 +1267,9 @@ function renderDetail() {
   else if (!keys.length && kind === 'town' && ['deals', 'sales'].includes(ui.metric)) why = `<p class="note">Transactions are published by marz, not by town. Open ${esc(D.marzes[mid].en)} to see them.</p>`;
   let h = `<div class="metric-head"><label class="dp-switch" title="Switch to another data point"><span>${esc(m.label)}${m.money ? ` (${ui.cur})` : ''}</span><span class="sw">⇅ Switch</span><select id="mPick" aria-label="Switch data point">${metricOptions(ui.metric)}</select></label>
       <div class="mnow"><b>${last ? esc(fmt(s[last])) : '–'}</b><span>${esc(when)}</span></div></div>
-    <div class="chart-ctrl"><span class="note" style="margin:0">${m.yearly ? 'One value per year' : m.rel === 'quarter' ? 'By quarter' : 'By month'}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${keys.length > 1 ? rangeButtons() : ''}</span></div>
-    ${keys.length > 1 ? withRow(m) : ''}
-    ${keys.length > 1 ? chart(rangeFilter(s), fmt, !!bars, true, rf(est), extra && { ...extra, s: rf(extra.s), est: rf(extra.est) }) + (m.real ? realNote() : '') : `<div class="chart-empty">${last ? `<b>${esc(fmt(s[last]))}</b><span>Only one value so far, so there is no history to chart yet.</span>` : `<span>No ${esc(m.label.toLowerCase())} for this place.</span>`}</div>`}
+    <div class="chart-ctrl"><span class="note" style="margin:0">${m.yearly ? 'One value per year' : m.rel === 'quarter' ? 'By quarter' : 'By month'}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${keys.length > 1 ? rangeButtons() + PNG_BTN : ''}</span></div>
+    ${keys.length > 1 ? avgToggle(ui.metric) + withRow(m) : ''}
+    ${keys.length > 1 ? chart(rangeFilter(s), fmt, !!bars, true, rf(est), extra && { ...extra, s: rf(extra.s), est: rf(extra.est) }, avgRef(ui.metric, s)) + (m.real ? realNote() : '') : `<div class="chart-empty">${last ? `<b>${esc(fmt(s[last]))}</b><span>Only one value so far, so there is no history to chart yet.</span>` : `<span>No ${esc(m.label.toLowerCase())} for this place.</span>`}</div>`}
     ${why}`;
   if (m.money && ui.cur === 'USD' && !m.yearly && last) h += `<p class="note">USD uses the Central Bank's average rate for each month (${usdRate(last)?.toFixed(2)} ֏ per $1 in ${monthLabel(last)}). The dram has moved against the dollar, so changes in USD can differ from changes in drams.</p>`;
   if (kind === 'town' && !m.yearly && !m.nat && !area) h += `<p class="note">Town prices come from fewer sales than Yerevan districts, so month-to-month moves can be noisy.</p>`;
@@ -1327,7 +1403,7 @@ function renderNational() {
   let h = `<div class="metric-head"><label class="dp-switch"><span>${esc(def.label)}</span><span class="sw">⇅ Switch</span><select id="natPick" aria-label="Switch data point">${Object.entries(NAT).map(([x, d]) => `<option value="${x}" ${x === k ? 'selected' : ''}>${esc(d.label)}</option>`).join('')}</select></label>
       <div class="mnow"><b>${esc(natFmt(k, s[last]))}</b><span>${last ? esc(def.yearly ? last.slice(0, 4) : monthLabel(last)) : ''}</span></div></div>
     <div class="chart-ctrl"><span class="note" style="margin:0">${def.yearly ? 'One value per year' : def.quarterly ? 'By quarter' : 'By month'}</span>${keys.length > 1 ? rangeButtons() : ''}</div>
-    ${chart(rangeFilter(s), v => natFmt(k, v), !!def.bars, true)}
+    ${avgToggle('nat_' + k)}${chart(rangeFilter(s), v => natFmt(k, v), !!def.bars, true, null, null, avgRef('nat_' + k, s))}
     <p class="note">${esc(def.note)}</p>
     <h4 class="snap-h">At a glance</h4><div class="kpis">${Object.entries(NAT).map(([x, d]) => {
       const sx = natSeries(x), kx = lastKey(sx);
@@ -1360,6 +1436,7 @@ $('#dBody').addEventListener('click', e => {
   const mt = e.target.closest('[data-metric]'); if (mt) { setMetric(mt.dataset.metric); return; }
   const nt = e.target.closest('[data-nat]'); if (nt) { ui.nat = nt.dataset.nat; renderDetail(); return; }
   const rl = e.target.closest('[data-real]'); if (rl) { ui.real = rl.dataset.real === '1'; saveState(); renderDetail(); return; }
+  if (e.target.closest('[data-export]')) { exportChart(); return; }
   const ax = e.target.closest('[data-axis]'); if (ax && !ax.disabled) { ui.axis = ax.dataset.axis; saveState(); renderDetail(); return; }
   const rg = e.target.closest('[data-range]'); if (rg) { ui.range = rg.dataset.range; renderDetail(); return; }
   const zr = e.target.closest('[data-zone]'); if (zr) { ui.zone = zr.dataset.zone; renderDetail(); return; }
@@ -1369,7 +1446,8 @@ $('#dBody').addEventListener('click', e => {
 });
 $('#dBody').addEventListener('change', e => {
   if (e.target.id === 'mPick') setMetric(e.target.value);
-  if (e.target.id === 'withPick') { ui.with = e.target.value; saveState(); renderDetail(); }
+  if (e.target.matches('[data-avg]')) { ui.showAvg = e.target.checked; saveState(); renderDetail(); }
+
   if (e.target.id === 'natPick') { ui.nat = e.target.value; renderDetail(); }
 });
 
@@ -1383,7 +1461,7 @@ function shortNum(text, v) {
 }
 let chartN = 0;
 const CHARTS = {};
-function chart(series, fmt, bars = false, big = false, est = null, extra = null) {
+function chart(series, fmt, bars = false, big = false, est = null, extra = null, ref = null) {   // ref = { v, label }: a dashed reference line (e.g. the average)
   const pts = Object.entries(series || {}).filter(([, v]) => v != null && !isNaN(v)).sort();
   // estimates for gaps (dashed): only the months the real series doesn't have, plus the real months they join
   const ePts = Object.entries(est || {}).filter(([, v]) => v != null && !isNaN(v)).sort();
@@ -1404,6 +1482,7 @@ function chart(series, fmt, bars = false, big = false, est = null, extra = null)
   const x0 = toIdx(allPts[0][0]), x1 = toIdx(allPts[allPts.length - 1][0]);
   const vals = (right ? [...pts, ...ePts] : allPts).map(p => p[1]);   // the left scale
   let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (ref) { lo = Math.min(lo, ref.v); hi = Math.max(hi, ref.v); }
   if (bars) lo = Math.min(0, lo);
   const pad = (hi - lo) * .08 || Math.abs(hi) * .05 || 1; if (!bars) lo -= pad; hi += pad;
   const X = ym => L0 + (bars ? .5 : 0) * (W - L0 - R0) / Math.max(1, x1 - x0 + 1) + (toIdx(ym) - x0) / Math.max(1, x1 - x0 + (bars ? 1 : 0)) * (W - L0 - R0);
@@ -1428,16 +1507,17 @@ function chart(series, fmt, bars = false, big = false, est = null, extra = null)
     if (ePts.length) {
       let e = '', pe = null;
       for (const [ym, v] of ePts) { e += (pe != null && toIdx(ym) - pe <= 1 ? 'L' : 'M') + X(ym).toFixed(1) + ' ' + Y(v).toFixed(1); pe = toIdx(ym); }
-      body = `<path d="${e}" fill="none" stroke="#1e40af" stroke-width="${big ? 2 : 1.6}" stroke-dasharray="5 4" opacity=".8"/>` + body;
+      body = `<path d="${e}" data-est="1" fill="none" stroke="#1e40af" stroke-width="${big ? 2.4 : 2}" stroke-linejoin="round"/>` + body;
     }
     if (xS.length) {   // the second line (Compare with), in orange, with its own dashed estimate
       let d2 = '', p2 = null, e2 = '', q2 = null;
       for (const [ym, v] of xS) { d2 += (p2 != null && toIdx(ym) - p2 <= gap ? 'L' : 'M') + X(ym).toFixed(1) + ' ' + Y2(v).toFixed(1); p2 = toIdx(ym); }
       for (const [ym, v] of xE) { e2 += (q2 != null && toIdx(ym) - q2 <= 1 ? 'L' : 'M') + X(ym).toFixed(1) + ' ' + Y2(v).toFixed(1); q2 = toIdx(ym); }
-      body += (e2 ? `<path d="${e2}" fill="none" stroke="#e76f51" stroke-width="${big ? 2 : 1.6}" stroke-dasharray="5 4" opacity=".8"/>` : '') +
+      body += (e2 ? `<path d="${e2}" data-est="1" fill="none" stroke="#e76f51" stroke-width="${big ? 2.4 : 2}" stroke-linejoin="round"/>` : '') +
         `<path d="${d2}" fill="none" stroke="#e76f51" stroke-width="${big ? 2.4 : 2}" stroke-linejoin="round"/>`;
     }
     if (lo < 0 && hi > 0) body = `<line x1="${L0}" x2="${W - R0}" y1="${Y(0)}" y2="${Y(0)}" stroke="#9ca3af"/>` + body;
+    if (ref) body += `<line x1="${L0}" x2="${W - R0}" y1="${Y(ref.v).toFixed(1)}" y2="${Y(ref.v).toFixed(1)}" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="6 4"/><text x="${W - R0 - 4}" y="${(Y(ref.v) - 6).toFixed(1)}" font-size="12" fill="#4b5563" text-anchor="end" paint-order="stroke" stroke="#fff" stroke-width="3">${esc(ref.label)}: ${esc(fmt(ref.v))}</text>`;
   }
   // gridlines and labels: 4 levels on the left, years along the bottom
   let axis = '';
@@ -1448,7 +1528,8 @@ function chart(series, fmt, bars = false, big = false, est = null, extra = null)
       if (right) { const v2 = lo2 + (hi2 - lo2) * i / 3; axis += `<text x="${W - R0 + 6}" y="${(y + 4).toFixed(1)}" font-size="12" fill="#c2410c" text-anchor="start">${esc(shortNum(fmt2(v2), v2))}</text>`; }
     }
     const y0 = +pts[0][0].slice(0, 4), y1 = +pts[pts.length - 1][0].slice(0, 4), step = Math.max(1, Math.ceil((y1 - y0 + 1) / 8));
-    for (let y = y0; y <= y1; y += step) { const ym = (y + '-01') > pts[0][0] ? y + '-01' : pts[0][0]; axis += `<text x="${X(ym).toFixed(1)}" y="${H - 6}" font-size="12" fill="#4b5563" text-anchor="middle">${y}</text>`; }
+    let lastX = -1e9;   // (a year label is skipped when it would overlap the one before)
+    for (let y = y0; y <= y1; y += step) { const ym = (y + '-01') > pts[0][0] ? y + '-01' : pts[0][0], xx = X(ym); if (xx - lastX < 34) continue; lastX = xx; axis += `<text x="${xx.toFixed(1)}" y="${H - 6}" font-size="12" fill="#4b5563" text-anchor="middle">${y}</text>`; }
   } else {
     axis = `<line x1="${L0}" x2="${W - R0}" y1="${H - B0}" y2="${H - B0}" stroke="#e5e7eb"/>
       <text x="${L0}" y="${H - 6}" font-size="12" fill="#4b5563">${pts[0][0].slice(0, 4)}</text><text x="${W - R0}" y="${H - 6}" font-size="12" fill="#4b5563" text-anchor="end">${pts[pts.length - 1][0].slice(0, 4)}</text>
@@ -1462,7 +1543,7 @@ function chart(series, fmt, bars = false, big = false, est = null, extra = null)
   const legend = xS.length ? `<div class="chart-legend"><span><i style="background:#1e40af"></i>${esc(extra.mainLabel)}${right ? ' (left)' : ''}</span><span><i style="background:#e76f51"></i>${esc(extra.label)}${right ? ' (right)' : ''}</span></div>` : '';
   const label = ym => yearlyPts ? ym.slice(0, 4) : monthLabel(ym);
   return legend + `<div class="chart-wrap"><svg class="chart${big ? ' big' : ''}" id="${id}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Chart">${axis}${body}<line class="cur" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="#9ca3af" stroke-dasharray="2 2" visibility="hidden"/><circle class="dot" r="5" fill="#f59e0b" stroke="#fff" stroke-width="2" visibility="hidden"/><circle class="dot2" r="5" fill="#e76f51" stroke="#fff" stroke-width="2" visibility="hidden"/></svg><div class="chart-bubble" id="${id}b"></div></div>
-    <div class="chart-tip" id="${id}t">${esc(label(pts[0][0]))} → ${esc(label(pts[pts.length - 1][0]))}: ${esc(fmt(pts[0][1]))} → ${esc(fmt(pts[pts.length - 1][1]))}${pts[0][1] > 0 && !bars ? ` (${fmtPct((pts[pts.length - 1][1] / pts[0][1] - 1) * 100)})` : ''}</div>${ePts.length ? '<p class="note" style="margin:2px 0 0">Dashed line: estimated from the Central Bank of Armenia price index where the Cadastre\'s monthly reports are missing. It joins the real prices on both sides.</p>' : ''}`;
+    <div class="chart-tip" id="${id}t">${esc(label(pts[0][0]))} → ${esc(label(pts[pts.length - 1][0]))}: ${esc(fmt(pts[0][1]))} → ${esc(fmt(pts[pts.length - 1][1]))}${pts[0][1] > 0 && !bars && !String(fmt(pts[0][1])).endsWith('%') ? ` (${fmtPct((pts[pts.length - 1][1] / pts[0][1] - 1) * 100)})` : ''}</div>${ePts.length ? '<p class="note" style="margin:2px 0 0">Months where the Cadastre\'s monthly reports are missing (mostly 2020–2024) are estimated from the Central Bank of Armenia price index; hover to see which (marked \"estimate\").</p>' : ''}`;
 }
 // Charts are drawn at the panel's width; if the panel wasn't laid out yet (it was just opening), draw once more
 // at its real width so nothing gets squashed
@@ -1472,6 +1553,79 @@ function fitCharts(redraw) {
   if (refitting || !sv) return;
   const real = sv.getBoundingClientRect().width;
   if (real > 0 && Math.abs(real - +sv.getAttribute('width')) > 12) { refitting = true; try { redraw(); } finally { refitting = false; } }
+}
+// ---------- download a chart as a PNG ----------
+// Laid out top to bottom so nothing overlaps: the place, the data point and period, the legend (when comparing), the
+// chart, the notes and sources (wrapped onto as many lines as they need), then the site's name and address on a
+// line of its own.
+const PNG_BTN = `<button type="button" class="dl-btn" data-export title="Download this chart as a PNG image" aria-label="Download chart as PNG"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14"/></svg><span>PNG</span></button>`;
+function sourceOf(id) {
+  const m = M[id] || {}, base = m.real || id;
+  const s = new Set();
+  if (['price', 'typical', 'mtg_pmt', 'ptoi', 'chg12', 'chg1', 'deals', 'sales'].includes(base)) s.add('Cadastre Committee of Armenia');
+  if (['mtg_pmt', 'rate_amd', 'rate_usd', 'rate_eur'].includes(base) || (m.nat && !['inflation'].includes(m.nat))) s.add('Central Bank of Armenia');
+  if (['ptoi', 'wage', 'poverty', 'population', 'space', 'built', 'built_total', 'built_yoy', 'house_sales', 'apt_sales'].includes(base) || m.nat === 'inflation') s.add('Armstat');
+  if (m.real) s.add(ui.cur === 'USD' ? 'US inflation: BLS' : 'inflation: Armstat');
+  if (m.money && ui.cur === 'USD') s.add('exchange rates: Central Bank of Armenia');
+  if (ui.sel?.kind === 'armenia' && base === 'chg12') s.add('Central Bank of Armenia price index');
+  return [...s];
+}
+function exportChart() {
+  const svg = document.querySelector('#dBody svg.chart');
+  if (!svg || !ui.sel) return;
+  const { kind, id } = ui.sel, m = M[ui.metric];
+  let place = kind === 'national' || kind === 'armenia' ? 'Armenia' : placeName(kind, id).split(' (')[0];
+  if (kind === 'district' && isZoneMode() && ui.zone && REAL_METRICS.concat(ZONE_METRICS).includes(ui.metric)) place += ` – Zone ${ui.zone}`;
+  const title = `${m.label}${m.money ? ` (${ui.cur})` : ''}${ui.with && M[ui.with] && ui.with !== ui.metric ? ` vs ${M[ui.with].label}` : ''}`;
+  const period = document.querySelector('#dBody .chart-tip')?.textContent.trim() || '';
+  const legendEl = svg.closest('.chart-wrap')?.previousElementSibling;
+  const legend = legendEl?.classList.contains('chart-legend') ? [...legendEl.querySelectorAll('span')].map(s => ({ text: s.textContent.trim(), color: getComputedStyle(s.querySelector('i')).backgroundColor })) : [];
+  const notes = [];
+  if (svg.querySelector('path[data-est]')) notes.push('Months where the Cadastre\'s monthly reports are missing (mostly 2020–2024) are estimated from the Central Bank of Armenia price index.');
+  if (m.real) notes.push(`In today's ${ui.cur === 'USD' ? 'dollars' : 'drams'}: earlier values adjusted for ${ui.cur === 'USD' ? 'US' : 'Armenian'} inflation.`);
+  const srcs = [...new Set([...sourceOf(ui.metric), ...(ui.with && M[ui.with] ? sourceOf(ui.with) : [])])];
+  const sourceLine = `Source: ${srcs.join(', ') || 'see openhousingatlas.com/armenia'}`;
+  // the chart drawing as a stand-alone image (fonts and colours written in, hover marks hidden)
+  let src = new XMLSerializer().serializeToString(svg);
+  if (!/xmlns="http:\/\/www\.w3\.org\/2000\/svg"/.test(src)) src = src.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+  src = src.replace('<svg', '<svg font-family="Segoe UI, Helvetica, Arial, sans-serif"');
+  const cw = +svg.getAttribute('width'), ch = +svg.getAttribute('height');
+  const S = 2, PAD = 20, W = Math.max(cw + PAD * 2, 560), font = '"Segoe UI", system-ui, Helvetica, Arial, sans-serif';
+  const meas = document.createElement('canvas').getContext('2d');
+  const wrap = (text, f, maxW) => { meas.font = f; const out = []; let line = ''; for (const w of text.split(' ')) { const tryL = line ? line + ' ' + w : w; if (meas.measureText(tryL).width > maxW && line) { out.push(line); line = w; } else line = tryL; } if (line) out.push(line); return out; };
+  const fTitle = `700 20px ${font}`, fSub = `600 14px ${font}`, fSmall = `12px ${font}`, fSite = `700 13px ${font}`;
+  const titleLines = wrap(title, fSub, W - PAD * 2), periodLines = wrap(period, fSmall, W - PAD * 2);
+  const noteLines = notes.flatMap(n => wrap(n, fSmall, W - PAD * 2)), srcLines = wrap(sourceLine, fSmall, W - PAD * 2);
+  const legendH = legend.length ? 24 : 0;
+  const TOP = 16 + 26 + titleLines.length * 19 + periodLines.length * 17 + 8 + legendH;
+  const BOTTOM = 14 + (noteLines.length + srcLines.length) * 17 + 14 + 24;
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = W * S; c.height = (TOP + ch + BOTTOM) * S;
+    const g = c.getContext('2d');
+    g.scale(S, S);
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, TOP + ch + BOTTOM);
+    let y = 16 + 20;
+    g.fillStyle = '#1e40af'; g.font = fTitle; g.fillText(place, PAD, y); y += 26 - 20 + 19;
+    g.fillStyle = '#111827'; g.font = fSub; for (const l of titleLines) { g.fillText(l, PAD, y - 4); y += 19; }
+    g.fillStyle = '#4b5563'; g.font = fSmall; for (const l of periodLines) { g.fillText(l, PAD, y - 4); y += 17; }
+    if (legend.length) { let x = PAD; g.font = fSmall; for (const it of legend) { g.fillStyle = it.color; g.fillRect(x, y + 2, 16, 3); g.fillStyle = '#374151'; g.fillText(it.text, x + 22, y + 8); x += 22 + g.measureText(it.text).width + 18; } }
+    g.drawImage(img, (W - cw) / 2, TOP, cw, ch);
+    y = TOP + ch + 14 + 12;
+    g.fillStyle = '#6b7280'; g.font = fSmall;
+    for (const l of [...noteLines, ...srcLines]) { g.fillText(l, PAD, y); y += 17; }
+    g.strokeStyle = '#e5e7eb'; g.beginPath(); g.moveTo(PAD, y - 4); g.lineTo(W - PAD, y - 4); g.stroke();
+    g.fillStyle = '#1e40af'; g.font = fSite; g.fillText('Open Housing Atlas · openhousingatlas.com/armenia', PAD, y + 16);
+    c.toBlob(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${place} - ${m.label}`.replace(/[\\/:*?\"<>|]+/g, '').replace(/\s+/g, ' ').trim() + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }, 'image/png');
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src.replace(/visibility="visible"/g, 'visibility="hidden"'));
 }
 function wireCharts() {
   for (const [id, c] of Object.entries(CHARTS)) {
@@ -1580,7 +1734,7 @@ function renderCompare() {
     chartH = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="cmp-chart" role="img" aria-label="${esc(m.label)} compared">
       ${ticks.map(t => `<line x1="${L0}" x2="${W - R0}" y1="${Y(t).toFixed(1)}" y2="${Y(t).toFixed(1)}" stroke="${Math.abs(t) < step / 1e6 ? '#9ca3af' : '#e5e7eb'}"/><text x="${L0 - 8}" y="${(Y(t) + 4).toFixed(1)}" text-anchor="end" font-size="12" fill="#4b5563">${esc(shortNum(fmt(t), t))}</text>`).join('')}
       ${Array.from({ length: y1 - y0 + 1 }, (_, i) => y0 + i).filter((yy, i) => i % every === 0).map(yy => `<text x="${X(Math.max(x0, yy * 12)).toFixed(1)}" y="${H - 9}" text-anchor="middle" font-size="12" fill="#4b5563">${yy}</text>`).join('')}
-      ${lines.map(l => l.est.length ? `<path d="${l.est.map((p, i) => `${i && p[0] - l.est[i - 1][0] <= 1 ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('')}" fill="none" stroke="${l.color}" stroke-width="2" stroke-dasharray="5 4" opacity=".8"/>` : '').join('')}
+      ${lines.map(l => l.est.length ? `<path d="${l.est.map((p, i) => `${i && p[0] - l.est[i - 1][0] <= 1 ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('')}" fill="none" stroke="${l.color}" stroke-width="2.6" stroke-linejoin="round"/>` : '').join('')}
       ${lines.map(l => l.pts.length ? `<path d="${path(l)}" fill="none" stroke="${l.color}" stroke-width="2.6" stroke-linejoin="round"/>${l.pts.length < 40 ? l.pts.map(p => `<circle cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="3" fill="${l.color}"/>`).join('') : ''}` : '').join('')}
       <line class="xh" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="#6b7280" stroke-dasharray="4 4" visibility="hidden"/><g class="xd"></g>
       <rect x="${L0}" y="${T0}" width="${W - L0 - R0}" height="${H - T0 - B0}" fill="transparent"/></svg>`;
@@ -1589,7 +1743,7 @@ function renderCompare() {
   body.innerHTML = `<div class="cmp-legend">${cmpList.map((p, i) => `<span class="cmp-chip" style="--c:${CMP_COLORS[i]}"><i></i>${esc(cmpName(p))}<button type="button" data-cmp-rm="${i}" aria-label="Remove">✕</button></span>`).join('')}</div>
     <div class="cmp-wrap">${chartH}<div class="cmp-tip"></div></div>${realOn(k) ? realNote() : ''}
     ${m.money && ui.cur === 'USD' ? '<p class="note">In US dollars at each month\'s Central Bank rate.</p>' : ''}
-    ${lines.some(l => l.est.length) ? '<p class="note">Dashed lines: estimated from the Central Bank of Armenia price index where the Cadastre\'s monthly reports are missing.</p>' : ''}
+    ${lines.some(l => l.est.length) ? '<p class="note">Months where the Cadastre\'s monthly reports are missing (mostly 2020–2024) are estimated from the Central Bank of Armenia price index.</p>' : ''}
     <table class="cmp-table"><thead><tr><th>Latest</th>${cmpList.map((p, i) => `<th style="color:${CMP_COLORS[i]}">${esc(cmpName(p))}</th>`).join('')}</tr></thead>
     <tbody>${rows.map(r => `<tr><td>${esc(M[r].label)}${M[r].money ? ` (${ui.cur})` : ''}</td>${cmpList.map(p => `<td>${esc(fmtValue(cmpValue(p, r), r))}</td>`).join('')}</tr>`).join('')}</tbody></table>
     <p class="note">Data published only by marz (wages, poverty) shows the place's marz; Yerevan districts and zones show Yerevan. The price index is published for 5 areas of Yerevan and for the rest of the country.</p>`;
@@ -1652,7 +1806,7 @@ function addCmpHit(h) {
 
 // ---------- remembered view (this browser only) ----------
 function saveState() {
-  try { localStorage.setItem('oha-armenia', JSON.stringify({ metric: ui.metric, cur: ui.cur, open: [...ui.open], level: ui.level, with: ui.with || '', axis: ui.axis || 'left' })); } catch (e) { }
+  try { localStorage.setItem('oha-armenia', JSON.stringify({ metric: ui.metric, cur: ui.cur, open: [...ui.open], level: ui.level, with: ui.with || '', axis: ui.axis || 'left', showAvg: ui.showAvg !== false })); } catch (e) { }
   const q = new URLSearchParams();
   if (ui.metric !== 'price') q.set('m', ui.metric);
   if (levelsFor(ui.metric).length > 1 && curLevel() !== levelsFor(ui.metric)[0]) q.set('l', curLevel());
@@ -1662,7 +1816,7 @@ function saveState() {
 }
 function loadState() {
   const LV = ['armenia', 'marz', 'district', 'town', 'zone'];
-  try { const s = JSON.parse(localStorage.getItem('oha-armenia') || '{}'); if (M[s.metric]) ui.metric = s.metric; if (s.metric === 'zone_price') { ui.metric = 'price'; ui.level = 'zone'; } if (LV.includes(s.level)) ui.level = s.level; if (s.cur === 'USD') ui.cur = 'USD'; if (M[s.with]) ui.with = s.with; if (s.axis === 'right') ui.axis = 'right'; if (Array.isArray(s.open)) ui.open = new Set(s.open); } catch (e) { }
+  try { const s = JSON.parse(localStorage.getItem('oha-armenia') || '{}'); if (M[s.metric]) ui.metric = s.metric; if (s.metric === 'zone_price') { ui.metric = 'price'; ui.level = 'zone'; } if (LV.includes(s.level)) ui.level = s.level; if (s.cur === 'USD') ui.cur = 'USD'; if (M[s.with]) ui.with = s.with; if (s.showAvg === false) ui.showAvg = false; if (s.axis === 'right') ui.axis = 'right'; if (Array.isArray(s.open)) ui.open = new Set(s.open); } catch (e) { }
   const q = new URLSearchParams(location.search);
   if (M[q.get('m')]) ui.metric = q.get('m');
   if (q.get('m') === 'zone_price') { ui.metric = 'price'; ui.level = 'zone'; }   // old links to the zone map
