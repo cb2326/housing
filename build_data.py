@@ -1476,6 +1476,69 @@ def mortgage_rate():
     return monthly, weekly[-1][1], weekly[-1][0]
 
 
+def home_equity():
+    """US households' homes: market value, mortgage debt and owners' equity, every quarter since 1945, in trillions of
+    dollars (Federal Reserve Financial Accounts, Z.1, table B.101). Keyed by the quarter's last month ("2026-06")."""
+    cached = load_dcache("equity.json") or {}
+    try:
+        data = fetch("https://www.federalreserve.gov/releases/z1/current/z1_csv_files.zip", "fed_z1.zip", PLAIN, timeout=180, tries=2)
+        zf = zipfile.ZipFile(io.BytesIO(data))
+        name = next(n for n in zf.namelist() if n.endswith("S1M_b.csv"))  # households and nonprofits, balance sheet
+        r = csv.reader(io.StringIO(zf.read(name).decode("utf-8", "replace")))
+        head = next(r)
+        ix = {k: next(i for i, h in enumerate(head) if h.startswith(k)) for k in ("LM155035015", "FL153165105")}
+        out = {}
+        for row in r:
+            m = re.match(r"(\d{4}):Q([1-4])$", row[0] if row else "")
+            if not m:
+                continue
+            val, debt = num(row[ix["LM155035015"]]), num(row[ix["FL153165105"]])
+            if val and debt is not None:
+                out[f"{m.group(1)}-{int(m.group(2)) * 3:02d}"] = [round(val / 1e6, 3), round(debt / 1e6, 3)]
+        if len(out) < 200:
+            raise ValueError(f"only {len(out)} quarters")
+        save_dcache("equity.json", out)
+        print(f"  Home equity (Fed Z.1): {min(out)} to {max(out)}")
+        return out
+    except Exception as e:
+        print(f"  (Fed Z.1 not available: {e}); using the saved copy")
+        return cached
+
+
+RATE_MIX_KEYS = ("PCT_INTRATE_LT_3", "PCT_INTRATE_3_4", "PCT_INTRATE_4_5", "PCT_INTRATE_5_6", "PCT_INTRATE_GE_6", "AVE_INTRATE")
+
+
+def rate_mix():
+    """Share of all outstanding mortgages by interest rate (<3%, 3-4, 4-5, 5-6, 6%+) and their average rate, every
+    quarter since 2013, for the US and each state (FHFA National Mortgage Database). {"US"|state fips: {"YYYY-MM": [6 values]}}."""
+    cached = load_dcache("rate_mix.json") or {}
+    out = {}
+    try:
+        for name, level in (("nmdb-outstanding-mortgage-statistics-national-census-areas-quarterly", "National"),
+                            ("nmdb-outstanding-mortgage-statistics-states-quarterly", "State")):
+            data = fetch(f"https://www.fhfa.gov/document/d/nmdb/{name}.zip", f"{name}.zip", PLAIN, timeout=180, tries=2)
+            zf = zipfile.ZipFile(io.BytesIO(data))
+            with zf.open(zf.namelist()[0]) as f:
+                for row in csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig")):
+                    if row["GEOLEVEL"] != level or row["MARKET"] != "All Mortgages" or row["SERIESID"] not in RATE_MIX_KEYS or row["SUPPRESSED"] == "1":
+                        continue
+                    pid = "US" if level == "National" else ABBR_TO_FIPS.get(row["GEOID"].upper())
+                    v = num(row["VALUE1"])
+                    m = re.match(r"(\d{4})Q([1-4])$", row["PERIOD"])
+                    if not pid or v is None or not m:
+                        continue
+                    rec = out.setdefault(pid, {}).setdefault(f"{m.group(1)}-{int(m.group(2)) * 3:02d}", [None] * 6)
+                    rec[RATE_MIX_KEYS.index(row["SERIESID"])] = v
+        if len(out.get("US", {})) < 20:
+            raise ValueError("national figures missing")
+        save_dcache("rate_mix.json", out)
+        print(f"  Mortgage rate mix (FHFA): {len(out) - 1} states, through {max(out['US'])}")
+        return out
+    except Exception as e:
+        print(f"  (FHFA mortgage rate mix not available: {e}); using the saved copy")
+        return cached
+
+
 def treasury_10y():
     """The 10-year Treasury yield (constant maturity), every month's average since January 1962, plus the latest day,
     from the Federal Reserve's H.15 release. Saved, so a failed download keeps the last copy."""
@@ -2332,6 +2395,7 @@ def main():
     print("Mortgage rate")
     rate_hist, rate, rate_day = mortgage_rate()
     t10 = treasury_10y()
+    equity, rmix = home_equity(), rate_mix()
     print("Inflation (CPI)")
     cpi, cpi_index = cpi_inflation()
     LONG = long_view(rate_hist, cpi_index)
@@ -2741,6 +2805,9 @@ def main():
         # nationwide rates for the rate charts: the 30-year mortgage rate (monthly average since April 1971) and the
         # 10-year Treasury yield (monthly average since January 1962), with the latest week / day
         "rates": {"mortgage": rate_hist, "t10": t10.get("monthly") or {}, "t10_now": t10.get("now"), "t10_date": t10.get("date")},
+        # homes' value and mortgage debt ($ trillions, quarterly since 1945) and the rate mix of outstanding mortgages
+        # (% in each rate band + average rate, quarterly since 2013, for the US and each state)
+        "equity": equity, "rate_mix": rmix,
         "counts": {k: len(v) for k, v in places.items()},
     }
     for lvl, ps in places.items():
