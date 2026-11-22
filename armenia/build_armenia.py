@@ -1157,16 +1157,17 @@ MONTH_NO = {n: i + 1 for i, n in enumerate(["january", "february", "march", "apr
 def monthly_blocks(rows):
     """The CBA's money-transfer sheets: a row of years, a row of month names, then for each month six columns
     (inflow, outflow, net inflow, then the same "of which" through fast money-transfer systems or non-commercial).
-    Returns {column of the month's first value: "YYYY-MM"}."""
-    mi = next(i for i, r in enumerate(rows) if sum(1 for v in r if isinstance(v, str) and v.strip().lower() in MONTH_NO) >= 6)
+    Returns {column of the month's first value: "YYYY-MM"}. Revised months carry a footnote mark ("April *")."""
+    name = lambda v: re.sub(r"[^a-z]", "", v.lower()) if isinstance(v, str) else ""
+    mi = next(i for i, r in enumerate(rows) if sum(1 for v in r if name(v) in MONTH_NO) >= 6)
     years, months = rows[mi - 1], rows[mi]
     cols, year = {}, None
     for c, v in enumerate(months):
         y = years[c] if c < len(years) else None
         if isinstance(y, float) and 2000 < y < 2100:
             year = int(y)
-        if isinstance(v, str) and v.strip().lower() in MONTH_NO and year:
-            cols[c] = f"{year}-{MONTH_NO[v.strip().lower()]:02d}"
+        if name(v) in MONTH_NO and year:
+            cols[c] = f"{year}-{MONTH_NO[name(v)]:02d}"
     return mi, cols
 
 def update_remittances():
