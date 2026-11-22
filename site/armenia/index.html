@@ -241,6 +241,7 @@
   .avg-chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); margin: 0 0 6px; cursor: pointer; }
   .avg-chk input { accent-color: #1e40af; width: 15px; height: 15px; margin: 0; }
   .avg-dash { width: 18px; border-top: 2px dashed #6b7280; display: inline-block; }
+  .chart-legend i.dash-key, .chart-bubble i.dash-key { width: 16px; height: 0; border-radius: 0; background: none !important; border-top: 2px dashed #6b7280; display: inline-block; vertical-align: middle; }
   .with-l { flex: none; }
   .with-btn { flex: 1 1 200px; min-width: 0; max-width: 340px; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; text-align: left; }
   .with-btn svg { flex: none; color: #1e40af; }
@@ -434,7 +435,59 @@ const METRICS = [
     info: 'Change in the floor area of new homes put into use compared with the year before (Armstat).' },
   { id: 'built', group: 'Housing', label: 'New housing built (m² per 1,000 people)', level: 'marz', yearly: true, rel: 'year',
     info: 'Floor area of new homes put into use in the latest year, per 1,000 residents (Armstat).' },
+  // (calc: worked out from seriesFor, the latest year being the value on the map)
+  { id: 'unemployment', calc: true, group: 'People and income', label: 'Unemployment rate', level: 'Armenia · marz', unit: '%', yearly: true, rel: 'year',
+    info: 'Share of the labor force (people working or looking for work) without a job, by marz (Armstat labor force survey).' },
+  { id: 'employment_rate', calc: true, group: 'People and income', label: 'Employment rate', level: 'Armenia · marz', unit: '%', yearly: true, rel: 'year',
+    info: 'Share of people aged 15 and over who have a job, by marz (Armstat labor force survey).' },
+  { id: 'spending', calc: true, group: 'People and income', label: 'Household spending per person (month)', level: 'Armenia · marz', money: true, yearly: true, rel: 'year',
+    info: 'Average consumer spending per person per month, by marz (Armstat household survey). In US dollars, each year uses that year\'s December exchange rate.' },
+  { id: 'apartments', calc: true, group: 'Housing', label: 'Apartments (number)', level: 'Armenia · marz · district · town', yearly: true, rel: 'year',
+    info: 'Number of apartments in apartment buildings at the end of the year (Armstat housing stock). Shown for the whole country, each marz, Yerevan\'s districts and the larger towns.' },
+  { id: 'apt_chg1', calc: true, group: 'Housing', label: 'Apartments, 1-year change', level: 'Armenia · marz · district · town', pct: true, yearly: true, rel: 'year',
+    info: 'Change in the number of apartments compared with the year before (Armstat housing stock): how fast new apartments are added.' },
+  { id: 'apt_chg10', calc: true, group: 'Housing', label: 'Apartments, change since 2010', level: 'Armenia · marz · district · town', pct: true, yearly: true, rel: 'year',
+    info: 'Change in the number of apartments since 2010, the first year Armstat publishes (or since the first year with figures for that place).' },
+  { id: 'apt_size', calc: true, group: 'Housing', label: 'Average apartment size', level: 'town', unit: 'm²', yearly: true, rel: 'year',
+    info: 'Total floor area of a town\'s apartments divided by their number (Armstat housing stock). Published by town only.' },
+  { id: 'houses', calc: true, group: 'Housing', label: 'Private houses (number)', level: 'Armenia · marz', yearly: true, rel: 'year',
+    info: 'Number of private (individual) houses at the end of the year, by marz (Armstat housing stock).' },
+  { id: 'housing_area', calc: true, group: 'Housing', label: 'Total housing floor area', level: 'Armenia · marz', suffix: ' m²', yearly: true, rel: 'year',
+    info: 'Floor area of all homes, apartments and houses together, at the end of the year, by marz (Armstat housing stock).' },
+  { id: 'new_apts', calc: true, group: 'Housing', label: 'New apartments completed (year)', level: 'Armenia', yearly: true, rel: 'year',
+    info: 'Number of apartments in residential buildings put into use in the year, in the whole country (Armstat construction statistics). Armstat publishes this for the whole country only.' },
+  { id: 'new_apt_size', calc: true, group: 'Housing', label: 'Average size of new apartments', level: 'Armenia', unit: 'm²', yearly: true, rel: 'year',
+    info: 'Average floor area of the apartments put into use in the year, in the whole country (Armstat construction statistics).' },
+  { id: 'new_bldgs', calc: true, group: 'Housing', label: 'New residential buildings completed (year)', level: 'Armenia', yearly: true, rel: 'year',
+    info: 'Number of residential buildings (apartment buildings and houses) put into use in the year, in the whole country (Armstat construction statistics).' },
+  { id: 'hotels', calc: true, group: 'Tourism', label: 'Hotels', level: 'Armenia · marz', yearly: true, rel: 'year',
+    info: 'Number of hotels and similar places to stay, by marz (Armstat tourism statistics).' },
+  { id: 'hotel_rev', calc: true, group: 'Tourism', label: 'Hotel revenue (year)', level: 'Armenia · marz', money: true, big: true, yearly: true, rel: 'year',
+    info: 'Money taken in by hotels and similar places in the year, by marz (Armstat tourism statistics). In US dollars, each year uses that year\'s December exchange rate.' },
+  { id: 'participation', calc: true, group: 'People and income', label: 'Labor force participation', level: 'Armenia · marz', unit: '%', yearly: true, rel: 'year',
+    info: 'Share of people aged 15 and over who are working or looking for work, by marz (Armstat labor force survey).' },
+  { id: 'land_sales', calc: true, group: 'Market activity', label: 'Land sales (year)', level: 'Armenia · marz', yearly: true, rel: 'year',
+    info: 'Plots of land (including farmland) sold in the year, by marz (Armstat, from Cadastre registrations). Land sales often come before new building.' },
+  { id: 'home_gifts', calc: true, group: 'Market activity', label: 'Homes given as gifts (year)', level: 'Armenia · marz', yearly: true, rel: 'year',
+    info: 'Apartments and houses passed on as gifts in the year (mostly within families), by marz (Armstat, from Cadastre registrations). Many homes change hands this way instead of being sold.' },
+  { id: 'cons_vol', calc: true, group: 'Housing', label: 'Construction work done (year)', level: 'Armenia · marz', money: true, big: true, yearly: true, rel: 'year',
+    info: 'Value of all construction work done in the year (homes, roads, offices, factories…), at that year\'s prices, by marz (Armstat). In US dollars, each year uses that year\'s December exchange rate.' },
+  // money sent home by individuals from abroad, through Armenian banks (Central Bank of Armenia, monthly; kept in US dollars)
+  { id: 'remit_in', calc: true, usdNative: true, group: 'Money from abroad', label: 'Money received from abroad (month)', level: 'Armenia · marz', money: true, big: true, rel: 'month',
+    info: 'All money transfers received by individuals from abroad through Armenian banks in the month (Central Bank of Armenia). For the whole country the history starts in 2013; by marz, in 2024. Yerevan\'s figure includes large transfers (savings, business, property money) as well as family remittances. The Central Bank publishes it in US dollars; in drams, each month uses that month\'s exchange rate.' },
+  { id: 'remit_net', calc: true, usdNative: true, group: 'Money from abroad', label: 'Money from abroad, net (month)', level: 'Armenia · marz', money: true, big: true, rel: 'month',
+    info: 'Money received by individuals from abroad minus money they sent abroad, through Armenian banks in the month (Central Bank of Armenia).' },
+  { id: 'remit_fast', calc: true, usdNative: true, group: 'Money from abroad', label: 'Money received through transfer systems (month)', level: 'Armenia · marz', money: true, big: true, rel: 'month',
+    info: 'The part of the money received from abroad that came through fast money-transfer systems, the usual way family remittances arrive (Central Bank of Armenia, by marz from 2024).' },
+  { id: 'remit_pp', calc: true, usdNative: true, group: 'Money from abroad', label: 'Money received through transfer systems, per person (month)', level: 'Armenia · marz', money: true, rel: 'month',
+    info: 'Money received from abroad through fast money-transfer systems in the month, divided by the marz\'s population (2022 census). It shows where family remittances matter most.' },
 ];
+// where each "calc" data point's numbers are kept in the data file (by marz; "apartments" also by district and town)
+const CALC_KEY = { unemployment: 'unemployment', employment_rate: 'employment_rate', spending: 'spending', houses: 'houses_stock', housing_area: 'housing_area',
+  new_apts: 'new_apartments', new_apt_size: 'new_apartment_size', new_bldgs: 'new_buildings', hotels: 'hotels', hotel_rev: 'hotel_revenue', cons_vol: 'construction_volume',
+  participation: 'participation', land_sales: 'land_sales', home_gifts: 'home_gifts' };
+// US-dollar figures (money from abroad, in millions) in the currency picked: drams at each month's rate
+const fromUsd = o => Object.fromEntries(Object.entries(o || {}).map(([ym, v]) => [ym, ui.cur === 'USD' ? v : v * usdRate(ym)]));
 // nationwide interest rates (the same everywhere: shown like the US map's "Mortgage rates (nationwide)")
 METRICS.push(
   { id: 'rate_amd', group: 'Mortgage rates (nationwide)', label: 'Mortgage rate in drams (֏)', level: 'nationwide', nat: 'mort_amd', unit: '%', rel: 'month',
@@ -445,7 +498,7 @@ METRICS.push(
     info: 'The Central Bank publishes no separate euro mortgage rate. This is the closest official figure: the average rate on new household loans of over 5 years in euros (mostly mortgages). Few such loans are made, so it moves around month to month.' },
 );
 // (a group is listed in the sidebar only if it has an icon here, in this order)
-const GROUP_ICONS = { 'Prices and affordability': 'home', 'Mortgage rates (nationwide)': 'percent', 'Economy and lending (nationwide)': 'bank', 'Market activity': 'activity', 'People and income': 'people', 'Housing': 'building' };
+const GROUP_ICONS = { 'Prices and affordability': 'home', 'Mortgage rates (nationwide)': 'percent', 'Economy and lending (nationwide)': 'bank', 'Market activity': 'activity', 'People and income': 'people', 'Housing': 'building', 'Money from abroad': 'globe', 'Tourism': 'bed' };
 const ICONS = {
   home: 'M3 11 12 4l9 7M5 10v10h14V10M10 20v-5h4v5',
   trend: 'M3 17l6-6 4 4 8-8M15 7h6v6',
@@ -454,6 +507,8 @@ const ICONS = {
   building: 'M4 21V8l8-5 8 5v13M9 21v-6h6v6M3 21h18',
   percent: 'M19 5 5 19M7.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM16.5 18a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z',
   bank: 'M3 10h18L12 4zM5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18',
+  bed: 'M3 19V6M3 15h18v4M21 15v-3a3 3 0 0 0-3-3h-7v6M7 12a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z',
+  globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
 };
 const icon = name => `<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
 const M = Object.fromEntries(METRICS.map(m => [m.id, m]));
@@ -491,10 +546,12 @@ const ZONE_METRICS = ['price', 'typical', 'chg12', 'chg1', 'mtg_pmt', 'ptoi', 'p
 function levelsFor(metric) {
   const m = M[metric];
   if (!m || m.nat) return ['armenia'];                           // nationwide: one number for the whole country
-  if (m.level === 'marz') return ['armenia', 'marz'];
+  if (m.level === 'marz' || m.level === 'Armenia · marz') return ['armenia', 'marz'];
+  if (m.level === 'Armenia') return ['armenia'];
+  if (m.level === 'town') return ['armenia', 'town'];
   if (metric === 'deals' || metric === 'sales') return ['armenia', 'marz', 'district'];
-  if (metric === 'built_total' || metric === 'built_yoy') return ['armenia', 'marz'];
-  return ['armenia', 'district', 'town', ...(ZONES && ZONE_METRICS.includes(metric) ? ['zone'] : [])];
+  // apartment prices: each marz is calculated from its towns (Yerevan from its districts), see marzPrices()
+  return ['armenia', 'marz', 'district', 'town', ...(ZONES && ZONE_METRICS.includes(metric) ? ['zone'] : [])];
 }
 // the level picked, or the data point's first level below Armenia when it has no numbers at the picked one
 function curLevel() { const ls = levelsFor(ui.metric); return ls.includes(ui.level) ? ui.level : ls.find(l => l !== 'armenia') || 'armenia'; }
@@ -529,6 +586,37 @@ function armPriceSeries() {
   }
   return out;
 }
+// Each marz's apartment price per m², month by month (no official figure, so it's calculated like the country's):
+// Yerevan = its districts weighted by their number of apartments (a month counts when at least 10 have prices);
+// another marz = the average of its towns, in months when at least half of its towns with prices have one
+// (so a month is not just one small town).
+function marzPrices() {
+  const lastY = o => { const k = lastKey(o); return k ? o[k] : null; };
+  const out = { yerevan: {} };
+  const months = new Set();
+  for (const d of Object.values(D.districts)) Object.keys(d.price || {}).forEach(m => months.add(m));
+  for (const ym of [...months].sort()) {
+    let s = 0, w = 0, n = 0;
+    for (const d of Object.values(D.districts)) if (d.price?.[ym]) { const dw = lastY(d.apartments) || 1; s += d.price[ym] * dw; w += dw; n++; }
+    if (n >= 10) out.yerevan[ym] = Math.round(s / w);
+  }
+  const townsBy = {};
+  for (const t of Object.values(D.towns)) if (Object.keys(t.price || {}).length) (townsBy[t.marz] ||= []).push(t);
+  for (const [mid, ts] of Object.entries(townsBy)) {
+    const o = {}, ms = new Set();
+    ts.forEach(t => Object.keys(t.price).forEach(m => ms.add(m)));
+    for (const ym of [...ms].sort()) {
+      const v = ts.map(t => t.price[ym]).filter(x => x);
+      if (v.length && v.length >= ts.length / 2) o[ym] = Math.round(v.reduce((a, b) => a + b, 0) / v.length);
+    }
+    out[mid] = o;
+  }
+  return out;
+}
+// Number of apartments by year: Armstat's housing stock for the country and each marz, its own tables for Yerevan's
+// districts and the towns
+const aptStock = (kind, id) => (kind === 'armenia' ? D.national.apartments_stock : kind === 'marz' ? D.marzes[id]?.apartments_stock
+  : kind === 'district' ? D.districts[id]?.apartments : D.towns[id]?.apartments) || {};
 // Filling long gaps in a price series (AMD, by month) with the Central Bank index for that area: the index is
 // scaled to the real price on both sides of the gap (the scale moves in a straight line between them), so the
 // estimate always meets the real line. Only gaps longer than 3 months, and only between two real prices.
@@ -629,13 +717,13 @@ const realButtons = metric => REAL_METRICS.includes(metric) && realAvailable() ?
 // what the price charts show: both lines (default), only as sold, or only in today's money
 const viewButtons = () => `<div class="seg-sm" title="Show prices as sold, in today's money, or both">${[['nominal', 'As sold'], ['real', ui.cur === 'USD' ? 'Today\'s $' : 'Today\'s ֏'], ['both', 'Both']].map(([v, l]) => `<button type="button" class="${(ui.rview || 'both') === v ? 'on' : ''}" data-rview="${v}">${l}</button>`).join('')}</div>`;
 // the unit a data point is measured in, so two of them share a scale only when it makes sense
-const PCT_NAT = ['inflation', 'rppi_houses', 'rppi_all', 'm2_yoy'], RATE_NAT = ['mort_amd', 'mort_usd', 'loan_eur', 'policy', 'amd_share'];
+const PCT_NAT = ['inflation', 'rppi_houses', 'rppi_all', 'm2_yoy', 'cost_yoy', 'econ_yoy'], RATE_NAT = ['mort_amd', 'mort_usd', 'loan_eur', 'policy', 'amd_share', 'vac_ratio', 'dep_amd', 'dep_usd', 'dep_amd_long', 'dep_usd_long'];
 // Two data points can share the left scale when they're measured alike: both amounts of money (֏ or $), or both
 // percentages (changes, rates, shares). Only truly different kinds (money vs %, counts, years…) need their own scale.
 function unitOf(id) { if (M[id]?.real) id = M[id].real;   // a real price is measured like its nominal one
   const m = M[id]; if (!m) return '';
-  if (m.nat) return PCT_NAT.includes(m.nat) || RATE_NAT.includes(m.nat) ? 'pct' : 'nat:' + m.nat;   // (money supply, loans: billions)
-  return m.money ? 'money' : m.pct || m.unit === '%' ? 'pct' : m.unit || id; }
+  if (m.nat) return PCT_NAT.includes(m.nat) || RATE_NAT.includes(m.nat) ? 'pct' : NAT[m.nat]?.usdNative ? 'mln' : ['usd', 'eur'].includes(m.nat) ? 'fx' : 'nat:' + m.nat;   // (money supply, loans: billions)
+  return m.big ? 'mln' : m.money ? 'money' : m.pct || m.unit === '%' ? 'pct' : m.unit || id; }
 // "Compare with" under the chart: pick any other data point; Left axis = same scale, Right axis = its own scale
 // "Compare with" under the chart, like the US map: a search box that opens a list of every data point (grouped,
 // searchable, with an x to close); Left axis = same scale, Right axis = its own scale
@@ -677,7 +765,18 @@ addEventListener('resize', closeWithPicker);
 // a dashed average line for data points that swing around a long-run norm (money supply growth)
 const AVG_LINE = ['nat_m2_yoy'];
 function avgRef(metric, s) { if (!AVG_LINE.includes(metric) || ui.showAvg === false) return null; const v = Object.values(s || {}).filter(x => x != null && !isNaN(x)); if (v.length < 12) return null; const ks = Object.keys(s).sort(); return { v: v.reduce((a, b) => a + b, 0) / v.length, label: `Average ${ks[0].slice(0, 4)}–${ks[ks.length - 1].slice(0, 4)}` }; }
-const avgToggle = metric => AVG_LINE.includes(metric) ? `<label class="avg-chk"><input type="checkbox" data-avg ${ui.showAvg === false ? '' : 'checked'}> <span class="avg-dash"></span> Show average</label>` : '';
+// "Show fair value" on the apartment price charts, like the US map's home value chart: a dashed line of what the
+// price would be at the place's usual price-to-wage ratio (seriesFor 'fair_value')
+const FAIR_LINE = ['typical', 'price'];
+function fairRef(kind, id, metric, zone) {
+  if (!FAIR_LINE.includes(metric) || ui.showFair === false) return null;
+  const r = seriesFor(kind, id, 'fair_value', zone), all = { ...(r.est || {}), ...(r.s || {}) };
+  if (Object.keys(all).length < 12) return null;
+  return { s: metric === 'price' ? Object.fromEntries(Object.entries(all).map(([k, v]) => [k, v / 60])) : all, label: 'Fair value (wage-based)' };
+}
+const fairToggle = metric => FAIR_LINE.includes(metric) ? `<label class="avg-chk"><input type="checkbox" data-fair ${ui.showFair === false ? '' : 'checked'}> <span class="avg-dash"></span> Show fair value</label>` : '';
+const fairNote = () => `<p class="note" style="margin:2px 0 0">Fair value = a year of the average wage in the marz (Armstat) × this place's average price-to-wage ratio since 2018. Wages after the latest published year are projected at their recent pace. Prices only go back to 2018, so this is a rough guide, not an appraisal.</p>`;
+const avgToggle = metric => FAIR_LINE.includes(metric) ? fairToggle(metric) : AVG_LINE.includes(metric) ? `<label class="avg-chk"><input type="checkbox" data-avg ${ui.showAvg === false ? '' : 'checked'}> <span class="avg-dash"></span> Show average</label>` : '';
 const realNote = () => `<p class="note" style="margin:2px 0 0">In today's ${ui.cur === 'USD' ? 'dollars: earlier prices raised by US inflation since then (BLS consumer prices), as felt by a buyer earning dollars' : 'drams: earlier prices raised by Armenian inflation since then (Armstat consumer prices)'}.</p>`;
 function wageFor(marzId) { return latestYearVal(marzObj(marzId)?.wage); }
 function valueOf(kind, id, metric = ui.metric) {
@@ -688,6 +787,7 @@ function valueOf(kind, id, metric = ui.metric) {
   const marzId = kind === 'district' ? 'yerevan' : kind === 'town' ? p.marz : id;
   // the whole country's 1-year change: the Central Bank's quality-adjusted index for all apartments
   if (kind === 'armenia' && metric === 'chg12') return latestYearVal((D.national.rppi?.yoy || {}).apt);
+  if (M[metric]?.calc) { const r = seriesFor(kind, id, metric), k = lastKey(r.s); return k && !r.marz && !r.natOnly ? r.s[k] : null; }
   switch (metric) {
     case 'price': { const k = lastKey(p.price); return recent(k) ? toCur(p.price[k], k) : null; }
     case 'typical': { const k = lastKey(p.price); return recent(k) ? toCur(p.price[k] * 60, k) : null; }
@@ -715,7 +815,9 @@ function fmtValue(v, metric = ui.metric) {
   if (v == null || isNaN(v)) return '–';
   if (m.nat) return natFmt(m.nat, v);
   if (m.pct) return fmtPct(v);
+  if (m.big) { const a = Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + ' bn' : Math.round(v) + ' mln'; return ui.cur === 'USD' ? '$' + a : a + ' ֏'; }   // (kept in millions)
   if (m.money) return fmtMoney(v, ui.cur);
+  if (m.suffix) return fmtInt(v) + m.suffix;
   if (m.unit === '%') return v.toFixed(1) + '%';
   if (m.unit === 'yrs') return v.toFixed(1) + ' years';
   if (m.unit === 'm²') return v.toFixed(1) + ' m²';
@@ -1007,7 +1109,7 @@ function renderLegend() {
       : ['price', 'typical', 'mtg_pmt', 'ptoi', 'chg1', 'price_real', 'typical_real', 'mtg_real'].includes(ui.metric) ? 'Calculated from Yerevan\'s districts and 45 towns, weighted by apartment sales.' : '';
     $('#legend').innerHTML = `<h3>${esc(m.label)}${m.money ? ` (${ui.cur})` : ''}</h3><div class="sub">The whole of Armenia${kWhen ? ' · ' + esc(kWhen) : ''}</div>
       <div class="us-val"><span>All of Armenia</span><b>${k ? esc(fmtValue(s[k])) : '–'}</b></div>
-      <div class="note" style="margin-top:6px">${k ? `${how} Click the map to see its history.` : `Not published for the whole country. Pick ${m.level.includes('marz') ? 'Marz' : 'District or Town'} above.`}</div>${LEGEND_BTNS}`;
+      <div class="note" style="margin-top:6px">${k ? `${how} Click the map to see its history.` : `Not published for the whole country. Pick ${m.level.includes('marz') ? 'Marz' : m.level === 'town' ? 'Town' : 'District or Town'} above.`}</div>${LEGEND_BTNS}`;
     return;
   }
   const sub = lv === 'marz' ? `By marz · ${when}` : lv === 'town' ? `45 towns outside Yerevan · ${when}`
@@ -1047,6 +1149,7 @@ document.addEventListener('click', e => {
   if (window.goatcounter && goatcounter.count) goatcounter.count({ path: 'feedback-click-armenia', title: 'Feedback clicked (Armenia)', event: true });
 });
 function latestYearLabel(metric) {
+  if (M[metric]?.calc) { const k = lastKey(seriesFor('armenia', 'armenia', metric).s) || lastKey(seriesFor('town', 'gyumri', metric).s); return k ? k.slice(0, 4) : ''; }
   const key = { wage: 'wage', poverty: 'poverty', population: 'population', space: 'space_per_person', built: 'new_housing_m2', house_sales: 'house_sales', apt_sales: 'apartment_sales' }[metric];
   const years = Object.values(D.marzes).map(p => lastKey(p[key])).filter(Boolean).sort();
   return metric === 'population' ? '2022 census' : years[years.length - 1] || '';
@@ -1194,7 +1297,8 @@ function seriesFor(kind, id, metric, zone) {
   const change = n => byMonth(p.price, (ym, v) => { const b = p.price?.[addMonths(ym, -n)]; return b ? (toCur(v, ym) / toCur(b, addMonths(ym, -n)) - 1) * 100 : null; });
   const wageIn = ym => { const ys = Object.keys(m.wage || {}).filter(y => y <= ym.slice(0, 4)).sort(); return ys.length ? m.wage[ys[ys.length - 1]] : null; };
   // long gaps in the price history get a dashed estimate from the Central Bank index for the place's area
-  const gap = kind !== 'marz' && p.price ? gapFill(p.price, rppiArea(kind, id)) : {};
+  // (a marz uses Yerevan's index or the "outside Yerevan" one, like its districts and towns)
+  const gap = p.price ? gapFill(p.price, rppiArea(kind, id)) : {};
   const both = f => ({ s: byMonth(p.price, f), est: Object.keys(gap).length ? byMonth(gap, f) : null });
   // price change over n months: real where both months have Cadastre prices, a dashed estimate where either month
   // comes from the Central Bank index (the gap), joined to the real line on both sides
@@ -1217,6 +1321,28 @@ function seriesFor(kind, id, metric, zone) {
     case 'chg1': return changeBoth(1);
     case 'ptoi': return both((ym, v) => { const w = wageIn(ym); return w ? v * 60 / (w * 12) : null; });
     case 'mtg_pmt': return both((ym, v) => mtgPayment(v, ym));
+    // Fair price, like the US map's fair home value: a year of local wages × the place's usual price-to-wage ratio
+    // (its average over every month with a price, estimated months included). Wages are Armstat's yearly averages,
+    // placed at mid-year with straight lines between; after the latest year they grow at the last year's rate.
+    case 'fair_value': case 'overvalued': {
+      const wy = m.wage || {}, ys = Object.keys(wy).sort();
+      if (ys.length < 2) return { s: {} };
+      const wageAt = ym => {
+        const t = +ym.slice(0, 4) + (+ym.slice(5) - 0.5) / 12 - 0.5;   // in years, where y.0 = the middle of year y
+        const y0 = Math.floor(t), f = t - y0, a = wy[y0], b = wy[y0 + 1];
+        if (a && b) return a + (b - a) * f;
+        const ly = +ys[ys.length - 1], g = wy[ly] / wy[ly - 1];
+        if (t >= ly && wy[ly - 1]) return wy[ly] * g ** (t - ly);
+        return a || b || null;
+      };
+      const all = { ...gap, ...p.price }, rs = [];
+      for (const [ym, v] of Object.entries(all)) { const w = wageAt(ym); if (w && v) rs.push(v * 60 / (w * 12)); }
+      if (rs.length < 24) return { s: {} };
+      const ratio = rs.reduce((a, b) => a + b, 0) / rs.length;
+      return metric === 'fair_value'
+        ? both(ym => { const w = wageAt(ym); return w ? toCur(w * 12 * ratio, ym) : null; })
+        : both((ym, v) => { const w = wageAt(ym); return w ? (v * 60 / (w * 12 * ratio) - 1) * 100 : null; });
+    }
     case 'rate_amd': case 'rate_usd': case 'rate_eur': return { s: natSeries(M[metric].nat) };
     case 'deals': return { s: kind === 'town' ? {} : (kind === 'district' ? p.deals : m.deals), bars: true };
     case 'sales': return { s: kind === 'town' ? {} : (kind === 'district' ? p.sales : m.sales), bars: true };
@@ -1229,6 +1355,41 @@ function seriesFor(kind, id, metric, zone) {
     case 'built_yoy': { const s = m.new_housing_m2 || {}; return { s: yearly(Object.fromEntries(Object.keys(s).filter(y => s[String(+y - 1)]).map(y => [y, (s[y] / s[String(+y - 1)] - 1) * 100]))), marz: kind !== 'marz' && kind !== 'armenia' }; }
     case 'house_sales': return { s: yearly(m.house_sales), marz: kind !== 'marz' && kind !== 'armenia', bars: true };
     case 'apt_sales': return { s: yearly(m.apartment_sales), marz: kind !== 'marz' && kind !== 'armenia', bars: true };
+    // published by marz (and for the whole country)
+    case 'unemployment': case 'employment_rate': case 'houses': case 'housing_area': case 'hotels': case 'participation': case 'land_sales': case 'home_gifts':
+      return { s: yearly(m[CALC_KEY[metric]]), marz: kind !== 'marz' && kind !== 'armenia', bars: ['hotels', 'land_sales', 'home_gifts'].includes(metric) };
+    case 'spending': case 'hotel_rev': case 'cons_vol': return { s: yearlyIn(m[CALC_KEY[metric]]), marz: kind !== 'marz' && kind !== 'armenia', bars: metric !== 'spending' };
+    // money from abroad (US dollars, millions): the whole country's totals go back to 2013, marzes to 2024
+    case 'remit_in': case 'remit_net': case 'remit_fast': case 'remit_pp': {
+      const all = kind === 'armenia' ? D.national.remit_all || {} : null, r = m.remit || {};
+      const marzOnly = kind !== 'marz' && kind !== 'armenia';
+      if (metric === 'remit_in') return { s: fromUsd(all ? all.in : r.in), marz: marzOnly, bars: true };
+      if (metric === 'remit_net') return { s: fromUsd(all ? all.net : r.net), marz: marzOnly, bars: true };
+      if (metric === 'remit_fast') return { s: fromUsd(r.fast_in), marz: marzOnly, bars: true };
+      const pop = kind === 'armenia' ? D.national.population?.['2022'] : m.population?.['2022'];
+      return { s: pop ? fromUsd(Object.fromEntries(Object.entries(r.fast_in || {}).map(([ym, v]) => [ym, v * 1e6 / pop]))) : {}, marz: marzOnly };
+    }
+    // published for the whole country only
+    case 'new_apts': case 'new_apt_size': case 'new_bldgs':
+      return { s: yearly(D.national[CALC_KEY[metric]]), natOnly: kind !== 'armenia', bars: metric !== 'new_apt_size' };
+    // number of apartments: the whole country and marzes (Armstat stock by marz), Yerevan districts and towns
+    case 'apartments': case 'apt_chg1': case 'apt_chg10': {
+      const a = aptStock(kind, id), ys = Object.keys(a).sort();
+      if (metric === 'apartments') return { s: yearly(a) };
+      const base = a['2010'] ? '2010' : ys[0];
+      const o = {};
+      for (const y of ys) {
+        const b = metric === 'apt_chg1' ? a[String(+y - 1)] : y > base ? a[base] : null;
+        if (b) o[y] = (a[y] / b - 1) * 100;
+      }
+      return { s: yearly(o) };
+    }
+    case 'apt_size': {
+      if (kind !== 'town') return { s: {} };
+      const o = {};
+      for (const [y, n] of Object.entries(p.apartments || {})) if (n && p.apartment_area?.[y]) o[y] = p.apartment_area[y] / n;
+      return { s: yearly(o) };
+    }
   }
   return { s: {} };
 }
@@ -1261,7 +1422,8 @@ function renderDetail() {
   let extra = null;
   if (ui.with && M[ui.with] && ui.with !== ui.metric) {
     const w = seriesFor(kind, id, ui.with);
-    if (Object.keys(w.s || {}).length) extra = { s: w.s, est: w.est, fmt: v => fmtValue(v, ui.with), mainLabel: m.label, label: M[ui.with].label, right: unitOf(ui.metric) !== unitOf(ui.with) || ui.axis === 'right' };
+    const wm = ui.with;   // (kept, so hovering an old chart still formats it after the pick changes)
+    if (Object.keys(w.s || {}).length) extra = { s: w.s, est: w.est, fmt: v => fmtValue(v, wm), mainLabel: m.label, label: M[ui.with].label, right: unitOf(ui.metric) !== unitOf(ui.with) || ui.axis === 'right' };
   } else if (kind === 'armenia' && ui.metric === 'chg12') extra = { s: natSeries('rppi_houses'), mainLabel: 'Apartments', label: 'Houses', diff: false };
   const rf = o => o && rangeFilter(o);
   const keys = Object.keys(s).sort(), last = keys[keys.length - 1];
@@ -1270,22 +1432,26 @@ function renderDetail() {
   let why = '';
   if (kind === 'armenia' && ui.metric === 'chg12') why = `<p class="note">For the whole country this is the Central Bank of Armenia's apartment price index (by quarter), which adjusts for size, floor and location.</p>`;
   else if (kind === 'armenia' && ['price', 'typical', 'mtg_pmt', 'ptoi', 'chg1', 'price_real', 'typical_real', 'mtg_real'].includes(ui.metric)) why = `<p class="note">No official countrywide apartment price exists, so this is calculated: Yerevan's districts (weighted by their number of apartments) and the towns in each marz, combined by each marz's apartment sales.</p>`;
-  else if (kind === 'armenia' && !keys.length) why = `<p class="note">${esc(m.label)} is published for ${esc(m.level.replace(/ · /g, ', ').replace('district', 'Yerevan districts').replace('town', 'towns').replace('zone', 'zones'))}, not for the whole country. Pick ${m.level.includes('marz') ? 'Marz' : 'District or Town'} above to see it.</p>`;
+  else if (kind === 'armenia' && !keys.length) why = `<p class="note">${esc(m.label)} is published for ${esc(m.level.replace(/ · /g, ', ').replace('district', 'Yerevan districts').replace('town', 'towns').replace('zone', 'zones'))}, not for the whole country. Pick ${m.level.includes('marz') ? 'Marz' : m.level === 'town' ? 'Town' : 'District or Town'} above to see it.</p>`;
+  else if (kind === 'marz' && ['price', 'typical', 'mtg_pmt', 'ptoi', 'chg12', 'chg1', 'price_real', 'typical_real', 'mtg_real'].includes(ui.metric) && keys.length) why = `<p class="note">No official price exists for a whole marz, so this is calculated: ${id === 'yerevan' ? 'Yerevan\'s 12 districts, weighted by their number of apartments' : 'the average of the towns in the marz that have prices that month'}.</p>`;
   else if (marz) why = `<p class="note">Published only by marz, so this is ${esc(D.marzes[mid].en)}${mid === 'yerevan' ? ' as a whole' : ' marz'}.</p>`;
+  else if (seriesFor(kind, id, ui.metric).natOnly) why = `<p class="note">Armstat publishes this for the whole country only, so this is all of Armenia.</p>`;
+  else if (!keys.length && m.level === 'town') why = `<p class="note">${esc(m.label)} is published for towns only. Pick Town above to see it.</p>`;
   else if (!keys.length && kind === 'marz' && m.level !== 'marz') why = `<p class="note">${esc(m.label)} is published for Yerevan districts and towns, not for whole marzes. ${mid === 'yerevan' ? 'See the districts below.' : 'See the towns below.'}</p>`;
   else if (!keys.length && kind === 'town' && ['deals', 'sales'].includes(ui.metric)) why = `<p class="note">Transactions are published by marz, not by town. Open ${esc(D.marzes[mid].en)} to see them.</p>`;
   let h = `<div class="metric-head"><label class="dp-switch" title="Switch to another data point"><span>${esc(m.label)}${m.money ? ` (${ui.cur})` : ''}</span><span class="sw">⇅ Switch</span><select id="mPick" aria-label="Switch data point">${metricOptions(ui.metric)}</select></label>
       <div class="mnow"><b>${last ? esc(fmt(s[last])) : '–'}</b><span>${esc(when)}</span></div></div>
     <div class="chart-ctrl"><span class="note" style="margin:0">${m.yearly ? 'One value per year' : m.rel === 'quarter' ? 'By quarter' : 'By month'}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${keys.length > 1 ? rangeButtons() + PNG_BTN : ''}</span></div>
     ${keys.length > 1 ? avgToggle(ui.metric) + withRow(m) : ''}
-    ${keys.length > 1 ? chart(rangeFilter(s), fmt, !!bars, true, rf(est), extra && { ...extra, s: rf(extra.s), est: rf(extra.est) }, avgRef(ui.metric, s)) + (m.real ? realNote() : '') : `<div class="chart-empty">${last ? `<b>${esc(fmt(s[last]))}</b><span>Only one value so far, so there is no history to chart yet.</span>` : `<span>No ${esc(m.label.toLowerCase())} for this place.</span>`}</div>`}
+    ${keys.length > 1 ? chart(rangeFilter(s), fmt, !!bars, true, rf(est), extra && { ...extra, s: rf(extra.s), est: rf(extra.est) }, avgRef(ui.metric, s) || fairRef(kind, id, ui.metric)) + (m.real ? realNote() : '') + (fairRef(kind, id, ui.metric) ? fairNote() : '') : `<div class="chart-empty">${last ? `<b>${esc(fmt(s[last]))}</b><span>Only one value so far, so there is no history to chart yet.</span>` : `<span>No ${esc(m.label.toLowerCase())} for this place.</span>`}</div>`}
     ${why}`;
-  if (m.money && ui.cur === 'USD' && !m.yearly && last) h += `<p class="note">USD uses the Central Bank's average rate for each month (${usdRate(last)?.toFixed(2)} ֏ per $1 in ${monthLabel(last)}). The dram has moved against the dollar, so changes in USD can differ from changes in drams.</p>`;
+  if (m.usdNative && ui.cur === 'AMD' && last) h += `<p class="note">The Central Bank publishes this in US dollars; drams use each month's average rate.</p>`;
+  if (m.money && ui.cur === 'USD' && !m.yearly && !m.usdNative && last) h += `<p class="note">USD uses the Central Bank's average rate for each month (${usdRate(last)?.toFixed(2)} ֏ per $1 in ${monthLabel(last)}). The dram has moved against the dollar, so changes in USD can differ from changes in drams.</p>`;
   if (kind === 'town' && !m.yearly && !m.nat && !area) h += `<p class="note">Town prices come from fewer sales than Yerevan districts, so month-to-month moves can be noisy.</p>`;
   // At a glance: click a tile to chart that data point (and color the map by it)
-  const tiles = kind === 'armenia' ? ['price', 'typical', 'chg12', 'built_total', 'mtg_pmt', 'ptoi', 'rate_usd', 'sales', 'wage', 'poverty', 'population', 'built']
-    : kind === 'marz' ? ['house_sales', 'apt_sales', 'sales', 'deals', 'wage', 'poverty', 'space', 'built']
-    : ['price', 'typical', 'mtg_pmt', 'chg12', 'ptoi', 'wage', 'poverty', kind === 'district' ? 'sales' : 'house_sales'];
+  const tiles = kind === 'armenia' ? ['price', 'typical', 'chg12', 'nat_cost_yoy', 'mtg_pmt', 'ptoi', 'rate_usd', 'sales', 'wage', 'unemployment', 'new_apts', 'remit_in']
+    : kind === 'marz' ? ['price', 'chg12', 'ptoi', 'apt_sales', 'house_sales', 'sales', 'wage', 'unemployment', 'spending', 'apartments', 'remit_pp', 'cons_vol']
+    : ['price', 'typical', 'mtg_pmt', 'chg12', 'ptoi', 'wage', 'poverty', kind === 'district' ? 'sales' : 'house_sales', 'apartments', kind === 'town' ? 'apt_size' : 'apt_chg10'];
   h += `<h4 class="snap-h">At a glance</h4><div class="kpis">${tiles.map(t => {
     const r = seriesFor(kind, id, t), k = lastKey(r.s), v = k ? r.s[k] : null;
     return `<button type="button" class="kpi ${t === ui.metric ? 'on' : ''}" data-metric="${t}"><span>${esc(M[t].label)}${r.marz ? ` <small>(${esc(D.marzes[mid].en)})</small>` : ''}</span><b class="${M[t].pct ? chgCls(v) : ''}">${esc(fmtValue(v, t))}</b><small>${k ? esc(M[t].yearly ? k.slice(0, 4) : monthLabel(k)) : ''}</small></button>`;
@@ -1300,8 +1466,19 @@ function renderDetail() {
     }).join('')}</table>
     <h4 class="snap-h">${esc(p.en.split(' (')[0])} – Zone ${ui.zone}: price per m² (${ui.cur})</h4>${(() => { const r = !!M[ui.metric]?.real && realAvailable(), zs0 = seriesFor('district', id, 'price', ui.zone), f = o => o && rangeFilter(o);
       const zs = r ? { s: deflate(zs0.s), est: zs0.est && deflate(zs0.est) } : zs0;
-      return chart(f(zs.s), v => fmtMoney(v, ui.cur), false, true, f(zs.est)) + (r ? realNote() : ''); })()}
+      const fr0 = r ? null : fairRef('district', id, 'price', ui.zone), fr = fr0 && { ...fr0, mainLabel: 'Zone ' + ui.zone + ': price per m²', label: 'Fair value (wage-based)' }; return chart(f(zs.s), v => fmtMoney(v, ui.cur), false, true, f(zs.est), null, fr) + (r ? realNote() : '') + (fr ? fairNote() : ''); })()}
     <p class="note">Yerevan is split into valuation zones set by the government in 2020 (decision N 1023-N): zone 1 is the most central, higher numbers are further out. Click a zone to see its history. Pick Zone at the top of the map to see them drawn (outlines traced from the official map, so approximate).</p>`;
+  }
+  // the whole country: what homes are like, from the 2022 census (published for towns and villages, not by marz)
+  const ch = D.national.census_homes;
+  if (kind === 'armenia' && ch?.armenia) {
+    const row = (label, k, f = v => v.toFixed(0) + '%') => `<tr><td>${label}</td>${['armenia', 'urban', 'rural'].map(a => `<td>${ch[a]?.[k] != null ? f(ch[a][k]) : '–'}</td>`).join('')}</tr>`;
+    h += `<h4 class="snap-h">Homes in the 2022 census</h4><table class="zones"><tr><th></th><th>Armenia</th><th>Towns</th><th>Villages</th></tr>
+      ${row('Households', 'households', v => fmtInt(v))}${row('People per household', 'household_size', v => v.toFixed(1))}
+      ${row('Running water inside the home', 'water_inside')}${row('Bath or shower inside the home', 'bath_inside')}
+      ${row('Heated with gas or electricity', 'heat_gas_electric')}${row('Heated with wood or other fuel', 'heat_wood')}${row('Central heating', 'heat_central')}
+      ${row('Owned by the household', 'owned')}${row('Owned by someone else (mostly rented)', 'rented_other')}</table>
+      <p class="note">Share of households (Armstat, 2022 census). The census publishes these for the whole country, towns and villages, not by marz.</p>`;
   }
   if (kind === 'marz' && id !== 'yerevan') {
     const towns = Object.entries(D.towns).filter(([, t]) => t.marz === id);
@@ -1354,12 +1531,32 @@ const NAT = {
   m2: { label: 'Money supply in drams (M2)', unit: () => ui.cur === 'USD' ? '$ bn' : 'bn ֏', note: 'Money in Armenian drams: currency in circulation plus dram deposits (M2), end of each month (Central Bank of Armenia). Shown in US dollars at that month\'s exchange rate when $ is selected.' },
   m2_yoy: { label: 'Money supply in drams, 1-year change', note: 'Change in the money supply in drams (M2) from the same month a year earlier (Central Bank of Armenia).' },
   rppi_houses: { label: 'House price index (1-year change)', quarterly: true, note: 'Central Bank of Armenia index for individual houses: change from the same quarter a year earlier. Experimental, so it may be revised.' },
+  eur: { label: 'Dram per euro', note: 'Official Central Bank rate, average of each month.' },
+  rub: { label: 'Dram per Russian ruble', note: 'Official Central Bank rate, average of each month. Many buyers since 2022 earn in rubles, and most money sent home comes from Russia.' },
+  cost_yoy: { label: 'Construction costs, 1-year change', group: 'Prices and affordability', note: 'Change in construction prices (building work, materials and other costs) from the same month a year earlier (Armstat construction price index). Compare it with Price change (1 year) to see whether homes are rising faster than the cost of building them.' },
+  cost_idx: { label: 'Construction cost index (2010 = 100)', group: 'Prices and affordability', note: 'Construction prices (building work, materials and other costs), January 2010 = 100, chained from Armstat\'s month-to-month construction price index.' },
+  pop_year: { label: 'Population (start of each year)', group: 'People and income', yearly: true, bars: true, note: 'Permanent (de jure) population at the start of each year (Armstat). 2022 is the census count.' },
+  net_mig: { label: 'Net migration (year)', group: 'People and income', yearly: true, bars: true, note: 'People who moved to Armenia minus people who left, in the year (Armstat, registered moves). The jump after 2022 is the arrival of people from Russia and elsewhere.' },
+  remit_ru: { label: 'Money received from Russia (month)', group: 'Money from abroad', usdNative: true, bars: true, note: 'Money transfers received by individuals from Russia through Armenian banks in the month (Central Bank of Armenia). Kept in US dollars; in drams at each month\'s rate.' },
+  reg_rent: { label: 'Registered rentals (year)', group: 'Market activity', yearly: true, bars: true, note: 'Lease contracts registered with the Cadastre in the year, whole country (Armstat). Only longer leases have to be registered, so most rentals are not counted; it shows the trend, not the size of the rental market.' },
+  reg_pledge: { label: 'Registered mortgages (year)', group: 'Market activity', yearly: true, bars: true, note: 'Pledges (mortgages and other loans secured on property) registered with the Cadastre in the year, whole country (Armstat).' },
+  reg_inherit: { label: 'Property inherited (year)', group: 'Market activity', yearly: true, bars: true, note: 'Inheritance registrations with the Cadastre in the year, whole country (Armstat).' },
+  births: { label: 'Births (year)', group: 'People and income', yearly: true, bars: true, note: 'Babies born in the year, whole country (Armstat).' },
+  nat_incr: { label: 'Natural increase (births minus deaths)', group: 'People and income', yearly: true, bars: true, note: 'Births minus deaths in the year, whole country (Armstat). Together with net migration, this is how the population grows.' },
+  vacancies: { label: 'Job vacancies (end of year)', group: 'People and income', yearly: true, bars: true, note: 'Unfilled jobs that employers were looking to fill at the end of the year, whole country (Armstat).' },
+  vac_ratio: { label: 'Job vacancy rate', group: 'People and income', yearly: true, note: 'Job vacancies as a share of all jobs at the end of the year (Armstat). Higher means employers are struggling to hire.' },
+  econ_yoy: { label: 'Economic activity, 1-year change', note: 'Armstat\'s monthly index of economic activity (industry, construction, trade and services together) compared with the same month a year earlier. A quick monthly stand-in for GDP growth.' },
+  dep_amd: { label: 'Deposit rate in drams (up to 1 year)', note: 'Average interest rate on new bank deposits in drams for up to 1 year, % a year (Central Bank of Armenia). Compare it with Price change (1 year) to see whether a home or a deposit has been the better place for savings.' },
+  dep_amd_long: { label: 'Deposit rate in drams (over 1 year)', note: 'Average interest rate on new bank deposits in drams for over 1 year, % a year (Central Bank of Armenia).' },
+  dep_usd: { label: 'Deposit rate in US dollars (up to 1 year)', note: 'Average interest rate on new bank deposits in US dollars for up to 1 year, % a year (Central Bank of Armenia).' },
+  dep_usd_long: { label: 'Deposit rate in US dollars (over 1 year)', note: 'Average interest rate on new bank deposits in US dollars for over 1 year, % a year (Central Bank of Armenia).' },
+  remit_us: { label: 'Money received from the USA (month)', group: 'Money from abroad', usdNative: true, bars: true, note: 'Money transfers received by individuals from the United States through Armenian banks in the month (Central Bank of Armenia).' },
 };
 // Every Armenia-overview data point is also in the sidebar ("Economy and lending (nationwide)"); the three
 // mortgage rates already have their own group.
 for (const [k, d] of Object.entries(NAT)) {
   if (METRICS.some(m => m.nat === k) || k === 'rppi_houses') continue;   // (houses are part of Price change (1 year))
-  const m = { id: 'nat_' + k, group: 'Economy and lending (nationwide)', label: d.label + ' (Armenia)', level: 'nationwide', nat: k,
+  const m = { id: 'nat_' + k, group: d.group || 'Economy and lending (nationwide)', label: d.label + ' (Armenia)', level: 'nationwide', nat: k,
               rel: d.yearly ? 'year' : 'month', yearly: d.yearly, info: d.note };
   METRICS.push(m);
   M[m.id] = m;
@@ -1389,6 +1586,23 @@ function natSeries(k) {
     case 'm2': return Object.fromEntries(Object.entries(n.money || {}).map(([m, v]) => [m, toCur(v.m2 * 1e6, m) / 1e9]));
     case 'm2_yoy': { const s = n.money || {}; return Object.fromEntries(Object.keys(s).filter(m => s[addMonths(m, -12)]).map(m => [m, (s[m].m2 / s[addMonths(m, -12)].m2 - 1) * 100])); }
     case 'rppi_houses': return (n.rppi?.yoy || {})[k.slice(5)] || {};
+    case 'eur': return n.eur || {};
+    case 'rub': return n.rub || {};
+    case 'cost_idx': return n.construction_cost || {};
+    case 'cost_yoy': { const s = n.construction_cost || {}; return Object.fromEntries(Object.keys(s).filter(m => s[addMonths(m, -12)]).map(m => [m, (s[m] / s[addMonths(m, -12)] - 1) * 100])); }
+    case 'pop_year': return yearly(n.population_year);
+    case 'net_mig': return yearly(n.migration?.net);
+    case 'remit_ru': return fromUsd(n.remit_all?.russia);
+    case 'remit_us': return fromUsd(n.remit_all?.usa);
+    case 'reg_rent': return yearly(n.registrations?.rent);
+    case 'reg_pledge': return yearly(n.registrations?.pledge);
+    case 'reg_inherit': return yearly(n.registrations?.inheritance);
+    case 'births': return yearly(n.births?.births);
+    case 'nat_incr': return yearly(n.births?.natural_increase);
+    case 'vacancies': return yearly(n.vacancies?.count);
+    case 'vac_ratio': return yearly(n.vacancies?.ratio);
+    case 'econ_yoy': return n.econ_activity || {};
+    case 'dep_amd': case 'dep_usd': case 'dep_amd_long': case 'dep_usd_long': return Object.fromEntries(Object.entries((n.deposit_rate || {})[k.slice(4)] || {}).filter(([m]) => m >= '2005'));
   }
   return {};
 }
@@ -1400,7 +1614,12 @@ function natFmt(k, v) {
   if (k === 'mortgage') return ui.cur === 'USD' ? '$' + v.toFixed(2) + ' bn' : Math.round(v).toLocaleString('en-US') + ' bn ֏';
   if (k === 'amd_share' || k === 'policy') return v.toFixed(k === 'policy' ? 2 : 0) + '%';
   if (k === 'inflation' || k.startsWith('rppi_')) return fmtPct(v);
-  if (k === 'usd') return v.toFixed(2) + ' ֏';
+  if (k === 'usd' || k === 'eur' || k === 'rub') return v.toFixed(2) + ' ֏';
+  if (k === 'cost_yoy' || k === 'econ_yoy') return fmtPct(v);
+  if (k.startsWith('dep_')) return v.toFixed(2) + '%';
+  if (k === 'vac_ratio') return v.toFixed(1) + '%';
+  if (k === 'cost_idx') return v.toFixed(1);
+  if (NAT[k]?.usdNative) { const a = Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + ' bn' : Math.round(v) + ' mln'; return ui.cur === 'USD' ? '$' + a : a + ' ֏'; }
   return fmtInt(v);
 }
 function renderNational() {
@@ -1456,6 +1675,7 @@ $('#dBody').addEventListener('click', e => {
 $('#dBody').addEventListener('change', e => {
   if (e.target.id === 'mPick') setMetric(e.target.value);
   if (e.target.matches('[data-avg]')) { ui.showAvg = e.target.checked; saveState(); renderDetail(); }
+  if (e.target.matches('[data-fair]')) { ui.showFair = e.target.checked; saveState(); renderDetail(); }
 
   if (e.target.id === 'natPick') { ui.nat = e.target.value; renderDetail(); }
 });
@@ -1491,7 +1711,11 @@ function chart(series, fmt, bars = false, big = false, est = null, extra = null,
   const x0 = toIdx(allPts[0][0]), x1 = toIdx(allPts[allPts.length - 1][0]);
   const vals = (right ? [...pts, ...ePts] : allPts).map(p => p[1]);   // the left scale
   let lo = Math.min(...vals), hi = Math.max(...vals);
-  if (ref) { lo = Math.min(lo, ref.v); hi = Math.max(hi, ref.v); }
+  // ref: a dashed reference, either one level (ref.v, e.g. an average) or a line (ref.s, e.g. the fair value)
+  const rPts = ref?.s ? okPts(ref.s).filter(inSpan) : [];
+  if (ref?.s && rPts.length < 2) ref = null;
+  if (ref && !ref.s) { lo = Math.min(lo, ref.v); hi = Math.max(hi, ref.v); }
+  if (rPts.length && !right) { lo = Math.min(lo, ...rPts.map(p => p[1])); hi = Math.max(hi, ...rPts.map(p => p[1])); }
   if (bars) lo = Math.min(0, lo);
   const pad = (hi - lo) * .08 || Math.abs(hi) * .05 || 1; if (!bars) lo -= pad; hi += pad;
   const X = ym => L0 + (bars ? .5 : 0) * (W - L0 - R0) / Math.max(1, x1 - x0 + 1) + (toIdx(ym) - x0) / Math.max(1, x1 - x0 + (bars ? 1 : 0)) * (W - L0 - R0);
@@ -1526,7 +1750,11 @@ function chart(series, fmt, bars = false, big = false, est = null, extra = null,
         `<path d="${d2}" fill="none" stroke="#e76f51" stroke-width="${big ? 2.4 : 2}" stroke-linejoin="round"/>`;
     }
     if (lo < 0 && hi > 0) body = `<line x1="${L0}" x2="${W - R0}" y1="${Y(0)}" y2="${Y(0)}" stroke="#9ca3af"/>` + body;
-    if (ref) body += `<line x1="${L0}" x2="${W - R0}" y1="${Y(ref.v).toFixed(1)}" y2="${Y(ref.v).toFixed(1)}" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="6 4"/><text x="${W - R0 - 4}" y="${(Y(ref.v) - 6).toFixed(1)}" font-size="12" fill="#4b5563" text-anchor="end" paint-order="stroke" stroke="#fff" stroke-width="3">${esc(ref.label)}: ${esc(fmt(ref.v))}</text>`;
+    if (rPts.length) {
+      let rd = '', rp = null;
+      for (const [ym, v] of rPts) { rd += (rp != null && toIdx(ym) - rp <= 3 ? 'L' : 'M') + X(ym).toFixed(1) + ' ' + Y(v).toFixed(1); rp = toIdx(ym); }
+      body = `<path d="${rd}" data-fair="1" fill="none" stroke="#6b7280" stroke-width="1.8" stroke-dasharray="5 4" stroke-linejoin="round"/>` + body;
+    } else if (ref) body += `<line x1="${L0}" x2="${W - R0}" y1="${Y(ref.v).toFixed(1)}" y2="${Y(ref.v).toFixed(1)}" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="6 4"/><text x="${W - R0 - 4}" y="${(Y(ref.v) - 6).toFixed(1)}" font-size="12" fill="#4b5563" text-anchor="end" paint-order="stroke" stroke="#fff" stroke-width="3">${esc(ref.label)}: ${esc(fmt(ref.v))}</text>`;
   }
   // gridlines and labels: 4 levels on the left, years along the bottom
   let axis = '';
@@ -1548,8 +1776,11 @@ function chart(series, fmt, bars = false, big = false, est = null, extra = null,
   const real = new Set(pts.map(p => p[0]));
   const hoverPts = ePts.length ? [...pts, ...ePts.filter(p => !real.has(p[0])).map(p => [p[0], p[1], 'est'])].sort() : pts;
   const xmap = xS.length ? Object.fromEntries([...xE, ...xS]) : null;
-  CHARTS[id] = { pts: hoverPts, fmt, fmt2, X, Y, Y2, W, yearlyPts, xmap, xlabel: extra?.label, mlabel: extra?.mainLabel, diff: !!extra?.diff };
-  const legend = xS.length ? `<div class="chart-legend"><span><i style="background:#1e40af"></i>${esc(extra.mainLabel)}${right ? ' (left)' : ''}</span><span><i style="background:#e76f51"></i>${esc(extra.label)}${right ? ' (right)' : ''}</span></div>` : '';
+  CHARTS[id] = { pts: hoverPts, fmt, fmt2, X, Y, Y2, W, yearlyPts, xmap, xlabel: extra?.label, mlabel: extra?.mainLabel, diff: !!extra?.diff,
+                 rmap: rPts.length ? Object.fromEntries(rPts) : null, rlabel: ref?.label };
+  const fairKey = rPts.length ? `<span><i class="dash-key"></i>${esc(ref.label)}</span>` : '';
+  const legend = xS.length ? `<div class="chart-legend"><span><i style="background:#1e40af"></i>${esc(extra.mainLabel)}${right ? ' (left)' : ''}</span><span><i style="background:#e76f51"></i>${esc(extra.label)}${right ? ' (right)' : ''}</span>${fairKey}</div>`
+    : fairKey ? `<div class="chart-legend"><span><i style="background:#1e40af"></i>${esc(ref.mainLabel || M[ui.metric]?.label || '')}</span>${fairKey}</div>` : '';
   const label = ym => yearlyPts ? ym.slice(0, 4) : monthLabel(ym);
   return legend + `<div class="chart-wrap"><svg class="chart${big ? ' big' : ''}" id="${id}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Chart">${axis}${body}<line class="cur" x1="0" x2="0" y1="${T0}" y2="${H - B0}" stroke="#9ca3af" stroke-dasharray="2 2" visibility="hidden"/><circle class="dot" r="5" fill="#f59e0b" stroke="#fff" stroke-width="2" visibility="hidden"/><circle class="dot2" r="5" fill="#e76f51" stroke="#fff" stroke-width="2" visibility="hidden"/></svg><div class="chart-bubble" id="${id}b"></div></div>
     <div class="chart-tip" id="${id}t">${esc(label(pts[0][0]))} → ${esc(label(pts[pts.length - 1][0]))}: ${esc(fmt(pts[0][1]))} → ${esc(fmt(pts[pts.length - 1][1]))}${pts[0][1] > 0 && !bars && !String(fmt(pts[0][1])).endsWith('%') ? ` (${fmtPct((pts[pts.length - 1][1] / pts[0][1] - 1) * 100)})` : ''}</div>${ePts.length ? '<p class="note" style="margin:2px 0 0">Months where the Cadastre\'s monthly reports are missing (mostly 2020–2024) are estimated from the Central Bank of Armenia price index; hover to see which (marked \"estimate\").</p>' : ''}`;
@@ -1572,8 +1803,10 @@ function sourceOf(id) {
   const m = M[id] || {}, base = m.real || id;
   const s = new Set();
   if (['price', 'typical', 'mtg_pmt', 'ptoi', 'chg12', 'chg1', 'deals', 'sales'].includes(base)) s.add('Cadastre Committee of Armenia');
-  if (['mtg_pmt', 'rate_amd', 'rate_usd', 'rate_eur'].includes(base) || (m.nat && !['inflation'].includes(m.nat))) s.add('Central Bank of Armenia');
-  if (['ptoi', 'wage', 'poverty', 'population', 'space', 'built', 'built_total', 'built_yoy', 'house_sales', 'apt_sales'].includes(base) || m.nat === 'inflation') s.add('Armstat');
+  if (FAIR_LINE.includes(base) && ui.showFair !== false) s.add('fair value: wages from Armstat');
+  const ARMSTAT_NAT = ['inflation', 'cost_yoy', 'cost_idx', 'pop_year', 'net_mig', 'reg_rent', 'reg_pledge', 'reg_inherit', 'births', 'nat_incr', 'vacancies', 'vac_ratio', 'econ_yoy'];
+  if (['mtg_pmt', 'rate_amd', 'rate_usd', 'rate_eur'].includes(base) || m.usdNative || (m.nat && !ARMSTAT_NAT.includes(m.nat))) s.add('Central Bank of Armenia');
+  if (['ptoi', 'wage', 'poverty', 'population', 'space', 'built', 'built_total', 'built_yoy', 'house_sales', 'apt_sales'].includes(base) || (m.calc && !m.usdNative) || ARMSTAT_NAT.includes(m.nat)) s.add('Armstat');
   if (m.real) s.add(ui.cur === 'USD' ? 'US inflation: BLS' : 'inflation: Armstat');
   if (m.money && ui.cur === 'USD') s.add('exchange rates: Central Bank of Armenia');
   if (ui.sel?.kind === 'armenia' && base === 'chg12') s.add('Central Bank of Armenia price index');
@@ -1655,7 +1888,9 @@ function wireCharts() {
       const name = c.mlabel || M[ui.metric]?.label || '';
       bub.innerHTML = `<b>${esc(c.yearlyPts ? best[0].slice(0, 4) : monthLabel(best[0]))}</b>` +
         `<div><i style="background:#1e40af"></i>${esc(name)}: <em>${esc(c.fmt(best[1]))}</em>${best[2] === 'est' ? ' <span style="opacity:.7">(estimate)</span>' : ''}</div>` +
-        (xv != null ? `<div><i style="background:#e76f51"></i>${esc(c.xlabel)}: <em>${esc(c.fmt2(xv))}</em></div>` : '');
+        (xv != null ? `<div><i style="background:#e76f51"></i>${esc(c.xlabel)}: <em>${esc(c.fmt2(xv))}</em></div>` : '') +
+        (c.rmap?.[best[0]] != null ? (() => { const fv = c.rmap[best[0]], g = (best[1] / fv - 1) * 100;
+          return `<div><i class="dash-key"></i>${esc(c.rlabel)}: <em>${esc(c.fmt(fv))}</em></div><div style="opacity:.8">Actual is ${Math.abs(g).toFixed(0)}% ${g >= 0 ? 'above' : 'below'}</div>`; })() : '');
       bub.style.display = 'block';
       const wrap = svg.parentElement.getBoundingClientRect(), px = c.X(best[0]) / c.W * r.width + (r.left - wrap.left), py = c.Y(best[1]) / svg.viewBox.baseVal.height * r.height + (r.top - wrap.top);
       bub.style.left = (px + 14 + bub.offsetWidth > wrap.width ? Math.max(0, px - 14 - bub.offsetWidth) : px + 14) + 'px';
@@ -1815,7 +2050,7 @@ function addCmpHit(h) {
 
 // ---------- remembered view (this browser only) ----------
 function saveState() {
-  try { localStorage.setItem('oha-armenia', JSON.stringify({ metric: ui.metric, cur: ui.cur, open: [...ui.open], level: ui.level, with: ui.with || '', axis: ui.axis || 'left', showAvg: ui.showAvg !== false })); } catch (e) { }
+  try { localStorage.setItem('oha-armenia', JSON.stringify({ metric: ui.metric, cur: ui.cur, open: [...ui.open], level: ui.level, with: ui.with || '', axis: ui.axis || 'left', showAvg: ui.showAvg !== false, showFair: ui.showFair !== false })); } catch (e) { }
   const q = new URLSearchParams();
   if (ui.metric !== 'price') q.set('m', ui.metric);
   if (levelsFor(ui.metric).length > 1 && curLevel() !== levelsFor(ui.metric)[0]) q.set('l', curLevel());
@@ -1825,7 +2060,7 @@ function saveState() {
 }
 function loadState() {
   const LV = ['armenia', 'marz', 'district', 'town', 'zone'];
-  try { const s = JSON.parse(localStorage.getItem('oha-armenia') || '{}'); if (M[s.metric]) ui.metric = s.metric; if (s.metric === 'zone_price') { ui.metric = 'price'; ui.level = 'zone'; } if (LV.includes(s.level)) ui.level = s.level; if (s.cur === 'USD') ui.cur = 'USD'; if (M[s.with]) ui.with = s.with; if (s.showAvg === false) ui.showAvg = false; if (s.axis === 'right') ui.axis = 'right'; if (Array.isArray(s.open)) ui.open = new Set(s.open); } catch (e) { }
+  try { const s = JSON.parse(localStorage.getItem('oha-armenia') || '{}'); if (M[s.metric]) ui.metric = s.metric; if (s.metric === 'zone_price') { ui.metric = 'price'; ui.level = 'zone'; } if (LV.includes(s.level)) ui.level = s.level; if (s.cur === 'USD') ui.cur = 'USD'; if (M[s.with]) ui.with = s.with; if (s.showAvg === false) ui.showAvg = false; if (s.showFair === false) ui.showFair = false; if (s.axis === 'right') ui.axis = 'right'; if (Array.isArray(s.open)) ui.open = new Set(s.open); } catch (e) { }
   const q = new URLSearchParams(location.search);
   if (M[q.get('m')]) ui.metric = q.get('m');
   if (q.get('m') === 'zone_price') { ui.metric = 'price'; ui.level = 'zone'; }   // old links to the zone map
@@ -1848,6 +2083,7 @@ Promise.all([fetch('data/armenia.json', { cache: 'no-cache' }).then(r => r.json(
   fetch('data/yerevan_zones.geojson', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null)])
   .then(([data, areas, zones]) => {
     D = data; AREAS = areas;
+    for (const [mid, s] of Object.entries(marzPrices())) if (D.marzes[mid]) D.marzes[mid].price = s;
     ZONES = zones && { ...zones, features: zones.features.filter(f => f.geometry?.coordinates?.some(p => p.length && p[0].length > 3)) };
     // transaction tables can be a month behind the prices (some reports have them only as pictures)
     D.deals_month = lastKey(D.national.deals) || D.latest_month;
