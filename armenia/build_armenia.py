@@ -530,11 +530,28 @@ def by_marz_year(rows, marz_code, year_code="years"):
             out.setdefault(mid, {})[y] = round(r["value"], 2)
     return out
 
+def drop_incomplete_years(by_area, name):
+    """The number of apartments hardly ever falls. When, in some year, at least a third of the places show a drop of
+    more than 5% (as in Armstat's first 2025 tables, where most Yerevan districts lost 90%), that year's table is
+    incomplete, so it is left out everywhere (whole country included) until Armstat corrects it."""
+    years = sorted({y for v in by_area.values() for y in v})
+    bad = set()
+    for prev, y in zip(years, years[1:]):
+        pairs = [(v[prev], v[y]) for v in by_area.values() if v.get(prev) and v.get(y) is not None]
+        if pairs and sum(b < 0.95 * a for a, b in pairs) >= len(pairs) / 3:
+            bad.add(y)
+    if bad:
+        print(f"Armstat {name}: leaving out incomplete year(s) {sorted(bad)}")
+    return {k: {y: x for y, x in v.items() if y not in bad} for k, v in by_area.items()}
+
 def update_armstat():
     """Yearly tables: refreshed at most once a week (they change once a year)."""
     saved = load_json(CACHE / "armstat.json", {})
     needed = ("poverty", "space_per_person", "new_housing_m2", "wage", "population", "house_sales", "apartment_sales",
-              "district_apartments", "inflation", "cpi_index")
+              "district_apartments", "inflation", "cpi_index", "unemployment", "employment_rate", "spending", "new_apartments",
+              "new_apartment_size", "new_buildings", "apartments_stock", "houses_stock", "housing_area", "hotels", "hotel_revenue",
+              "town_apartments", "town_apartment_area", "construction_volume", "construction_cost", "population_year", "migration",
+              "census_homes", "participation", "registrations", "land_sales", "home_gifts", "births", "vacancies", "econ_activity")
     # refresh weekly, or at once when a table was added since the last download
     if saved.get("fetched") and (dt.date.today() - dt.date.fromisoformat(saved["fetched"])).days < 7 and all(k in saved for k in needed) \
             and "armenia" in saved.get("wage", {}):   # (re-download once to add the national wage)
@@ -577,6 +594,88 @@ def update_armstat():
             if name in saved:
                 out[name] = saved[name]
         time.sleep(0.5)
+    # More marz data: jobs, household spending, new construction, housing stock and hotels. Each table lists the marzes
+    # either as their own dimension or inside the indicator's name; the whole-country row is saved as "armenia".
+    norm = lambda s: re.sub(r"\s+", " ", s).strip().lower()
+    C = "3 Industry, Construction, trade and services/31 Construction/IC-co-1-2024.px"
+    extra = {
+        # name: (table, keep this indicator?, where the marz is, is this the whole-country row?)
+        "unemployment": (P + "23 Employment and unemployment/PS-eu-1-2024.px",
+                         lambda s: s.startswith("unemployed- by ra marzes") or s == "unemployment rate, total", "indicators",
+                         lambda s: s == "unemployment rate, total"),
+        "employment_rate": (P + "23 Employment and unemployment/PS-eu-15-2024.px",
+                            lambda s: s.startswith("employment rate-by ra marzes") or s == "employment rate-total", "indicators",
+                            lambda s: s == "employment rate-total"),
+        "spending": (P + "25 Households/PS-hh-1-2022.px",
+                     lambda s: s.startswith("per capita consumer expenditures of the household by marzes"), "indicators",
+                     lambda s: s.endswith("national average")),
+        "new_apartments": (C, lambda s: s == "number of apartments of operated residential buildings - total (number in units)", "marzes", None),
+        "new_apartment_size": (C, lambda s: s == "average space of apartments of operated residential buildings - total (m2)", "marzes", None),
+        "new_buildings": (C, lambda s: s == "number of operated residential buildings - total (number in units)", "marzes", None),
+        "apartments_stock": (P + "26 Housing/261 Bnakfond/PS-hs-bn08.px", lambda s: s == "total", "marzes", None),
+        "houses_stock": (P + "26 Housing/261 Bnakfond/PS-hs-bn29.px", None, "marzes", None),
+        "housing_area": (P + "26 Housing/261 Bnakfond/PS-hs-bn01.px", None, "marzes", None),
+        "hotels": ("4 Transport and tourism/43 Tourism/TT-tu-1-2025.px", lambda s: s.startswith("number of hotels"), "marzes", None),
+        "hotel_revenue": ("4 Transport and tourism/43 Tourism/TT-tu-1-2025.px", lambda s: s.startswith("proceeds"), "marzes", None),
+        "construction_volume": (C, lambda s: s.startswith("volume of constructions-total"), "marzes", None),   # mln drams
+        "participation": (P + "23 Employment and unemployment/PS-eu-7-2024.px",
+                          lambda s: "by ra marzes" in s or s == "labour force participation rate-total", "indicators",   # (Kotayk's label has no space before "-by")
+                          lambda s: s == "labour force participation rate-total"),
+    }
+    for name, (path, keep, marz_code, is_nat) in extra.items():
+        try:
+            rows = px_table(path, lambda c, s, keep=keep: keep is None or c != "indicators" or keep(norm(s)))
+            vals = by_marz_year(rows, marz_code)
+            for r in rows:   # the whole-country row ("Total RA", "National average"…)
+                label = norm(r[marz_code])
+                if (is_nat and is_nat(label)) or label in ("total ra", "total", "republic of armenia"):
+                    y = year_of(r["years"])
+                    if y:
+                        vals.setdefault("armenia", {})[y] = round(r["value"], 2)
+            # Armstat fills the new-construction rows for the whole country only (the marz rows are empty)
+            if name in ("new_apartments", "new_apartment_size", "new_buildings") and "armenia" in vals:
+                vals = {"armenia": vals["armenia"]}
+            elif len([k for k in vals if k != "armenia"]) < 10:
+                raise ValueError(f"only {len(vals)} areas found")
+            out[name] = {k: dict(sorted(v.items())) for k, v in vals.items()}
+            print(f"Armstat {name}: {len(vals)} areas, years {min(min(v) for v in vals.values())}-{max(max(v) for v in vals.values())}")
+        except Exception as e:
+            notice(f"Armenia: Armstat table '{name}' ({path}) failed: {e}. The saved copy is used.")
+            if name in saved:
+                out[name] = saved[name]
+        time.sleep(0.5)
+    # Apartments in apartment buildings, and their total floor area, by town ("urban areas"; Armstat spells some
+    # names differently from the map)
+    TOWN_ALIAS = {"aktala": "akhtala", "charencavan": "charentsavan", "eghegnadzor": "yeghegnadzor", "eghvard": "yeghvard",
+                  "nor-hachn": "nor hachn", "qajaran": "kajaran", "tshambarak": "chambarak", "vayq": "vayk",
+                  "vagharshapat": "vagharshapat (etchmiadzin)"}
+    town_by_name = {t["en"].strip().lower(): t["id"] for t in PLACES["towns"]}
+    for name, table in (("town_apartments", "PS-hs-bn09.px"), ("town_apartment_area", "PS-hs-bn12.px")):
+        try:
+            rows = px_table(P + "26 Housing/261 Bnakfond/" + table, lambda c, s: True)
+            vals = {}
+            for r in rows:
+                nm = r["urban areas"].strip().lower()
+                tid = town_by_name.get(TOWN_ALIAS.get(nm, nm))
+                y = year_of(r["years"])
+                if tid and y:
+                    vals.setdefault(tid, {})[y] = round(r["value"], 1)
+            if len(vals) < 40:
+                raise ValueError(f"only {len(vals)} towns matched")
+            # The housing stock barely moves year to year; a year that drops by more than 30% (some towns' early
+            # 2025 figures) is a reporting gap, not real, so it is left out.
+            for tid, v in vals.items():
+                ys = sorted(v)
+                for a, b2 in zip(ys, ys[1:]):
+                    if v.get(a) and v[b2] < 0.7 * v[a]:
+                        v[b2] = None
+                vals[tid] = {y: x for y, x in v.items() if x is not None}
+            out[name] = {k: dict(sorted(v.items())) for k, v in vals.items()}
+            print(f"Armstat {name}: {len(vals)} towns")
+        except Exception as e:
+            notice(f"Armenia: Armstat town table '{name}' failed: {e}. The saved copy is used.")
+            if name in saved:
+                out[name] = saved[name]
     # Apartments in apartment buildings by Yerevan district
     try:
         rows = px_table(P + "26 Housing/261 Bnakfond/PS-hs-bn20.px", lambda c, t: True)
@@ -636,6 +735,161 @@ def update_armstat():
         notice(f"Armenia: Armstat month-on-month CPI table failed: {e}")
         if "cpi_index" in saved:
             out["cpi_index"] = saved["cpi_index"]
+    # Construction prices (Armstat), each month vs the month before -> a price level, January 2010 = 100
+    try:
+        rows = px_table("1 Econnomy and finance/16 Producer Prices/165 CPI/EF-PP-CPI-1.px",
+                        lambda c, t: c != "indicators" or t.strip() == "Construction price index")
+        months = {n: i + 1 for i, n in enumerate(["January", "February", "March", "April", "May", "June", "July",
+                                                  "August", "September", "October", "November", "December"])}
+        mm = {}
+        for r in rows:
+            mo, y = months.get(r["months"].strip()), year_of(r["years"])
+            if mo and y and r["value"] > 0:
+                mm[f"{y}-{mo:02d}"] = r["value"]
+        level, lv = {}, 100.0
+        for ym in sorted(k for k in mm if k >= "2010-02"):
+            lv *= mm[ym] / 100
+            level[ym] = round(lv, 2)
+        if len(level) < 120:
+            raise ValueError(f"only {len(level)} months")
+        out["construction_cost"] = {"2010-01": 100.0, **level}
+        print(f"Armstat construction prices: {len(level)} months, latest {max(level)}")
+    except Exception as e:
+        notice(f"Armenia: Armstat construction price table failed: {e}")
+        if "construction_cost" in saved:
+            out["construction_cost"] = saved["construction_cost"]
+    # Population at the start of each year (thousands -> people; "2022¹" = the census count, preferred) and migration
+    try:
+        rows = px_table(P + "28 Population/PS-pp-7-2025.px", lambda c, t: c != "indicators" or t.startswith("Total Population"))
+        pop = {}
+        for r in sorted(rows, key=lambda r: "¹" in r["years"]):   # the census row last, so it wins
+            y = year_of(r["years"])
+            if y and int(y) >= 2000:
+                pop[y] = round(r["value"] * 1000)
+        out["population_year"] = dict(sorted(pop.items()))
+        rows = px_table(P + "28 Population/PS-pp-13-2025.px", lambda c, t: True)
+        mig = {}
+        for r in rows:
+            t, y = r["indicators"].strip().lower(), year_of(r["years"])
+            k = "arrived" if t.startswith("ra- total -arrived") else "departed" if t.startswith("ra- total- departed") else "net" if t.startswith("net migration") else None
+            if k and y:
+                mig.setdefault(k, {})[y] = round(r["value"])
+        if not mig.get("net"):
+            raise ValueError("no net migration rows")
+        out["migration"] = mig
+        print(f"Armstat population {max(pop)}: {pop[max(pop)]:,}; net migration {max(mig['net'])}: {mig['net'][max(mig['net'])]:,}")
+    except Exception as e:
+        notice(f"Armenia: Armstat population/migration tables failed: {e}")
+        for k in ("population_year", "migration"):
+            if k in saved:
+                out[k] = saved[k]
+    # Homes in the 2022 census (whole country, towns and villages): household size, water, bath, heating, ownership
+    try:
+        C22 = P + "20 Census/"
+        homes = {}
+        def census(table, keep_label):
+            m = px_meta(C22 + table)
+            area, item, last = (v["code"] for v in m["variables"])
+            rows = px_table(C22 + table, lambda c, t: c != last or t.strip() in ("Total",))
+            got = {}
+            for r in rows:
+                a = {"RA": "armenia", "Urban": "urban", "Rural": "rural"}.get(r[area].strip())
+                if a:
+                    got.setdefault(a, {})[r[item].strip()] = r["value"]
+            return got
+        size = census("PS-pp-7.1.px", None)
+        for a, v in size.items():
+            n = sum(v.get(f"{k} person", 0) * k for k in range(1, 10)) + v.get("10+ person", 0) * 10.5
+            homes.setdefault(a, {})["households"] = round(v["Total"])
+            homes[a]["household_size"] = round(n / v["Total"], 2)
+        share = lambda v, pred: round(100 * sum(x for k, x in v.items() if pred(k)) / v["Total"], 1)
+        for a, v in census("PS-pp-8.4-1.px", None).items():
+            homes[a]["water_inside"] = share(v, lambda k: k.startswith("Central water supply in the housing unit"))
+        for a, v in census("PS-pp-8.8-1.px", None).items():
+            homes[a]["bath_inside"] = share(v, lambda k: k.startswith("Fixed bath or shower in the housing unit"))
+        for a, v in census("PS-pp-8.9-1.px", None).items():
+            homes[a]["heat_gas_electric"] = share(v, lambda k: k.startswith("Individual heating system running on natural gas") or k in ("Gas furnace", "Electric heater"))
+            homes[a]["heat_wood"] = share(v, lambda k: "wood" in k.lower() or "biofuel" in k.lower())
+            homes[a]["heat_central"] = share(v, lambda k: k == "Central heating")
+            homes[a]["heat_none"] = share(v, lambda k: k == "Has no main heating")
+        for a, v in census("PS-pp-8.11.px", None).items():
+            homes[a]["owned"] = share(v, lambda k: k == "Owned by H/H members")
+            homes[a]["rented_other"] = share(v, lambda k: k == "Other person/s")
+        out["census_homes"] = homes
+        print(f"Armstat 2022 census homes: {homes.get('armenia')}")
+    except Exception as e:
+        notice(f"Armenia: Armstat census housing tables failed: {e}")
+        if "census_homes" in saved:
+            out["census_homes"] = saved["census_homes"]
+    # Property registrations at the Cadastre (Armstat, yearly): rentals, mortgages (pledges), inheritance… for the
+    # whole country; by marz, land sales and homes given as gifts
+    try:
+        S = P + "26 Housing/262 Shuka/"
+        reg = {}
+        for r in px_table(S + "PS-hs-rem01.px", lambda c, t: True):
+            k = {"alienation": "alienation", "rent": "rent", "pledge": "pledge", "inheritance": "inheritance", "total": "total"}.get(r["indicators"].strip().lower())
+            y = year_of(r["years"])
+            if k and y:
+                reg.setdefault(k, {})[y] = round(r["value"])
+        if not reg.get("rent"):
+            raise ValueError("no rent rows")
+        out["registrations"] = reg
+        def by_type(table, types):
+            vals = {}
+            for r in px_table(S + table, lambda c, t: c != "type of transaction" or t.strip() in types):
+                label = r["marzes"].strip()
+                mid = "armenia" if label.lower() == "total ra" else marz_from_english(label)
+                y = year_of(r["years"])
+                if mid and y:
+                    vals.setdefault(mid, {})[y] = vals.get(mid, {}).get(y, 0) + round(r["value"])
+            if len(vals) < 12:
+                raise ValueError(f"only {len(vals)} areas in {table}")
+            return {k: dict(sorted(v.items())) for k, v in vals.items()}
+        out["land_sales"] = by_type("PS-hs-rem03.px", ("Lands (including agricultural purposes)",))
+        out["home_gifts"] = by_type("PS-hs-rem04.px", ("Apartments in multi-apartment buildings", "Residential houses (apartments)"))
+        print(f"Armstat registrations {max(reg['rent'])}: rentals {reg['rent'][max(reg['rent'])]:,}, mortgages {reg['pledge'][max(reg['pledge'])]:,}")
+    except Exception as e:
+        notice(f"Armenia: Armstat real-estate registration tables failed: {e}")
+        for k in ("registrations", "land_sales", "home_gifts"):
+            if k in saved:
+                out[k] = saved[k]
+    # Births and natural increase (whole country), job vacancies, and the monthly economic activity index
+    try:
+        b_ = {}
+        for r in px_table(P + "28 Population/PS-pp-5-2025.px", lambda c, t: (c != "urban/rural distridution" or t.strip() == "Total Population")
+                          and (c != "indicators" or t.startswith("Births, total") or t.startswith("Natural increase, total"))):
+            y = year_of(r["years"])
+            if y:
+                b_.setdefault("births" if r["indicators"].startswith("Births") else "natural_increase", {})[y] = round(r["value"])
+        out["births"] = b_
+        v_ = {}
+        for r in px_table(P + "23 Employment and unemployment/PS-eu-21-2024.px",
+                          lambda c, t: c != "indicators" or t.startswith("Number of job vacancies -Total") or t.startswith("Job vacancies ratio on the number of jobs - Total")):
+            y = year_of(r["years"])
+            if y:
+                if r["indicators"].startswith("Number"):
+                    v_.setdefault("count", {})[y] = round(r["value"] * 1000)
+                else:
+                    v_.setdefault("ratio", {})[y] = r["value"]
+        out["vacancies"] = v_
+        months = {n: i + 1 for i, n in enumerate(["January", "February", "March", "April", "May", "June", "July",
+                                                  "August", "September", "October", "November", "December"])}
+        ea = {}
+        for r in px_table("1 Econnomy and finance/15 National Accounts/EF-NA-01.px",
+                          lambda c, t: c != "indicators" or t.startswith("To the same month of previous year")):
+            mo, y = months.get(r["months"].strip()), year_of(r["years"])
+            if mo and y:
+                ea[f"{y}-{mo:02d}"] = round(r["value"] - 100, 2) if r["value"] > 50 else r["value"]   # (index, previous year = 100)
+        out["econ_activity"] = dict(sorted(ea.items()))
+        print(f"Armstat births {max(b_['births'])}: {b_['births'][max(b_['births'])]:,}; vacancies {max(v_['count'])}: {v_['count'][max(v_['count'])]:,}; activity latest {max(ea)}: {ea[max(ea)]}%")
+    except Exception as e:
+        notice(f"Armenia: Armstat births/vacancies/economic activity tables failed: {e}")
+        for k in ("births", "vacancies", "econ_activity"):
+            if k in saved:
+                out[k] = saved[k]
+    for k in ("apartments_stock", "district_apartments", "town_apartments", "town_apartment_area"):
+        if k in out:
+            out[k] = drop_incomplete_years(out[k], k)
     save_json(CACHE / "armstat.json", out, pretty=True)
     return out
 
@@ -896,6 +1150,72 @@ def update_rppi():
         out[key] = series
     return out
 
+CBA_EXT = "https://www.cba.am/file_manager/Statistics_reports/ExtSector/"
+MONTH_NO = {n: i + 1 for i, n in enumerate(["january", "february", "march", "april", "may", "june", "july", "august",
+                                            "september", "october", "november", "december"])}
+
+def monthly_blocks(rows):
+    """The CBA's money-transfer sheets: a row of years, a row of month names, then for each month six columns
+    (inflow, outflow, net inflow, then the same "of which" through fast money-transfer systems or non-commercial).
+    Returns {column of the month's first value: "YYYY-MM"}."""
+    mi = next(i for i, r in enumerate(rows) if sum(1 for v in r if isinstance(v, str) and v.strip().lower() in MONTH_NO) >= 6)
+    years, months = rows[mi - 1], rows[mi]
+    cols, year = {}, None
+    for c, v in enumerate(months):
+        y = years[c] if c < len(years) else None
+        if isinstance(y, float) and 2000 < y < 2100:
+            year = int(y)
+        if isinstance(v, str) and v.strip().lower() in MONTH_NO and year:
+            cols[c] = f"{year}-{MONTH_NO[v.strip().lower()]:02d}"
+    return mi, cols
+
+def update_remittances():
+    num = lambda v: v if isinstance(v, float) else None
+    # whole country, by sending country
+    rows = xlsx_rows(fetch(CBA_EXT + urllib.parse.quote("5_Money_transfers_of_individuals_by_countries-eng.xlsx")), "monthly in USD")
+    mi, cols = monthly_blocks(rows)
+    nat = {"in": {}, "out": {}, "net": {}, "russia": {}, "usa": {}}
+    for r in rows[mi + 1:]:
+        label = str((r[0] if r else "") or "").strip().lower()
+        key = "total" if label == "total" else "russia" if label.startswith("russia") else "usa" if label in ("usa", "united states") else None
+        if not key:
+            continue
+        for c, ym in cols.items():
+            vin, vout = num(r[c]) if c < len(r) else None, num(r[c + 1]) if c + 1 < len(r) else None
+            if vin is None:
+                continue
+            if key == "total":
+                nat["in"][ym] = round(vin / 1000, 2)
+                if vout is not None:
+                    nat["out"][ym] = round(vout / 1000, 2)
+                    nat["net"][ym] = round((vin - vout) / 1000, 2)
+            else:
+                nat[key][ym] = round(vin / 1000, 2)
+    if len(nat["in"]) < 60:
+        raise ValueError(f"only {len(nat['in'])} months in the by-country file")
+    # by marz: all transfers, and the part sent through fast money-transfer systems (closest to family remittances)
+    rows = xlsx_rows(fetch(CBA_EXT + urllib.parse.quote("Statistics of individual transfers by region_eng.xlsx")), "monthly (in USD)")
+    mi, cols = monthly_blocks(rows)
+    marz = {}
+    for r in rows[mi + 1:]:
+        label = re.sub(r"^\d+\.", "", str((r[0] if r else "") or "")).strip()
+        mid = "armenia" if label.lower() == "total" else marz_from_english(label)
+        if not mid:
+            continue
+        for c, ym in cols.items():
+            v = [num(r[c + j]) if c + j < len(r) else None for j in range(6)]
+            if v[0] is None:
+                continue
+            d = marz.setdefault(mid, {"in": {}, "net": {}, "fast_in": {}})
+            d["in"][ym] = round(v[0] / 1000, 3)
+            if v[2] is not None:
+                d["net"][ym] = round(v[2] / 1000, 3)
+            if v[3] is not None:
+                d["fast_in"][ym] = round(v[3] / 1000, 3)
+    if len([k for k in marz if k != "armenia"]) < 11:
+        raise ValueError(f"only {len(marz)} areas in the by-region file")
+    return nat, marz
+
 def update_cba():
     saved = load_json(CACHE / "cba.json", {})
     out = dict(saved)
@@ -972,38 +1292,78 @@ def update_cba():
         print(f"CBA policy rate: {len(changes)} changes, latest {changes[-1]}")
     except Exception as e:
         notice(f"Armenia: CBA policy-rate file failed: {e}")
-    # AMD per USD, monthly average of the official daily rate (web service built for websites)
-    usd = dict(saved.get("usd", {}))
+    # Money sent to and from abroad by individuals through Armenian banks (thousand USD -> million USD, by month):
+    # the whole country (and from Russia and the USA), from 2013; and by marz, from 2024
+    try:
+        out["remit"], out["remit_marz"] = update_remittances()
+        print(f"CBA money transfers: {len(out['remit']['in'])} months, latest {max(out['remit']['in'])}; by marz {len(out['remit_marz'])} areas")
+    except Exception as e:
+        notice(f"Armenia: CBA money-transfer files failed: {e}")
+    # Interest rates on new bank deposits (% a year, by month): up to 1 year and over 1 year, in drams and dollars
+    try:
+        rows = xlsx_rows(fetch("https://www.cba.am/file_manager/Statistics_reports/mfs/11_Deposit_rates_eng.xlsx"))
+        head = next(r for r in rows if r and len(r) > 15 and isinstance(r[1], str) and r[1].startswith("Average deposit rate"))
+        over = next(i for i, h in enumerate(head) if isinstance(h, str) and h.strip().lower().startswith("over 1 year"))
+        dep = {"amd": {}, "usd": {}, "amd_long": {}, "usd_long": {}}
+        for r in rows:
+            if not r or not isinstance(r[0], float) or r[0] < 30000:
+                continue
+            ym = (dt.date(1899, 12, 30) + dt.timedelta(days=int(r[0]) - 1)).strftime("%Y-%m")   # (dates are month ends)
+            for k, c in (("amd", 1), ("usd", 2), ("amd_long", over), ("usd_long", over + 1)):
+                if c < len(r) and isinstance(r[c], float):
+                    dep[k][ym] = round(r[c], 2)
+        if len(dep["amd"]) < 120:
+            raise ValueError(f"only {len(dep['amd'])} months")
+        out["deposit_rate"] = dep
+        print(f"CBA deposit rates: {len(dep['amd'])} months, latest {max(dep['amd'])}: {dep['amd'][max(dep['amd'])]}% in drams")
+    except Exception as e:
+        notice(f"Armenia: CBA deposit-rate file failed: {e}")
+    # AMD per USD, EUR and RUB, monthly average of the official daily rate (web service built for websites)
+    rates_saved = {c: dict(saved.get(c, {})) for c in ("usd", "eur", "rub")}
     this_month = dt.date.today().strftime("%Y-%m")
     start = "2018-01"
     ym = start
     fetched = 0
     while ym <= this_month:
-        if ym not in usd or ym >= month_add(this_month, -1):
+        if any(ym not in rates_saved[c] for c in rates_saved) or ym >= month_add(this_month, -1):
             y, m = int(ym[:4]), int(ym[5:])
             last = (dt.date(y + (m == 12), m % 12 + 1, 1) - dt.timedelta(days=1))
             body = f"""<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-<soap:Body><ExchangeRatesByDateRangeByISO xmlns="http://www.cba.am/"><ISOCodes>USD</ISOCodes>
+<soap:Body><ExchangeRatesByDateRangeByISO xmlns="http://www.cba.am/"><ISOCodes>USD,EUR,RUB</ISOCodes>
 <DateFrom>{ym}-01</DateFrom><DateTo>{last.isoformat()}</DateTo></ExchangeRatesByDateRangeByISO></soap:Body></soap:Envelope>"""
             try:
                 x = fetch("https://api.cba.am/exchangerates.asmx", data=body.encode(),
                           headers={"Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"http://www.cba.am/ExchangeRatesByDateRangeByISO"'})
-                rates = [float(t) for t in re.findall(rb"<Rate>([\d.]+)</Rate>", x)]
-                if rates:
-                    usd[ym] = round(sum(rates) / len(rates), 2)
+                got = {}
+                for rec in re.findall(rb"<ExchangeRatesByRange\b.*?</ExchangeRatesByRange>", x, re.S):
+                    r_ = re.search(rb"<Rate>([\d.]+)</Rate>", rec)
+                    a_ = re.search(rb"<Amount>(\d+)</Amount>", rec)
+                    iso = re.search(rb"<ISO>(\w+)\s*</ISO>", rec)
+                    if r_ and iso:
+                        got.setdefault(iso.group(1).decode().lower(), []).append(float(r_.group(1)) / (int(a_.group(1)) if a_ else 1))
+                for c, v in got.items():
+                    if c in rates_saved and v:
+                        rates_saved[c][ym] = round(sum(v) / len(v), 4 if c == "rub" else 2)
                 fetched += 1
                 time.sleep(0.3)
             except Exception as e:
                 notice(f"Armenia: CBA exchange rate for {ym} failed: {e}")
                 break
         ym = month_add(ym, 1)
-    out["usd"] = dict(sorted(usd.items()))
-    print(f"CBA AMD/USD: {len(usd)} months (fetched {fetched}), latest {max(usd) if usd else None}")
+    for c, v in rates_saved.items():
+        out[c] = dict(sorted(v.items()))
+    usd = out["usd"]
+    print(f"CBA AMD/USD, EUR, RUB: {len(usd)} months (fetched {fetched}), latest {max(usd) if usd else None}")
     save_json(CACHE / "cba.json", out, pretty=True)
     return out
 
 # ---------------------------------------------------------------- output
+# the newer marz data (Armstat), passed through to the map for each marz and for the whole country
+MARZ_EXTRA = ("unemployment", "employment_rate", "spending", "new_apartments", "new_apartment_size", "new_buildings",
+              "apartments_stock", "houses_stock", "housing_area", "hotels", "hotel_revenue", "construction_volume",
+              "participation", "land_sales", "home_gifts")
+
 def build(max_reports):
     OUT.mkdir(parents=True, exist_ok=True)
     try:
@@ -1039,20 +1399,28 @@ def build(max_reports):
     for t in PLACES["towns"]:
         i = t["id"]
         data["towns"][i] = {"hy": t["hy"], "en": t["en"], "marz": t["marz"], "lat": t["lat"], "lon": t["lon"],
-                            "price": series.get("town_price", {}).get(i, {})}
+                            "price": series.get("town_price", {}).get(i, {}),
+                            "apartments": armstat.get("town_apartments", {}).get(i, {}), "apartment_area": armstat.get("town_apartment_area", {}).get(i, {})}
     for m in PLACES["marzes"]:
         i = m["id"]
         data["marzes"][i] = {"hy": m["hy"], "en": m["en"],
                              "deals": series.get("marz_deals", {}).get(i, {}), "sales": series.get("marz_sales", {}).get(i, {}),
-                             **{k: armstat.get(k, {}).get(i, {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales")}}
+                             "remit": cba.get("remit_marz", {}).get(i, {}),
+                             **{k: armstat.get(k, {}).get(i, {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales", *MARZ_EXTRA)}}
     data["national"] = {
         "usd": cba.get("usd", {}), "mortgage": cba.get("mortgage", {}), "policy_rate": cba.get("policy_rate", []),
         "mortgage_rate": cba.get("mortgage_rate", {}), "longterm_rate": cba.get("longterm_rate", {}),
         "rppi": cba.get("rppi", {}),
         "cpi_am": armstat.get("cpi_index", {}), "cpi_us": us_cpi_index(), "money": cba.get("money", {}),
         "inflation": armstat.get("inflation", {}),
+        "eur": cba.get("eur", {}), "rub": cba.get("rub", {}), "remit_all": cba.get("remit", {}),
+        "remit": cba.get("remit_marz", {}).get("armenia", {}),
+        "construction_cost": armstat.get("construction_cost", {}), "population_year": armstat.get("population_year", {}),
+        "migration": armstat.get("migration", {}), "census_homes": armstat.get("census_homes", {}),
+        "registrations": armstat.get("registrations", {}), "births": armstat.get("births", {}), "vacancies": armstat.get("vacancies", {}),
+        "econ_activity": armstat.get("econ_activity", {}), "deposit_rate": cba.get("deposit_rate", {}),
         "deals": series.get("marz_deals", {}).get("armenia", {}), "sales": series.get("marz_sales", {}).get("armenia", {}),
-        **{k: armstat.get(k, {}).get("armenia", {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales")},
+        **{k: armstat.get(k, {}).get("armenia", {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales", *MARZ_EXTRA)},
     }
     save_json(OUT / "armenia.json", data)
     shutil.copyfile(STATIC / "areas.geojson", OUT / "areas.geojson")
