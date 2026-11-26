@@ -179,6 +179,14 @@
   .pick-tip { font-size: 12px; }
   .zip-loading { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); z-index: 520; background: var(--text); color: #fff; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; display: none; }
   .zip-loading.show { display: block; }
+  /* "Find my location" button: a blue round button inside the right end of the place search box */
+  .place-search input { padding-right: 52px; }
+  .place-search input::-webkit-search-cancel-button { display: none; }
+  .locate-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border-radius: 50%; border: 0; background: #1e40af; color: #fff; display: grid; place-items: center; cursor: pointer; padding: 0; }
+  .locate-btn:hover { background: #1e3a8a; }
+  .locate-btn.busy svg { animation: locspin 1.1s linear infinite; }
+  @keyframes locspin { to { transform: rotate(360deg); } }
+  .locate-dot { width: 16px; height: 16px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(37, 99, 235, .25); }
   .brand h1, .legend h3, .drawer header h2, .sec h4, .tv-head h3, .kpi b { letter-spacing: -0.01em; }
   .tip { position: absolute; z-index: 600; pointer-events: none; background: #1d1b17; color: #f4eee4; border-radius: 10px; padding: 9px 11px; font-size: 12.5px; min-width: 190px; box-shadow: 0 10px 24px rgba(0, 0, 0, .3); display: none; }
   .tip b { display: block; font-size: 13.5px; margin-bottom: 4px; }
@@ -509,6 +517,7 @@
       <div class="place-search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input id="placeSearch" type="search" placeholder="City, county, metro, state or ZIP" autocomplete="off" aria-label="Search places">
+        <button type="button" class="locate-btn" id="locateBtn" title="Show the ZIP code I'm in" aria-label="Show the ZIP code I'm in"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></button>
         <div class="results" id="results"></div>
       </div>
       <div class="seg" id="levels" role="tablist" aria-label="Map level">
@@ -525,6 +534,7 @@
     <div class="zip-hint" id="zipHint"><b>Pick a county to see its ZIP codes</b><span>Click any county on the map, or search a county or ZIP code above.</span></div>
     <div class="zip-banner" id="zipBanner"></div>
     <div class="zip-loading" id="zipLoading">Loading ZIP codes…</div>
+    <div class="zip-loading" id="locateMsg"></div>
     <div class="tip" id="tip"></div>
     <section class="table-view" id="rankView" aria-label="Rankings">
       <div class="tv-head"><h3 id="rankTitle">Rankings</h3><select id="rankPick" aria-label="Ranking"></select><button class="x" id="rankClose" type="button" aria-label="Close rankings">✕</button></div>
@@ -842,13 +852,35 @@ const dataId = (level, id) => level === 'county' && CT_OLD_TO_NEW[id] ? CT_OLD_T
 // Data points with no data anywhere yet (e.g. survey data before a Census key is added) are left out of the lists.
 const HAS = new Set();
 const hasData = k => !HAS.size || HAS.has(k);
+// The data points one map level has (US, states, metros, counties or ZIP codes): the Data list and the place
+// panel's data point menus only show these, so every choice colours the map you are looking at.
+const LEVEL_HAS = {};
+function levelHas(k, level = ui.level) {
+  if (!HAS.size) return true;
+  if (!HAS.has(k)) return false;
+  if (k === 'afford' || (M[k] && M[k].national)) return true; // your budget, and nationwide figures: every level
+  let s = LEVEL_HAS[level];
+  if (!s) {
+    s = new Set();
+    if (level === 'zip') for (const x in D.meta.zipBreaks || {}) s.add(x); // (ZIP data loads one state at a time)
+    else for (const p of Object.values(D[level] || {})) for (const x in p.v) if (p.v[x] != null) s.add(x);
+    if (!s.size) return true; // (level not loaded)
+    LEVEL_HAS[level] = s;
+  }
+  return s.has(k);
+}
+// Moving to a level that lacks the chosen data point: switch to one it has (home value growth if possible).
+function fitMetricToLevel() {
+  if (levelHas(ui.metric)) return;
+  ui.metric = ['hv_yoy', 'hv', 'rent', 'income'].find(k => levelHas(k)) || GROUPS.flatMap(g => g[1]).find(k => levelHas(k)) || ui.metric;
+}
 function renderGroups() {
   const q = document.getElementById('dpSearch').value.trim().toLowerCase();
   const start = ''; // (the "Start here" quick buttons were removed; "What can I afford?" is the button on the map)
   // Each section has its own radio group, so a data point listed in two sections (e.g. Typical rent under
   // For investors and in Start here) shows as selected everywhere.
   document.getElementById('groups').innerHTML = start + (GROUPS.map(([name, keys, ic], gi) => {
-    const list = keys.filter(k => hasData(k) && (!q || M[k].l.toLowerCase().includes(q)));
+    const list = keys.filter(k => levelHas(k) && (!q || M[k].l.toLowerCase().includes(q)));
     if (!list.length) return '';
     const open = q || ui.open.has(name);
     const here = list.includes(ui.metric) ? ' <i class="dot" aria-label="selected here"></i>' : '';
@@ -1117,6 +1149,8 @@ function setLevel(level) {
   if (level === 'us' && time.on) stopTime(); // Over time is for comparing places
   const wasUS = ui.level === 'us';
   ui.level = level;
+  fitMetricToLevel();
+  renderGroups();
   document.querySelectorAll('#levels button').forEach(b => b.classList.toggle('on', b.dataset.level === level));
   for (const [k, l] of Object.entries(layers)) {
     if (k === 'stateLines') continue;
@@ -1428,6 +1462,46 @@ function zoomTo(level, id) {
   map.flyToBounds(bounds, { maxZoom: level === 'state' ? 6 : level === 'zip' ? 9 : 7.5, paddingTopLeft: [wide ? pw + 40 : 40, wide ? 80 : 120], paddingBottomRight: wide ? [40, 40] : [40, innerHeight * 0.6] });
 }
 
+// ---------- "Find my location": opens the ZIP code you are in ----------
+// Your position never leaves the browser: it is only matched against the map's own county and ZIP shapes.
+function inShape(g, x, y) {
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+  return polys.some(p => inRing(x, y, p[0]) && !p.slice(1).some(h => inRing(x, y, h)));
+}
+const locateBtn = document.getElementById('locateBtn'), locateMsg = document.getElementById('locateMsg');
+let locateDot = null, locateTimer;
+function locateSay(t, ms = 4500) {
+  locateMsg.textContent = t; locateMsg.classList.toggle('show', !!t); clearTimeout(locateTimer);
+  if (t && ms) locateTimer = setTimeout(() => locateMsg.classList.remove('show'), ms);
+}
+locateBtn.addEventListener('click', () => {
+  if (!navigator.geolocation) return locateSay('This browser can’t share your location.');
+  if (!layers.county) return;
+  locateBtn.classList.add('busy'); locateSay('Finding your location…', 0);
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const { latitude: y, longitude: x } = pos.coords;
+    locateSay('');
+    try {
+      if (locateDot) map.removeLayer(locateDot);
+      locateDot = L.marker([y, x], { interactive: false, keyboard: false, icon: L.divIcon({ className: '', iconSize: [16, 16], html: '<div class="locate-dot"></div>' }) }).addTo(map);
+      let county = null;
+      layers.county.eachLayer(l => { if (!county && inShape(l.feature.geometry, x, y)) county = dataId('county', l.feature.id); });
+      if (!county || !D.county[county]) { locateSay('You seem to be outside the US, so there’s no ZIP code to show.'); map.flyTo([y, x], 6); return; }
+      const st = abbrOf(county.slice(0, 2));
+      const ok = st && await loadZipState(st);
+      const f = ok && zipFeats[st].find(f => D.zip[f.id] && inShape(f.geometry, x, y));
+      if (f) { locateSay(''); pick({ level: 'zip', id: f.id, st, label: placeName('zip', D.zip[f.id]) }); }
+      else { // no ZIP code covers this exact spot (parks, water, open land): show the county's ZIP codes instead
+        locateSay(`No ZIP code covers this exact spot, so here are the ZIP codes in ${D.county[county].n}.`, 6000);
+        await setZipFocus(county);
+      }
+    } finally { locateBtn.classList.remove('busy'); }
+  }, err => {
+    locateBtn.classList.remove('busy');
+    locateSay(err.code === 1 ? 'Location is blocked for this site. Allow it in your browser’s settings, then tap again.' : 'Couldn’t get your location. Try again in a moment.', 6500);
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+});
+
 // ---------- detail drawer ----------
 let openPlace = null, hist = null, chartRange = 'all';
 // The "N ZIP codes in …" banner sits just below the buttons along the top of the map, however many rows they wrap onto.
@@ -1714,7 +1788,8 @@ function renderDrawer() {
   const series = hist ? seriesFor(k, hist, p) : null;
   const skeys = series ? Object.keys(series).sort() : [];
   const annual = skeys.length && skeys[0].length === 4;
-  const options = GROUPS.filter(([g, keys]) => keys.some(hasData)).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].filter(hasData).map(x => `<option value="${x}" ${x === k ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('');
+  const here = x => levelHas(x, level);
+  const options = GROUPS.filter(([g, keys]) => keys.some(here)).map(([g, keys]) => `<optgroup label="${esc(g)}">${[...new Set(keys)].filter(here).map(x => `<option value="${x}" ${x === k ? 'selected' : ''}>${esc(M[x].l)}</option>`).join('')}</optgroup>`).join('');
   const tile = x => `<button type="button" class="kpi ${x === k ? 'on' : ''}" data-metric="${x}"><span>${esc(M[x].l)}</span><b>${fmtV(x, v[x])}</b></button>`;
   // Yearly data points (Census, mortgages…) have one value a year, so the Yearly/Monthly switch only shows for monthly data.
   const toggles = `<div class="chart-ctrl">${annual ? '<span class="note" style="margin:0">One value per year</span>' : `<div class="seg-sm">${[['yearly', 'By year'], ['monthly', 'By month']].map(([m, l]) => `<button type="button" class="${chartMode === m ? 'on' : ''}" data-cmode="${m}">${l}</button>`).join('')}</div>`}
@@ -1813,7 +1888,7 @@ function openPicker(btn, mode) {
 function fillPicker(q) {
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean), cur = ui.metric;
   const html = GROUPS.map(([g, keys]) => {
-    const items = [...new Set(keys)].filter(x => hasData(x) && (dpMode === 'main' || x !== cur))
+    const items = [...new Set(keys)].filter(x => levelHas(x, openPlace ? openPlace.level : ui.level) && (dpMode === 'main' || x !== cur))
       .filter(x => { const t = (M[x].l + ' ' + g).toLowerCase(); return words.every(w => t.includes(w)); });
     return items.length ? `<div class="dp-g">${esc(g)}</div>` + items.map(x => `<button type="button" class="dp-o ${x === (dpMode === 'main' ? cur : overlayKey) ? 'on' : ''}" data-pick-k="${x}" role="option">${esc(M[x].l)}</button>`).join('') : '';
   }).join('');
