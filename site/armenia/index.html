@@ -481,6 +481,16 @@ const METRICS = [
     info: 'The part of the money received from abroad that came through fast money-transfer systems, the usual way family remittances arrive (Central Bank of Armenia, by marz from 2024).' },
   { id: 'remit_pp', calc: true, usdNative: true, group: 'Money from abroad', label: 'Money received through transfer systems, per person (month)', level: 'Armenia · marz', money: true, rel: 'month',
     info: 'Money received from abroad through fast money-transfer systems in the month, divided by the marz\'s population (2022 census). It shows where family remittances matter most.' },
+  // schools and health care, per head (Armstat counts by marz; each year's population worked out from Armstat's
+  // pensioner figures, since it publishes no yearly population by marz)
+  { id: 'schools_pc', calc: true, group: 'Schools and health care', label: 'Schools per 10,000 people', level: 'Armenia · marz', dec: 1, yearly: true, rel: 'year',
+    info: 'General schools (state and private) per 10,000 residents, by marz (Armstat). Rural marzes have many small village schools, so a higher number does not always mean bigger or better schools. Population for each year is worked out from Armstat\'s pensioner figures.' },
+  { id: 'kinder_pc', calc: true, group: 'Schools and health care', label: 'Kindergarten places per 1,000 people', level: 'Armenia · marz', dec: 1, yearly: true, rel: 'year',
+    info: 'Places in kindergartens and nurseries (state and private) per 1,000 residents, by marz (Armstat). A sign of how easy it is to find childcare.' },
+  { id: 'beds_pc', calc: true, group: 'Schools and health care', label: 'Hospital beds per 1,000 people', level: 'Armenia · marz', dec: 1, yearly: true, rel: 'year',
+    info: 'Hospital beds per 1,000 residents, by marz (Armstat). Most large hospitals are in Yerevan, which also treats patients from the rest of the country.' },
+  { id: 'doctors_pc', calc: true, group: 'Schools and health care', label: 'Doctors per 1,000 people', level: 'Armenia · marz', dec: 1, yearly: true, rel: 'year',
+    info: 'Physicians per 1,000 residents, by marz (Armstat).' },
 ];
 // where each "calc" data point's numbers are kept in the data file (by marz; "apartments" also by district and town)
 const CALC_KEY = { unemployment: 'unemployment', employment_rate: 'employment_rate', spending: 'spending', houses: 'houses_stock', housing_area: 'housing_area',
@@ -497,8 +507,11 @@ METRICS.push(
   { id: 'rate_eur', group: 'Mortgage rates (nationwide)', label: 'Long-term loan rate in euros (€)', level: 'nationwide', nat: 'loan_eur', unit: '%', rel: 'month',
     info: 'The Central Bank publishes no separate euro mortgage rate. This is the closest official figure: the average rate on new household loans of over 5 years in euros (mostly mortgages). Few such loans are made, so it moves around month to month.' },
 );
-// (a group is listed in the sidebar only if it has an icon here, in this order)
-const GROUP_ICONS = { 'Prices and affordability': 'home', 'Mortgage rates (nationwide)': 'percent', 'Economy and lending (nationwide)': 'bank', 'Market activity': 'activity', 'People and income': 'people', 'Housing': 'building', 'Money from abroad': 'globe', 'Tourism': 'bed' };
+// (a group is listed in the sidebar only if it has an icon here, in this order; which data points go in each group,
+// and their order, is set by SIDEBAR below)
+const GROUP_ICONS = { 'Prices and affordability': 'home', 'Rent and living costs': 'key', 'Mortgages and interest rates': 'percent',
+  'Sales and transactions': 'activity', 'Homes and housing stock': 'building', 'Building and construction': 'tool', 'Population': 'people',
+  'Jobs and income': 'briefcase', 'Schools and health care': 'school', 'Money from abroad': 'globe', 'Economy and currency': 'bank', 'Tourism': 'bed' };
 const ICONS = {
   home: 'M3 11 12 4l9 7M5 10v10h14V10M10 20v-5h4v5',
   trend: 'M3 17l6-6 4 4 8-8M15 7h6v6',
@@ -509,6 +522,10 @@ const ICONS = {
   bank: 'M3 10h18L12 4zM5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18',
   bed: 'M3 19V6M3 15h18v4M21 15v-3a3 3 0 0 0-3-3h-7v6M7 12a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z',
   globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
+  key: 'M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4',
+  tool: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8z',
+  briefcase: 'M3 7h18v13H3zM8 7V4h8v3M3 13h18',
+  school: 'M22 10 12 5 2 10l10 5 10-5zM6 12v5c3 2 9 2 12 0v-5',
 };
 const icon = name => `<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
 const M = Object.fromEntries(METRICS.map(m => [m.id, m]));
@@ -643,8 +660,21 @@ function gapFill(price, area) {
   return out;
 }
 const isZoneMode = () => curLevel() === 'zone' && !!zoneLayer;
+// Does a data point have numbers at a level? The Data list only shows the level you picked. At "Armenia" that is the
+// figures published for the whole country (not ones only published for marzes, districts or towns).
+function metricAt(id, lv) {
+  const m = M[id]; if (!m) return false;
+  if (lv === 'armenia') return !!m.nat || /Armenia|nationwide/.test(m.level || '');
+  return levelsFor(id).includes(lv);
+}
+// Picking a level that lacks the chosen data point switches to one it has (apartment prices where there are any).
+function fitMetricToLevel(lv) {
+  if (metricAt(ui.metric, lv)) return;
+  const m = ['price', 'population', 'apartments'].find(id => metricAt(id, lv)) || (METRICS.find(x => metricAt(x.id, lv)) || {}).id;
+  if (m) { ui.metric = m; ui.zband = null; if (M[m].nat) ui.nat = M[m].nat; }
+}
 function renderLevels() {
-  const ls = levelsFor(ui.metric), cur = curLevel();
+  const ls = ['armenia', 'marz', 'district', 'town', ...(ZONES ? ['zone'] : [])], cur = curLevel();
   document.querySelectorAll('#levels button').forEach(b => {
     const ok = ls.includes(b.dataset.level);
     b.disabled = !ok; b.classList.toggle('on', ok && b.dataset.level === cur);
@@ -661,6 +691,7 @@ function flyToLevel(lv) {
 document.getElementById('levels').addEventListener('click', e => {
   const b = e.target.closest('[data-level]'); if (!b || b.disabled) return;
   ui.level = b.dataset.level; ui.zband = null;
+  fitMetricToLevel(ui.level); renderMetrics();
   if (ui.level === 'armenia') { select('armenia', 'armenia'); flyToLevel('armenia'); return; }   // the whole country: open its panel
   restyle(); refreshDetail(); saveState(); flyToLevel(ui.level);
 });
@@ -817,6 +848,7 @@ function fmtValue(v, metric = ui.metric) {
   if (m.pct) return fmtPct(v);
   if (m.big) { const a = Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + ' bn' : Math.round(v) + ' mln'; return ui.cur === 'USD' ? '$' + a : a + ' ֏'; }   // (kept in millions)
   if (m.money) return fmtMoney(v, ui.cur);
+  if (m.dec != null) return v.toFixed(m.dec);
   if (m.suffix) return fmtInt(v) + m.suffix;
   if (m.unit === '%') return v.toFixed(1) + '%';
   if (m.unit === 'yrs') return v.toFixed(1) + ' years';
@@ -949,6 +981,7 @@ function restyle() {
   else for (const id of Object.keys(D.districts)) vals.push(valueOf('district', id));
   scale = makeScale(vals, ui.metric, zoneMode);
   renderLevels();
+  if (renderMetrics._lv !== curLevel()) renderMetrics();   // the level changed (e.g. a data point picked in the panel): list its data points
   marzLayer.setStyle(f => {
     const id = f.properties.id, sel = ui.sel && ui.sel.kind === 'marz' && ui.sel.id === id;
     // the whole country in one color (grey when the figure isn't published for all of Armenia)
@@ -1158,9 +1191,9 @@ function latestYearLabel(metric) {
 // ---------- sidebar ----------
 // The same collapsible groups as the US map: click a group to open it, pick a data point, "i" explains it.
 function renderMetrics() {
-  const q = $('#dpSearch').value.trim().toLowerCase();
+  const q = $('#dpSearch').value.trim().toLowerCase(), lv = renderMetrics._lv = curLevel();
   const groups = {};
-  for (const m of METRICS) (groups[m.group] ||= []).push(m);
+  for (const m of METRICS) if (metricAt(m.id, lv)) (groups[m.group] ||= []).push(m);
   $('#groups').innerHTML = Object.keys(GROUP_ICONS).filter(g => groups[g]).map(g => [g, groups[g]]).map(([name, ms], gi) => {
     const list = ms.filter(m => !q || m.label.toLowerCase().includes(q) || m.info.toLowerCase().includes(q));
     if (!list.length) return '';
@@ -1369,6 +1402,12 @@ function seriesFor(kind, id, metric, zone) {
       const pop = kind === 'armenia' ? D.national.population?.['2022'] : m.population?.['2022'];
       return { s: pop ? fromUsd(Object.fromEntries(Object.entries(r.fast_in || {}).map(([ym, v]) => [ym, v * 1e6 / pop]))) : {}, marz: marzOnly };
     }
+    // schools and health care per head: counts by marz ÷ that year's population (worked out from pensioners)
+    case 'schools_pc': case 'kinder_pc': case 'beds_pc': case 'doctors_pc': {
+      const sv = m.services || {}, pop = sv.population || {}, per = metric === 'schools_pc' ? 10000 : 1000;
+      const key = { schools_pc: 'schools', kinder_pc: 'kinder_places', beds_pc: 'beds', doctors_pc: 'doctors' }[metric];
+      return { s: yearly(Object.fromEntries(Object.entries(sv[key] || {}).filter(([y]) => pop[y]).map(([y, v]) => [y, v / pop[y] * per]))), marz: kind !== 'marz' && kind !== 'armenia' };
+    }
     // published for the whole country only
     case 'new_apts': case 'new_apt_size': case 'new_bldgs':
       return { s: yearly(D.national[CALC_KEY[metric]]), natOnly: kind !== 'armenia', bars: metric !== 'new_apt_size' };
@@ -1551,6 +1590,10 @@ const NAT = {
   dep_usd: { label: 'Deposit rate in US dollars (up to 1 year)', note: 'Average interest rate on new bank deposits in US dollars for up to 1 year, % a year (Central Bank of Armenia).' },
   dep_usd_long: { label: 'Deposit rate in US dollars (over 1 year)', note: 'Average interest rate on new bank deposits in US dollars for over 1 year, % a year (Central Bank of Armenia).' },
   remit_us: { label: 'Money received from the USA (month)', group: 'Money from abroad', usdNative: true, bars: true, note: 'Money transfers received by individuals from the United States through Armenian banks in the month (Central Bank of Armenia).' },
+  rent_yoy: { label: 'Rent price change (official, year)', yearly: true, note: 'The rent part of Armstat\'s consumer price index: change in rents paid by tenants from the year before, whole country. It mixes regulated rents with market rents and is known to lag the market (Yerevan rents rose far more after 2022), so treat it as a floor, not the market rate. Armenia publishes no rent amounts by area.' },
+  elec: { label: 'Electricity price (per kWh)', yearly: true, note: 'Average price households paid for electricity in the year, drams per kWh, whole country (Armstat consumer-price survey). Tariffs are set by the regulator, so it changes in steps.' },
+  gas: { label: 'Natural gas price (per m³)', yearly: true, note: 'Average price households paid for natural gas in the year, drams per cubic meter, whole country (Armstat consumer-price survey). Tariffs are set by the regulator.' },
+  water: { label: 'Drinking water price (per m³)', yearly: true, note: 'Average price households paid for drinking water in the year, drams per cubic meter, whole country (Armstat consumer-price survey). Tariffs are set by the regulator.' },
 };
 // Every Armenia-overview data point is also in the sidebar ("Economy and lending (nationwide)"); the three
 // mortgage rates already have their own group.
@@ -1560,6 +1603,30 @@ for (const [k, d] of Object.entries(NAT)) {
               rel: d.yearly ? 'year' : 'month', yearly: d.yearly, info: d.note };
   METRICS.push(m);
   M[m.id] = m;
+}
+// The sidebar: each group and its data points in order, so related ones sit next to each other (nationwide
+// figures, "nat_…", beside the local ones they go with)
+const SIDEBAR = {
+  'Prices and affordability': ['price', 'price_real', 'typical', 'typical_real', 'chg12', 'chg1', 'ptoi', 'mtg_pmt', 'mtg_real'],
+  'Rent and living costs': ['nat_rent_yoy', 'nat_reg_rent', 'nat_elec', 'nat_gas', 'nat_water'],
+  'Mortgages and interest rates': ['rate_amd', 'rate_usd', 'rate_eur', 'nat_mortgage', 'nat_amd_share', 'nat_reg_pledge', 'nat_policy',
+    'nat_dep_amd', 'nat_dep_amd_long', 'nat_dep_usd', 'nat_dep_usd_long'],
+  'Sales and transactions': ['sales', 'deals', 'apt_sales', 'house_sales', 'land_sales', 'home_gifts', 'nat_reg_inherit'],
+  'Homes and housing stock': ['apartments', 'apt_chg1', 'apt_chg10', 'apt_size', 'houses', 'housing_area', 'space'],
+  'Building and construction': ['built_total', 'built_yoy', 'built', 'new_apts', 'new_apt_size', 'new_bldgs', 'cons_vol', 'nat_cost_yoy', 'nat_cost_idx'],
+  'Population': ['population', 'nat_pop_year', 'nat_births', 'nat_nat_incr', 'nat_net_mig'],
+  'Jobs and income': ['wage', 'spending', 'poverty', 'unemployment', 'employment_rate', 'participation', 'nat_vacancies', 'nat_vac_ratio'],
+  'Schools and health care': ['schools_pc', 'kinder_pc', 'beds_pc', 'doctors_pc'],
+  'Money from abroad': ['remit_in', 'remit_net', 'remit_fast', 'remit_pp', 'nat_remit_ru', 'nat_remit_us'],
+  'Economy and currency': ['nat_inflation', 'nat_econ_yoy', 'nat_usd', 'nat_eur', 'nat_rub', 'nat_m2', 'nat_m2_yoy'],
+  'Tourism': ['hotels', 'hotel_rev'],
+};
+{
+  const order = {};
+  for (const [g, ids] of Object.entries(SIDEBAR)) for (const id of ids) if (M[id]) { M[id].group = g; order[id] = Object.keys(order).length; }
+  METRICS.sort((a, b) => (order[a.id] ?? 1e6) - (order[b.id] ?? 1e6));   // (anything not listed keeps its group, at the end)
+  // whole-country copies of data points that already show Armenia as a whole stay reachable (old links) but not listed
+  for (const id of ['nat_sales', 'nat_deals', 'nat_house_sales']) { const i = METRICS.findIndex(m => m.id === id); if (i >= 0) METRICS.splice(i, 1); }
 }
 function natSeries(k) {
   const n = D.national;
@@ -1602,6 +1669,9 @@ function natSeries(k) {
     case 'vacancies': return yearly(n.vacancies?.count);
     case 'vac_ratio': return yearly(n.vacancies?.ratio);
     case 'econ_yoy': return n.econ_activity || {};
+    case 'rent_yoy': return yearly(n.living_prices?.rent_yoy);
+    case 'elec': return yearly(n.living_prices?.electricity);
+    case 'gas': case 'water': return yearly(n.living_prices?.[k]);
     case 'dep_amd': case 'dep_usd': case 'dep_amd_long': case 'dep_usd_long': return Object.fromEntries(Object.entries((n.deposit_rate || {})[k.slice(4)] || {}).filter(([m]) => m >= '2005'));
   }
   return {};
@@ -1615,7 +1685,8 @@ function natFmt(k, v) {
   if (k === 'amd_share' || k === 'policy') return v.toFixed(k === 'policy' ? 2 : 0) + '%';
   if (k === 'inflation' || k.startsWith('rppi_')) return fmtPct(v);
   if (k === 'usd' || k === 'eur' || k === 'rub') return v.toFixed(2) + ' ֏';
-  if (k === 'cost_yoy' || k === 'econ_yoy') return fmtPct(v);
+  if (k === 'cost_yoy' || k === 'econ_yoy' || k === 'rent_yoy') return fmtPct(v);
+  if (k === 'elec' || k === 'gas' || k === 'water') return (v % 1 ? v.toFixed(1) : v) + ' ֏';
   if (k.startsWith('dep_')) return v.toFixed(2) + '%';
   if (k === 'vac_ratio') return v.toFixed(1) + '%';
   if (k === 'cost_idx') return v.toFixed(1);
@@ -1638,7 +1709,7 @@ function renderNational() {
       return `<button type="button" class="kpi ${x === k ? 'on' : ''}" data-nat="${x}"><span>${esc(d.label)}</span><b>${esc(natFmt(x, kx ? sx[kx] : null))}</b><small>${kx ? esc(d.yearly ? kx.slice(0, 4) : monthLabel(kx)) : ''}</small></button>`;
     }).join('')}</div>
     <h4 class="snap-h">Earthquake risk</h4><p class="note">All of Armenia is rated <b>high</b> for earthquake hazard (<a href="https://thinkhazard.org/en/report/13-armenia" target="_blank" rel="noopener">ThinkHazard!</a>, <a href="https://www.globalquakemodel.org/product/global-seismic-hazard-map" target="_blank" rel="noopener">GEM hazard map</a>). Building age and construction matter a lot; ask for a building's seismic assessment before buying.</p>
-    <h4 class="snap-h">Rents</h4><p class="note">Armenia publishes no official rent figures by area, so this map does not show rents.</p>`;
+    <h4 class="snap-h">Rents</h4><p class="note">Armenia publishes no official rent amounts by area, so this map does not show rents by place. The only official measure is the yearly rent price change for the whole country (in the list above), which lags the market.</p>`;
   h += sourceNote();
   $('#dBody').innerHTML = h;
   wireCharts();
@@ -1819,7 +1890,7 @@ function sourceOf(id) {
   const s = new Set();
   if (['price', 'typical', 'mtg_pmt', 'ptoi', 'chg12', 'chg1', 'deals', 'sales'].includes(base)) s.add('Cadastre Committee of Armenia');
   if (FAIR_LINE.includes(base) && ui.showFair !== false) s.add('fair value: wages from Armstat');
-  const ARMSTAT_NAT = ['inflation', 'cost_yoy', 'cost_idx', 'pop_year', 'net_mig', 'reg_rent', 'reg_pledge', 'reg_inherit', 'births', 'nat_incr', 'vacancies', 'vac_ratio', 'econ_yoy'];
+  const ARMSTAT_NAT = ['inflation', 'cost_yoy', 'cost_idx', 'pop_year', 'net_mig', 'reg_rent', 'reg_pledge', 'reg_inherit', 'births', 'nat_incr', 'vacancies', 'vac_ratio', 'econ_yoy', 'rent_yoy', 'elec', 'gas', 'water'];
   if (['mtg_pmt', 'rate_amd', 'rate_usd', 'rate_eur'].includes(base) || m.usdNative || (m.nat && !ARMSTAT_NAT.includes(m.nat))) s.add('Central Bank of Armenia');
   if (['ptoi', 'wage', 'poverty', 'population', 'space', 'built', 'built_total', 'built_yoy', 'house_sales', 'apt_sales'].includes(base) || (m.calc && !m.usdNative) || ARMSTAT_NAT.includes(m.nat)) s.add('Armstat');
   if (m.real) s.add(ui.cur === 'USD' ? 'US inflation: BLS' : 'inflation: Armstat');
