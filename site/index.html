@@ -2159,8 +2159,15 @@ function exportChart() {
   let src = new XMLSerializer().serializeToString(svg).replace(/var\((--[\w-]+)\)/g, (_, v) => cs.getPropertyValue(v).trim() || '#111827');
   if (!/xmlns="http:\/\/www\.w3\.org\/2000\/svg"/.test(src)) src = src.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
   src = src.replace('<svg', '<svg font-family="Segoe UI, Helvetica, Arial, sans-serif"'); // web fonts can't load inside an image
-  const vb = svg.viewBox.baseVal, W = vb.width, H = vb.height, TOP = 70, BOTTOM = 40, S = 2;
+  const vb = svg.viewBox.baseVal, W = vb.width, H = vb.height, TOP = 70, S = 2;
   const font = '"Inter", "Segoe UI", system-ui, sans-serif';
+  // The source wraps onto as many lines as it needs; the site's name gets a line of its own below it, so it is always readable.
+  const sourceLine = `Source: ${sourceText(k, keys)}${svg.dataset.cpi ? ' · Inflation: U.S. Bureau of Labor Statistics (CPI)' : ''}${svg.dataset.vals2 && overlayKey ? ` · ${sourceParts(overlayKey).name}` : ''}`;
+  const meas = document.createElement('canvas').getContext('2d'); meas.font = `11px ${font}`;
+  const srcLines = []; let line = '';
+  for (const w of sourceLine.split(' ')) { const t = line ? line + ' ' + w : w; if (meas.measureText(t).width > W - 36 && line) { srcLines.push(line); line = w; } else line = t; }
+  if (line) srcLines.push(line);
+  const BOTTOM = 12 + srcLines.length * 15 + 34;
   const img = new Image();
   img.onload = () => {
     const c = document.createElement('canvas');
@@ -2173,9 +2180,11 @@ function exportChart() {
     g.fillText(`${M[k].l}${svg.dataset.vals2 && overlayKey ? ` vs ${M[overlayKey].l}` : ''} · ${ymLabel(keys[0])} – ${ymLabel(keys[keys.length - 1])}`, 18, 54);
     g.drawImage(img, 0, TOP, W, H);
     g.fillStyle = '#6b7280'; g.font = `11px ${font}`;
-    g.fillText(`Source: ${sourceText(k, keys)}${svg.dataset.cpi ? ' · Inflation: U.S. Bureau of Labor Statistics (CPI)' : ''}${svg.dataset.vals2 && overlayKey ? ` · ${sourceParts(overlayKey).name}` : ''}`, 18, TOP + H + 18);
-    g.fillStyle = '#1e40af'; g.font = `600 11px ${font}`;
-    g.textAlign = 'right'; g.fillText('Open Housing Atlas · openhousingatlas.com', W - 18, TOP + H + 18);
+    let y = TOP + H + 18;
+    for (const l of srcLines) { g.fillText(l, 18, y); y += 15; }
+    g.strokeStyle = '#e5e7eb'; g.beginPath(); g.moveTo(18, y - 4); g.lineTo(W - 18, y - 4); g.stroke();
+    g.fillStyle = '#1e40af'; g.font = `700 13px ${font}`;
+    g.fillText('Open Housing Atlas · openhousingatlas.com', 18, y + 15);
     c.toBlob(blob => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
