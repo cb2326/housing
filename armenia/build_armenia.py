@@ -551,7 +551,8 @@ def update_armstat():
               "district_apartments", "inflation", "cpi_index", "unemployment", "employment_rate", "spending", "new_apartments",
               "new_apartment_size", "new_buildings", "apartments_stock", "houses_stock", "housing_area", "hotels", "hotel_revenue",
               "town_apartments", "town_apartment_area", "construction_volume", "construction_cost", "population_year", "migration",
-              "census_homes", "participation", "registrations", "land_sales", "home_gifts", "births", "vacancies", "econ_activity")
+              "census_homes", "participation", "registrations", "land_sales", "home_gifts", "births", "vacancies", "econ_activity",
+              "living_prices", "services")
     # refresh weekly, or at once when a table was added since the last download
     if saved.get("fetched") and (dt.date.today() - dt.date.fromisoformat(saved["fetched"])).days < 7 and all(k in saved for k in needed) \
             and "armenia" in saved.get("wage", {}):   # (re-download once to add the national wage)
@@ -887,6 +888,74 @@ def update_armstat():
         for k in ("births", "vacancies", "econ_activity"):
             if k in saved:
                 out[k] = saved[k]
+    # Average prices paid in the year, whole country (drams; Armstat's consumer-price survey): electricity per kWh,
+    # natural gas per m³, drinking water per m³; and the rent part of the consumer price index (% change on the year
+    # before). (Armstat's "average rent per m²" is the regulated rent of state-owned flats, 17 ֏ for decades, so it
+    # is left out.)
+    try:
+        items = {"Electricity supply (kWt/hour)": "electricity", "Natural gas (m3)": "gas", "Drinking water (m3)": "water"}
+        lp = {}
+        for r in px_table("1 Econnomy and finance/12 Consumer Prices/1.2.4 Average annual prices/EF-CPI-av.px",
+                          lambda c, t: c != "items" or t.strip() in items):
+            y = year_of(r.get("year") or r.get("years") or "")
+            if y and r["value"] > 0:
+                lp.setdefault(items[r["items"].strip()], {})[y] = round(r["value"], 2)
+        if len(lp) < 3:
+            raise ValueError(f"only {sorted(lp)} found")
+        for r in px_table("1 Econnomy and finance/12 Consumer Prices/1.2.2 Annual indicators/EF-cpi-ai2.px",
+                          lambda c, t: c != "name of group" or t.startswith("04.1.1")):
+            y = year_of(r["years"])
+            if y:
+                lp.setdefault("rent_yoy", {})[y] = round(r["value"] - 100, 1)
+        out["living_prices"] = {k: dict(sorted(v.items())) for k, v in lp.items()}
+        print(f"Armstat electricity {max(lp['electricity'])}: {lp['electricity'][max(lp['electricity'])]} AMD/kWh; rent change {lp.get('rent_yoy', {})}")
+    except Exception as e:
+        notice(f"Armenia: Armstat average rent/utility prices failed: {e}")
+        if "living_prices" in saved:
+            out["living_prices"] = saved["living_prices"]
+    # Schools, kindergartens, hospital beds and doctors by marz (Armstat, yearly), and each marz's population worked
+    # out from its pensioners (number ÷ pensioners per 1,000 people), since Armstat has no yearly population by marz
+    try:
+        def marz_ind(path, keep, code="indicators", need=12):
+            vals = {}
+            for r in px_table(path, lambda c, t: c not in (code, "type of pension") or t.strip() in keep):
+                label = r["marzes"].strip()
+                mid = "armenia" if label.lower() == "total ra" else marz_from_english(label)
+                y = year_of(r["years"])
+                if mid and y:
+                    vals.setdefault(mid, {})[y] = vals.get(mid, {}).get(y, 0) + r["value"]
+            if len(vals) < need:
+                raise ValueError(f"only {len(vals)} areas in {path}")
+            return vals
+        E = P + "22 Education/"
+        H = P + "24 Social issues/"
+        st = marz_ind(E + "222 General education institutions/ps-ed-gei01.px", ("Number of schools, total",))
+        ns = marz_ind(E + "222 General education institutions/ps-ed-gei02.px", ("Number of schools, total",), need=1)   # (private: not in every marz)
+        kp = marz_ind(E + "221 Preschool institutions/PS-ed-pi01.px", ("Number of places in institutions",))
+        kn = marz_ind(E + "221 Preschool institutions/PS-ed-pi02.px", ("Number of places in institutions",), need=1)
+        beds = marz_ind(H + "2401-si-hms/ps-si-hms33.px", ("Number of hospital beds",))
+        docs = marz_ind(H + "2401-si-hms/ps-si-hms33.px", ("Number of physicians",))
+        pens = marz_ind(H + "2405-si-pasp/ps-si-pasp01.px", ("Number of pensioners, total", "Total"))
+        per = {}
+        for r in px_table(H + "2405-si-pasp/ps-si-pasp02.px", lambda c, t: True):
+            label = r["marzes"].strip()
+            mid = "armenia" if label.lower() == "total ra" else marz_from_english(label)
+            y = year_of(r["years"])
+            if mid and y and r["value"] > 0:
+                per.setdefault(mid, {})[y] = r["value"]
+        add = lambda a, b: {m: {y: round(a[m].get(y, 0) + b.get(m, {}).get(y, 0)) for y in a[m]} for m in a}
+        pop = {m: {y: round(pens[m][y] / per[m][y] * 1000) for y in pens[m] if per.get(m, {}).get(y)} for m in pens}
+        out["services"] = {m: {"schools": add(st, ns)[m], "kinder_places": add(kp, kn)[m],
+                               "beds": {y: round(v) for y, v in beds.get(m, {}).items()},
+                               "doctors": {y: round(v) for y, v in docs.get(m, {}).items()},
+                               "population": pop.get(m, {})} for m in st}
+        a = out["services"]["armenia"]
+        print(f"Armstat services {max(a['beds'])}: {a['schools'][max(a['schools'])]:,} schools, {a['beds'][max(a['beds'])]:,} hospital beds; "
+              f"population (from pensioners) {max(a['population'])}: {a['population'][max(a['population'])]:,}")
+    except Exception as e:
+        notice(f"Armenia: Armstat schools/health tables failed: {e}")
+        if "services" in saved:
+            out["services"] = saved["services"]
     for k in ("apartments_stock", "district_apartments", "town_apartments", "town_apartment_area"):
         if k in out:
             out[k] = drop_incomplete_years(out[k], k)
@@ -1363,7 +1432,7 @@ def update_cba():
 # the newer marz data (Armstat), passed through to the map for each marz and for the whole country
 MARZ_EXTRA = ("unemployment", "employment_rate", "spending", "new_apartments", "new_apartment_size", "new_buildings",
               "apartments_stock", "houses_stock", "housing_area", "hotels", "hotel_revenue", "construction_volume",
-              "participation", "land_sales", "home_gifts")
+              "participation", "land_sales", "home_gifts", "services")
 
 def build(max_reports):
     OUT.mkdir(parents=True, exist_ok=True)
@@ -1420,6 +1489,7 @@ def build(max_reports):
         "migration": armstat.get("migration", {}), "census_homes": armstat.get("census_homes", {}),
         "registrations": armstat.get("registrations", {}), "births": armstat.get("births", {}), "vacancies": armstat.get("vacancies", {}),
         "econ_activity": armstat.get("econ_activity", {}), "deposit_rate": cba.get("deposit_rate", {}),
+        "living_prices": armstat.get("living_prices", {}),
         "deals": series.get("marz_deals", {}).get("armenia", {}), "sales": series.get("marz_sales", {}).get("armenia", {}),
         **{k: armstat.get(k, {}).get("armenia", {}) for k in ("poverty", "wage", "space_per_person", "new_housing_m2", "population", "house_sales", "apartment_sales", *MARZ_EXTRA)},
     }
